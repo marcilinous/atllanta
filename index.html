@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Atllanta — Hiring, matched.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="auth-screen" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="brand-mark">A</div>
+    <h1 class="auth-title">Atllanta</h1>
+    <p class="auth-sub">Resume-to-JD matching, scheduling and outreach — one login for your whole hiring desk.</p>
+    <form id="login-form" class="auth-form">
+      <label>Email
+        <input type="email" id="login-email" autocomplete="email" required placeholder="you@company.com" />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign in</button>
+      <p id="login-error" class="form-error hidden"></p>
+    </form>
+    <p class="auth-foot">No account yet? Ask your org admin for an invite.</p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app-shell" class="app-shell hidden">
+
+  <nav class="rail" aria-label="Main navigation">
+    <div class="rail-profile" id="rail-profile" title="Account">
+      <div class="avatar" id="user-avatar">?</div>
+      <div class="rail-menu" id="profile-menu">
+        <div class="rail-menu-head">
+          <strong id="menu-email">—</strong>
+          <span id="menu-org">—</span>
+        </div>
+        <button id="logout-btn" class="rail-menu-item">Sign out</button>
+      </div>
+    </div>
+
+    <div class="rail-nav">
+      <button class="rail-btn active" data-view="jobs" aria-label="Jobs">
+        <svg viewBox="0 0 24 24"><path d="M9 6V5a3 3 0 0 1 6 0v1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1h4Zm2 0h2V5a1 1 0 0 0-2 0v1Z"/></svg>
+        <span class="tip">Jobs</span>
+      </button>
+      <button class="rail-btn" data-view="candidates" aria-label="Candidates">
+        <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.9 0-7 1.9-7 4.5V20h14v-1.5c0-2.6-3.1-4.5-7-4.5Z"/></svg>
+        <span class="tip">Candidates</span>
+      </button>
+      <button class="rail-btn" data-view="interviews" aria-label="Interviews">
+        <svg viewBox="0 0 24 24"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5l-4 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 5h8v2H8V9Z"/></svg>
+        <span class="tip">Interviews</span>
+      </button>
+      <button class="rail-btn" data-view="chat" aria-label="Chat">
+        <svg viewBox="0 0 24 24"><path d="M12 3C7 3 3 6.6 3 11c0 2.1.9 4 2.4 5.4L4 21l4.8-1.6c1 .4 2.1.6 3.2.6 5 0 9-3.6 9-8s-4-9-9-9Z"/></svg>
+        <span class="tip">Chat</span>
+      </button>
+      <button class="rail-btn" data-view="rescore" aria-label="Re-score">
+        <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z"/></svg>
+        <span class="tip">Re-score</span>
+      </button>
+      <button class="rail-btn" data-view="analytics" aria-label="Analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10h3v10H4Zm6.5 0V4h3v16h-3ZM17 20v-7h3v7h-3Z"/></svg>
+        <span class="tip">Analytics</span>
+      </button>
+    </div>
+
+    <div class="rail-foot">
+      <div class="credits-pill" id="credits-pill" title="Credits remaining">
+        <span id="credits-count">—</span>
+        <span class="tip">Credits remaining</span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="workspace">
+    <header class="topbar">
+      <h2 id="view-title" class="view-title">Jobs</h2>
+      <div class="topbar-right">
+        <select id="client-switcher" class="select" title="Client company"></select>
+      </div>
+    </header>
+
+    <section id="view-root" class="view-root">
+      <!-- views render here -->
+    </section>
+  </main>
+</div>
+
+<!-- generic modal -->
+<div id="modal-backdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h3 id="modal-title">—</h3>
+      <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="/js/config.js"></script>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
