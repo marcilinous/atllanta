@@ -68,8 +68,12 @@ function openModal(title, bodyNode) {
   body.innerHTML = "";
   body.appendChild(bodyNode);
   $("#modal-backdrop").classList.remove("hidden");
+  document.body.classList.add("modal-open");
 }
-function closeModal() { $("#modal-backdrop").classList.add("hidden"); }
+function closeModal() {
+  $("#modal-backdrop").classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
 $("#modal-close").addEventListener("click", closeModal);
 $("#modal-backdrop").addEventListener("click", (e) => {
   if (e.target.id === "modal-backdrop") closeModal();
@@ -732,77 +736,80 @@ async function screenJob(jobId) {
   if (!job) return;
 
   const jobApps = S.cache.applications.filter((a) => a.job_id === jobId);
+  const unscoredCount = jobApps.filter((a) => a.match_score == null).length;
   const attachedCandIds = new Set(jobApps.map((a) => a.candidate_id));
   const poolCands = S.cache.candidates
     .filter((c) => !attachedCandIds.has(c.id) && c.resume_raw_text)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const creditsBalance = S.org?.credits_balance ?? 0;
 
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
+  function renderItem(id, cls, name, sub, scoreHtml, created, checked) {
+    return `<label class="sc-item">
+      <input type="checkbox" value="${id}" class="${cls}" data-created="${created}" ${checked ? "checked" : ""} />
+      <div class="av" style="background:${avColor(name)};width:26px;height:26px;font-size:9px;border-radius:7px">${initials(name)}</div>
+      <div class="sc-item-info"><div class="sc-item-name">${esc(name)}</div><div class="sc-item-sub">${esc(sub)}</div></div>
+      ${scoreHtml ? `<div class="sc-item-score">${scoreHtml}</div>` : ""}
+    </label>`;
+  }
+
   const f = el("div", "form-grid");
   f.innerHTML = `
-    <p style="font-size:13px;color:var(--grey);margin-bottom:4px">
-      <strong>${esc(job.title)}</strong> — ${jobApps.length} candidate${jobApps.length !== 1 ? "s" : ""} attached
-    </p>
+    <div class="sc-summary">
+      <div class="sc-stat"><div class="n">${jobApps.length}</div><div class="l">In pipeline</div></div>
+      <div class="sc-stat"><div class="n">${unscoredCount}</div><div class="l">Unscored</div></div>
+      <div class="sc-stat"><div class="n" id="sc-sel-count">0</div><div class="l">Selected</div></div>
+      <div class="sc-stat"><div class="n" id="sc-credit-cost">0</div><div class="l">Credits cost</div></div>
+      <div class="sc-stat"><div class="n">${creditsBalance}</div><div class="l">Balance</div></div>
+    </div>
 
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px">
-      <label style="flex:1;min-width:120px;font-size:12px;font-weight:600;color:var(--grey)">From date
-        <input type="date" id="sc-from" class="input" value="${weekAgo}" style="font-size:12.5px;padding:5px 8px" />
-      </label>
-      <label style="flex:1;min-width:120px;font-size:12px;font-weight:600;color:var(--grey)">To date
-        <input type="date" id="sc-to" class="input" value="${today}" style="font-size:12.5px;padding:5px 8px" />
-      </label>
-      <button class="btn btn-outline btn-sm" id="sc-apply-dates" style="font-size:11px;padding:5px 10px;white-space:nowrap">Apply dates</button>
+    <div class="sc-filters">
+      <label>From <input type="date" id="sc-from" class="input" value="${weekAgo}" /></label>
+      <label>To <input type="date" id="sc-to" class="input" value="${today}" /></label>
+      <button class="btn btn-outline btn-sm" id="sc-apply-dates" style="padding:5px 10px;white-space:nowrap;font-size:11px">Apply</button>
     </div>
 
     ${jobApps.length ? `
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
-        <strong style="font-size:12.5px">Candidates</strong>
+      <div class="sc-toolbar">
+        <strong>Candidates (${jobApps.length})</strong>
+        <input type="text" id="sc-search" class="input" placeholder="Search…" style="flex:1;min-width:80px;padding:4px 8px;font-size:12px" />
         <button class="btn btn-outline btn-sm" id="sc-sel-unscored" style="font-size:11px;padding:2px 8px">Unscored</button>
         <button class="btn btn-outline btn-sm" id="sc-sel-all" style="font-size:11px;padding:2px 8px">All</button>
         <button class="btn btn-outline btn-sm" id="sc-sel-none" style="font-size:11px;padding:2px 8px">Clear</button>
       </div>
-      <div id="sc-cand-list" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:4px">
+      <div class="sc-list" id="sc-cand-list">
         ${jobApps.map((a) => {
           const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
           const added = c?.created_at ? new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
-          return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
-            <input type="checkbox" value="${a.id}" class="sc-check" data-created="${c?.created_at || ""}" ${a.match_score == null ? "checked" : ""} />
-            <div class="av" style="background:${avColor(c?.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c?.name)}</div>
-            <div style="flex:1;min-width:0;overflow:hidden"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c?.name || "Unknown")}</div><div style="font-size:11px;color:var(--grey)">${added}</div></div>
-            <div style="flex-shrink:0">${scoreBar(a.match_score)}</div>
-          </label>`;
+          return renderItem(a.id, "sc-check", c?.name || "Unknown", (c?.email || "") + (added ? " · " + added : ""), scoreBar(a.match_score), c?.created_at || "", a.match_score == null);
         }).join("")}
       </div>
-    ` : `<p style="color:var(--grey);font-size:13px">No candidates attached yet. Upload resumes or add from pool below.</p>`}
+    ` : `<p style="color:var(--grey);font-size:13px">No candidates attached. Upload resumes or add from pool below.</p>`}
+
     ${poolCands.length ? `
-      <div style="border-top:1px solid var(--line2);padding-top:10px;margin-top:2px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <strong style="font-size:12.5px">Add from pool</strong>
-          <button class="btn btn-outline btn-sm" id="sc-pool-all" style="font-size:11px;padding:2px 8px">Select all</button>
-        </div>
-        <div id="sc-pool-list" style="max-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:4px">
-          ${poolCands.slice(0, 50).map((c) => {
-            const added = new Date(c.created_at);
-            const dateStr = added.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-            return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
-              <input type="checkbox" value="${c.id}" class="sc-pool-check" data-created="${c.created_at || ""}" />
-              <div class="av" style="background:${avColor(c.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c.name)}</div>
-              <div style="flex:1;min-width:0;overflow:hidden"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div><div style="font-size:11px;color:var(--grey)">${esc(c.email || "")} · ${dateStr}</div></div>
-            </label>`;
-          }).join("")}
-        </div>
+      <div class="sc-toolbar" style="border-top:1px solid var(--line2);padding-top:10px;margin-top:4px">
+        <strong>From pool (${poolCands.length})</strong>
+        <input type="text" id="sc-pool-search" class="input" placeholder="Search…" style="flex:1;min-width:80px;padding:4px 8px;font-size:12px" />
+        <button class="btn btn-outline btn-sm" id="sc-pool-all" style="font-size:11px;padding:2px 8px">Select all</button>
+      </div>
+      <div class="sc-list" id="sc-pool-list">
+        ${poolCands.slice(0, 200).map((c) => {
+          const dateStr = new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+          return renderItem(c.id, "sc-pool-check", c.name, (c.email || "") + " · " + dateStr, "", c.created_at || "", false);
+        }).join("")}
       </div>
     ` : ""}
-    <div style="display:flex;gap:8px;margin-top:6px">
+
+    <div class="sc-actions">
       <button class="btn btn-outline" id="sc-upload" style="flex:1">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload resumes
       </button>
       <button class="btn btn-amber" id="sc-start" style="flex:1">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Screen selected
+        Screen selected (<span id="sc-start-count">0</span>)
       </button>
     </div>
     <div id="sc-progress" class="hidden">
@@ -812,7 +819,43 @@ async function screenJob(jobId) {
       </div>
       <div id="sc-log" style="max-height:180px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:4px"></div>
     </div>`;
-  openModal("Screen candidates", f);
+  openModal("Screen — " + job.title, f);
+
+  function updateCounts() {
+    const count = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
+    f.querySelector("#sc-sel-count").textContent = count;
+    f.querySelector("#sc-credit-cost").textContent = count;
+    f.querySelector("#sc-start-count").textContent = count;
+  }
+  updateCounts();
+
+  f.addEventListener("change", (e) => {
+    if (e.target.classList.contains("sc-check") || e.target.classList.contains("sc-pool-check")) updateCounts();
+  });
+
+  const searchInput = f.querySelector("#sc-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.toLowerCase();
+      f.querySelectorAll("#sc-cand-list .sc-item").forEach((item) => {
+        const name = item.querySelector(".sc-item-name")?.textContent?.toLowerCase() || "";
+        const sub = item.querySelector(".sc-item-sub")?.textContent?.toLowerCase() || "";
+        item.style.display = (!q || name.includes(q) || sub.includes(q)) ? "" : "none";
+      });
+    });
+  }
+
+  const poolSearch = f.querySelector("#sc-pool-search");
+  if (poolSearch) {
+    poolSearch.addEventListener("input", () => {
+      const q = poolSearch.value.toLowerCase();
+      f.querySelectorAll("#sc-pool-list .sc-item").forEach((item) => {
+        const name = item.querySelector(".sc-item-name")?.textContent?.toLowerCase() || "";
+        const sub = item.querySelector(".sc-item-sub")?.textContent?.toLowerCase() || "";
+        item.style.display = (!q || name.includes(q) || sub.includes(q)) ? "" : "none";
+      });
+    });
+  }
 
   f.querySelector("#sc-apply-dates").onclick = () => {
     const from = f.querySelector("#sc-from").value;
@@ -820,18 +863,12 @@ async function screenJob(jobId) {
     if (!from || !to) return toast("Select both dates");
     const fromDate = new Date(from + "T00:00:00");
     const toDate = new Date(to + "T23:59:59");
-
-    f.querySelectorAll(".sc-check").forEach((cb) => {
+    f.querySelectorAll(".sc-check, .sc-pool-check").forEach((cb) => {
+      if (cb.closest(".sc-item").style.display === "none") return;
       const created = cb.dataset.created ? new Date(cb.dataset.created) : null;
       cb.checked = created ? created >= fromDate && created <= toDate : false;
     });
-    f.querySelectorAll(".sc-pool-check").forEach((cb) => {
-      const created = cb.dataset.created ? new Date(cb.dataset.created) : null;
-      cb.checked = created ? created >= fromDate && created <= toDate : false;
-    });
-
-    const checkedCount = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
-    toast(`${checkedCount} candidate${checkedCount !== 1 ? "s" : ""} selected in date range`);
+    updateCounts();
   };
 
   const candList = f.querySelector("#sc-cand-list");
@@ -841,25 +878,22 @@ async function screenJob(jobId) {
         const app = jobApps.find((a) => a.id === cb.value);
         cb.checked = app?.match_score == null;
       });
+      updateCounts();
     };
-    f.querySelector("#sc-sel-all").onclick = () => candList.querySelectorAll(".sc-check").forEach((cb) => { cb.checked = true; });
-    f.querySelector("#sc-sel-none").onclick = () => candList.querySelectorAll(".sc-check").forEach((cb) => { cb.checked = false; });
+    f.querySelector("#sc-sel-all").onclick = () => { candList.querySelectorAll(".sc-check").forEach((cb) => { cb.checked = true; }); updateCounts(); };
+    f.querySelector("#sc-sel-none").onclick = () => { candList.querySelectorAll(".sc-check").forEach((cb) => { cb.checked = false; }); updateCounts(); };
   }
 
   const poolAllBtn = f.querySelector("#sc-pool-all");
   if (poolAllBtn) {
-    poolAllBtn.onclick = () => f.querySelectorAll(".sc-pool-check").forEach((cb) => { cb.checked = true; });
+    poolAllBtn.onclick = () => { f.querySelectorAll(".sc-pool-check").forEach((cb) => { cb.checked = true; }); updateCounts(); };
   }
 
-  f.querySelector("#sc-upload").onclick = () => {
-    closeModal();
-    bulkUploadForm(jobId);
-  };
+  f.querySelector("#sc-upload").onclick = () => { closeModal(); bulkUploadForm(jobId); };
 
   f.querySelector("#sc-start").onclick = async () => {
     const selectedAppIds = Array.from(f.querySelectorAll(".sc-check:checked")).map((cb) => cb.value);
     const selectedPoolIds = Array.from(f.querySelectorAll(".sc-pool-check:checked")).map((cb) => cb.value);
-
     if (!selectedAppIds.length && !selectedPoolIds.length) return toast("Select at least one candidate");
 
     const startBtn = f.querySelector("#sc-start");
@@ -878,7 +912,7 @@ async function screenJob(jobId) {
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` };
 
       if (selectedPoolIds.length) {
-        label.textContent = `Adding ${selectedPoolIds.length} candidate${selectedPoolIds.length !== 1 ? "s" : ""} from pool…`;
+        label.textContent = `Adding ${selectedPoolIds.length} from pool…`;
         for (const candId of selectedPoolIds) {
           const { data: app, error } = await sb.from("applications").insert({ job_id: jobId, candidate_id: candId }).select().single();
           if (!error && app) selectedAppIds.push(app.id);
@@ -898,7 +932,6 @@ async function screenJob(jobId) {
       fill.style.width = "100%";
       const scored = data.results.filter((r) => r.score != null).length;
       label.textContent = `Done — ${scored} scored, ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`;
-
       if (data.credits_remaining != null) $("#credits-count").textContent = data.credits_remaining;
 
       data.results.forEach((r) => {
@@ -908,7 +941,6 @@ async function screenJob(jobId) {
           : `<span style="color:var(--red)">&#10007;</span> ${esc(r.candidate_name)} — ${esc(r.error || "skipped")}`;
         log.appendChild(entry);
       });
-
       if (!data.results.length) log.innerHTML = `<div style="color:var(--grey)">No candidates to screen.</div>`;
       toast(`Screening complete — ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`);
     } catch (err) {
