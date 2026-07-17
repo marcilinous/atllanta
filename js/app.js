@@ -773,6 +773,15 @@ async function screenJob(jobId) {
       <button class="btn btn-outline btn-sm" id="sc-apply-dates" style="padding:5px 10px;white-space:nowrap;font-size:11px">Apply</button>
     </div>
 
+    <div class="sc-method">
+      <span style="font-size:12px;font-weight:600;color:var(--grey)">Method</span>
+      <div class="sc-toggle">
+        <button class="sc-toggle-btn active" data-method="ai">AI</button>
+        <button class="sc-toggle-btn" data-method="python">Python</button>
+      </div>
+      <span class="sc-method-hint" id="sc-method-hint">1 credit per candidate</span>
+    </div>
+
     ${jobApps.length ? `
       <div class="sc-toolbar">
         <strong>Candidates (${jobApps.length})</strong>
@@ -824,16 +833,28 @@ async function screenJob(jobId) {
     </div>`;
   openModal("Screen — " + job.title, f, { scrollList: true });
 
+  let screenMethod = "ai";
+
   function updateCounts() {
     const count = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
     f.querySelector("#sc-sel-count").textContent = count;
-    f.querySelector("#sc-credit-cost").textContent = count;
+    f.querySelector("#sc-credit-cost").textContent = screenMethod === "ai" ? count : 0;
     f.querySelector("#sc-start-count").textContent = count;
   }
   updateCounts();
 
   f.addEventListener("change", (e) => {
     if (e.target.classList.contains("sc-check") || e.target.classList.contains("sc-pool-check")) updateCounts();
+  });
+
+  f.querySelectorAll(".sc-toggle-btn").forEach((btn) => {
+    btn.onclick = () => {
+      f.querySelectorAll(".sc-toggle-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      screenMethod = btn.dataset.method;
+      f.querySelector("#sc-method-hint").textContent = screenMethod === "ai" ? "1 credit per candidate" : "Free — no credits used";
+      updateCounts();
+    };
   });
 
   const searchInput = f.querySelector("#sc-search");
@@ -927,7 +948,7 @@ async function screenJob(jobId) {
 
       const resp = await fetch("/api/screen-job", {
         method: "POST", headers,
-        body: JSON.stringify({ job_id: jobId, mode: "all", application_ids: selectedAppIds }),
+        body: JSON.stringify({ job_id: jobId, mode: "all", application_ids: selectedAppIds, method: screenMethod }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Screening failed");

@@ -527,6 +527,21 @@ body.modal-open { overflow: hidden; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sc-item-score { flex-shrink: 0; justify-self: end; }
+.sc-method {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-shrink: 0;
+}
+.sc-method-hint { font-size: 11px; color: var(--grey); }
+.sc-toggle {
+  display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--line2);
+}
+.sc-toggle-btn {
+  padding: 4px 14px; font-size: 12px; font-weight: 600; border: none;
+  background: none; cursor: pointer; color: var(--grey); transition: all .15s;
+}
+.sc-toggle-btn.active {
+  background: var(--ink); color: var(--white); border-radius: 7px;
+}
 .sc-actions { display: flex; gap: 8px; margin-top: 10px; flex-shrink: 0; }
 
 /* ── Toast ─────────────────────────────────── */
