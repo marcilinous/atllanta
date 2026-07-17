@@ -491,13 +491,13 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 body.modal-open { overflow: hidden; }
 
 /* ── Screen candidate list ────────────────── */
-.sc-summary { display: flex; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; flex-shrink: 0; }
+.sc-summary { display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; flex-shrink: 0; }
 .sc-stat {
-  flex: 1; min-width: 80px; text-align: center;
-  background: var(--bg2); border-radius: 10px; padding: 10px 8px;
+  flex: 1; min-width: 60px; text-align: center;
+  background: var(--bg2); border-radius: 8px; padding: 6px 4px;
 }
-.sc-stat .n { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
-.sc-stat .l { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--grey); margin-top: 2px; }
+.sc-stat .n { font-family: var(--font-display); font-size: 16px; font-weight: 700; }
+.sc-stat .l { font-size: 9px; text-transform: uppercase; letter-spacing: .03em; color: var(--grey); margin-top: 1px; }
 .sc-filters { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; flex-shrink: 0; }
 .sc-filters label { flex: 1; min-width: 100px; font-size: 12px; font-weight: 600; color: var(--grey); }
 .sc-filters .input { font-size: 12.5px; padding: 5px 8px; }
