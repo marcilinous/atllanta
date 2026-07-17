@@ -746,12 +746,13 @@ async function screenJob(jobId) {
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
-  function renderItem(id, cls, name, sub, scoreHtml, created, checked) {
+  function renderItem(id, cls, name, contact, dateStr, scoreHtml, created, checked) {
+    const sub = [contact, dateStr].filter(Boolean).join(" · ");
     return `<label class="sc-item">
       <input type="checkbox" value="${id}" class="${cls}" data-created="${created}" ${checked ? "checked" : ""} />
-      <div class="av" style="background:${avColor(name)};width:26px;height:26px;font-size:9px;border-radius:7px">${initials(name)}</div>
+      <div class="av" style="background:${avColor(name)}">${initials(name)}</div>
       <div class="sc-item-info"><div class="sc-item-name">${esc(name)}</div><div class="sc-item-sub">${esc(sub)}</div></div>
-      ${scoreHtml ? `<div class="sc-item-score">${scoreHtml}</div>` : ""}
+      ${scoreHtml ? `<div class="sc-item-score">${scoreHtml}</div>` : "<div></div>"}
     </label>`;
   }
 
@@ -783,7 +784,8 @@ async function screenJob(jobId) {
         ${jobApps.map((a) => {
           const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
           const added = c?.created_at ? new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
-          return renderItem(a.id, "sc-check", c?.name || "Unknown", (c?.email || "") + (added ? " · " + added : ""), scoreBar(a.match_score), c?.created_at || "", a.match_score == null);
+          const contact = c?.email || c?.phone || "";
+          return renderItem(a.id, "sc-check", c?.name || "Unknown", contact, added, scoreBar(a.match_score), c?.created_at || "", a.match_score == null);
         }).join("")}
       </div>
     ` : `<p style="color:var(--grey);font-size:13px">No candidates attached. Upload resumes or add from pool below.</p>`}
@@ -797,7 +799,7 @@ async function screenJob(jobId) {
       <div class="sc-list" id="sc-pool-list">
         ${poolCands.slice(0, 200).map((c) => {
           const dateStr = new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-          return renderItem(c.id, "sc-pool-check", c.name, (c.email || "") + " · " + dateStr, "", c.created_at || "", false);
+          return renderItem(c.id, "sc-pool-check", c.name, c.email || c.phone || "", dateStr, "", c.created_at || "", false);
         }).join("")}
       </div>
     ` : ""}
