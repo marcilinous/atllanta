@@ -763,7 +763,6 @@ async function screenJob(jobId) {
       <div class="sc-stat"><div class="n">${jobApps.length}</div><div class="l">In pipeline</div></div>
       <div class="sc-stat"><div class="n">${unscoredCount}</div><div class="l">Unscored</div></div>
       <div class="sc-stat"><div class="n" id="sc-sel-count">0</div><div class="l">Selected</div></div>
-      <div class="sc-stat"><div class="n" id="sc-credit-cost">0</div><div class="l">Credits cost</div></div>
       <div class="sc-stat"><div class="n">${creditsBalance}</div><div class="l">Balance</div></div>
     </div>
 
@@ -779,7 +778,10 @@ async function screenJob(jobId) {
         <button class="sc-toggle-btn active" data-method="ai">AI</button>
         <button class="sc-toggle-btn" data-method="python">Basic</button>
       </div>
-      <span class="sc-method-hint" id="sc-method-hint">1 credit per candidate</span>
+      <div class="sc-credit-bar" id="sc-credit-bar">
+        <div class="sc-credit-track"><div class="sc-credit-fill" id="sc-credit-fill"></div></div>
+        <span class="sc-credit-label" id="sc-credit-label">0 / ${creditsBalance}</span>
+      </div>
     </div>
 
     ${jobApps.length ? `
@@ -838,8 +840,18 @@ async function screenJob(jobId) {
   function updateCounts() {
     const count = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
     f.querySelector("#sc-sel-count").textContent = count;
-    f.querySelector("#sc-credit-cost").textContent = screenMethod === "ai" ? count : 0;
     f.querySelector("#sc-start-count").textContent = count;
+    const bar = f.querySelector("#sc-credit-bar");
+    if (screenMethod === "ai") {
+      bar.style.display = "";
+      const cost = count;
+      const pct = creditsBalance > 0 ? Math.min(100, (cost / creditsBalance) * 100) : (cost > 0 ? 100 : 0);
+      f.querySelector("#sc-credit-fill").style.width = pct + "%";
+      f.querySelector("#sc-credit-fill").style.background = pct > 80 ? "var(--red)" : "var(--amber)";
+      f.querySelector("#sc-credit-label").textContent = cost + " / " + creditsBalance;
+    } else {
+      bar.style.display = "none";
+    }
   }
   updateCounts();
 
@@ -852,7 +864,6 @@ async function screenJob(jobId) {
       f.querySelectorAll(".sc-toggle-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       screenMethod = btn.dataset.method;
-      f.querySelector("#sc-method-hint").textContent = screenMethod === "ai" ? "1 credit per candidate" : "Free — keyword matching";
       updateCounts();
     };
   });
