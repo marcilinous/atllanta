@@ -936,6 +936,9 @@ async function screenJob(jobId) {
 
     try {
       const { data: { session } } = await sb.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Session expired — please log in again");
+      }
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` };
 
       if (selectedPoolIds.length) {

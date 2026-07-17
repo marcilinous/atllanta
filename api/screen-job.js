@@ -122,11 +122,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST" });
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set. Configure it in Vercel → Settings → Environment Variables." });
+  }
+
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) return res.status(401).json({ error: "Missing auth token" });
 
   const user = await getUserFromToken(token);
-  if (!user?.id) return res.status(401).json({ error: "Invalid session" });
+  if (!user?.id) return res.status(401).json({ error: "Invalid or expired session — please log in again" });
 
   const db = supabaseAdmin();
   const { job_id, mode, application_ids, method } = req.body || {};
@@ -135,7 +139,7 @@ export default async function handler(req, res) {
   const useAI = method !== "python";
 
   if (useAI && !process.env.GROQ_API_KEY) {
-    return res.status(500).json({ error: "GROQ_API_KEY is not set." });
+    return res.status(500).json({ error: "GROQ_API_KEY is not set. Configure it in Vercel → Settings → Environment Variables." });
   }
 
   const { data: job } = await db
