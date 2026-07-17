@@ -453,9 +453,6 @@ function candidates(root) {
 function candidateForm() {
   const f = el("div", "form-grid");
   f.innerHTML = `
-    <label>Full name <input id="cf-name" class="input" /></label>
-    <label>Email <input id="cf-email" type="email" class="input" /></label>
-    <label>Phone (with country code, for WhatsApp) <input id="cf-phone" class="input" placeholder="91XXXXXXXXXX" /></label>
     <label>Upload resume (PDF or DOCX)
       <div class="file-drop" id="cf-drop">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -465,19 +462,25 @@ function candidateForm() {
       </div>
     </label>
     <div id="cf-parse-status" class="parse-status hidden"></div>
-    <label>Resume text <textarea id="cf-resume" class="input" style="min-height:120px" placeholder="Upload a file above, or paste the resume text here."></textarea></label>
-    <label>Attach to job (optional)
-      <select id="cf-job" class="input"><option value="">— none —</option>
-      ${S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("")}</select>
-    </label>
-    <button class="btn btn-amber" id="cf-save">Add candidate</button>`;
+    <div id="cf-fields" class="hidden">
+      <label>Full name <input id="cf-name" class="input" /></label>
+      <label>Email <input id="cf-email" type="email" class="input" /></label>
+      <label>Phone (with country code) <input id="cf-phone" class="input" placeholder="+91XXXXXXXXXX" /></label>
+      <label>Summary <input id="cf-summary" class="input" /></label>
+      <label>Resume text <textarea id="cf-resume" class="input" style="min-height:120px"></textarea></label>
+      <label>Attach to job (optional)
+        <select id="cf-job" class="input"><option value="">— none —</option>
+        ${S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("")}</select>
+      </label>
+      <button class="btn btn-amber" id="cf-save">Add candidate</button>
+    </div>`;
   openModal("Add candidate", f);
 
   const drop = f.querySelector("#cf-drop");
   const fileInput = f.querySelector("#cf-file");
   const dropLabel = f.querySelector("#cf-drop-label");
   const parseStatus = f.querySelector("#cf-parse-status");
-  const resumeTA = f.querySelector("#cf-resume");
+  const fieldsDiv = f.querySelector("#cf-fields");
 
   drop.addEventListener("click", () => fileInput.click());
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("dragover"); });
@@ -506,37 +509,57 @@ function candidateForm() {
     drop.classList.add("has-file");
     parseStatus.textContent = "Extracting text from resume…";
     parseStatus.classList.remove("hidden", "error");
+    fieldsDiv.classList.add("hidden");
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result.split(",")[1];
-      try {
-        const { data: { session } } = await sb.auth.getSession();
-        const resp = await fetch("/api/parse-resume", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ filename: file.name, data: base64 }),
-        });
-        const result = await resp.json();
-        if (!resp.ok) throw new Error(result.error || "Parse failed");
-        resumeTA.value = result.text;
-        parseStatus.textContent = `Extracted ${result.text.length.toLocaleString()} characters`;
-      } catch (err) {
-        parseStatus.textContent = err.message;
-        parseStatus.classList.add("error");
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const base64 = await readFileAsBase64(file);
+      const { data: { session } } = await sb.auth.getSession();
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      };
+
+      const parseResp = await fetch("/api/parse-resume", {
+        method: "POST", headers,
+        body: JSON.stringify({ filename: file.name, data: base64 }),
+      });
+      const parseResult = await parseResp.json();
+      if (!parseResp.ok) throw new Error(parseResult.error || "Parse failed");
+
+      const resumeText = parseResult.text;
+      parseStatus.textContent = "Extracting candidate details with AI…";
+
+      const extResp = await fetch("/api/extract-candidate", {
+        method: "POST", headers,
+        body: JSON.stringify({ resume_text: resumeText }),
+      });
+      const extResult = await extResp.json();
+      if (!extResp.ok) throw new Error(extResult.error || "Extraction failed");
+
+      f.querySelector("#cf-name").value = extResult.name || "";
+      f.querySelector("#cf-email").value = extResult.email || "";
+      f.querySelector("#cf-phone").value = extResult.phone || "";
+      f.querySelector("#cf-summary").value = extResult.summary || "";
+      f.querySelector("#cf-resume").value = resumeText;
+
+      parseStatus.textContent = "Details extracted — review and save below";
+      fieldsDiv.classList.remove("hidden");
+    } catch (err) {
+      parseStatus.textContent = err.message;
+      parseStatus.classList.add("error");
+    }
   }
+
+  f.addEventListener("click", (e) => {
+    if (e.target.id !== "cf-save") return;
+    e.target.onclick();
+  });
 
   f.querySelector("#cf-save").onclick = async () => {
     const name = f.querySelector("#cf-name").value.trim();
     if (!name) return toast("Name is required");
-    const resumeText = resumeTA.value.trim() || null;
-    if (!resumeText) return toast("Resume text is required — upload a file or paste text");
+    const resumeText = f.querySelector("#cf-resume").value.trim() || null;
+    if (!resumeText) return toast("Resume text is required");
     const { data: cand, error } = await sb
       .from("candidates")
       .insert({
