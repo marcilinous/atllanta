@@ -276,13 +276,16 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 18px; display: flex; flex-direction: column; gap: 12px;
 }
-.job-card-head { display: flex; justify-content: space-between; align-items: flex-start; }
-.job-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
-.job-dept { font-size: 12px; color: var(--grey); margin-top: 2px; }
+.job-card.expanded { grid-column: 1 / -1; }
+.job-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.job-card-head:hover .job-title { color: var(--amber); }
+.job-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; transition: color .15s; }
+.job-dept { font-size: 12px; color: var(--grey); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job-stats { display: flex; gap: 20px; }
 .jstat { text-align: center; }
 .jstat .n { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
 .jstat .l { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--grey); }
+.job-detail { border-top: 1px solid var(--line2); padding-top: 10px; }
 .job-actions { display: flex; gap: 8px; margin-top: 4px; }
 .new-job-card {
   border: 1.5px dashed #D4C9A8; background: #FFFBF4; border-radius: var(--radius);

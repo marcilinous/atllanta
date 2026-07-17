@@ -216,6 +216,7 @@ function jobs(root) {
   const tabs = el("div", "cat-tabs");
   const statuses = ["all", "open", "paused", "closed"];
   let filter = "all";
+  let expandedId = null;
 
   function counts(s) {
     return s === "all" ? S.cache.jobs.length : S.cache.jobs.filter((j) => j.status === s).length;
@@ -241,38 +242,59 @@ function jobs(root) {
   function draw() {
     const rows = S.cache.jobs.filter((j) => filter === "all" || j.status === filter);
     const cards = rows.map((j) => {
-      const appCount = S.cache.applications.filter((a) => a.job_id === j.id).length;
-      const shortlisted = S.cache.applications.filter((a) => a.job_id === j.id &&
+      const jobApps = S.cache.applications.filter((a) => a.job_id === j.id);
+      const appCount = jobApps.length;
+      const shortlisted = jobApps.filter((a) =>
         ["shortlisted", "interview_scheduled", "interviewed", "offered", "hired"].includes(a.stage)).length;
-      const hired = S.cache.applications.filter((a) => a.job_id === j.id && a.stage === "hired").length;
+      const hired = jobApps.filter((a) => a.stage === "hired").length;
+      const isExpanded = expandedId === j.id;
+      const jdPreview = (j.jd_raw_text || j.description || "").slice(0, 200);
+
+      let detailHTML = "";
+      if (isExpanded) {
+        const candRows = jobApps.map((a) => {
+          const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line2)">
+            <div class="av" style="background:${avColor(c?.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c?.name)}</div>
+            <div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c?.name || "Unknown")}</div>
+            <div style="flex-shrink:0">${scoreBar(a.match_score)}</div>
+            <div style="flex-shrink:0">${stagePill(a.stage)}</div>
+          </div>`;
+        }).join("");
+
+        detailHTML = `
+          <div class="job-detail" data-id="${j.id}">
+            ${jdPreview ? `<div style="font-size:12.5px;color:var(--ink2);line-height:1.5;margin-bottom:10px;white-space:pre-wrap;word-break:break-word">${esc(jdPreview)}${(j.jd_raw_text || "").length > 200 ? "…" : ""}</div>` : ""}
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey);margin-bottom:6px">Candidates (${appCount})</div>
+            ${candRows || `<div style="font-size:12.5px;color:var(--grey);padding:8px 0">No candidates yet</div>`}
+          </div>`;
+      }
+
       return `
-        <div class="job-card">
-          <div class="job-card-head">
-            <div>
+        <div class="job-card${isExpanded ? " expanded" : ""}">
+          <div class="job-card-head" data-id="${j.id}" data-act="toggle" style="cursor:pointer">
+            <div style="flex:1;min-width:0">
               <div class="job-title">${esc(j.title)}</div>
               <div class="job-dept">${esc(j.description || "")}</div>
             </div>
             ${stagePill(j.status)}
+            <svg class="expand-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-left:6px;transition:transform .2s;${isExpanded ? "transform:rotate(180deg)" : ""}"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
           <div class="job-stats">
             <div class="jstat"><div class="n">${appCount}</div><div class="l">In pipeline</div></div>
             <div class="jstat"><div class="n">${shortlisted}</div><div class="l">Shortlisted</div></div>
             <div class="jstat"><div class="n">${hired}</div><div class="l">Hired</div></div>
           </div>
+          ${detailHTML}
           <div class="job-actions">
-            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="addcand" title="Add single candidate">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-              Add
-            </button>
-            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="bulk" title="Bulk upload resumes">
+            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="upload">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Upload
+              Upload resumes
             </button>
             <button class="btn btn-amber btn-sm" style="flex:1" data-id="${j.id}" data-act="screen">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               Screen
             </button>
-            <button class="btn btn-dark btn-sm" style="flex:1" data-id="${j.id}" data-act="view">View</button>
           </div>
         </div>`;
     }).join("");
@@ -284,22 +306,18 @@ function jobs(root) {
       </div>`;
 
     grid.querySelector("#new-job-btn").onclick = jobForm;
-    grid.querySelectorAll("[data-act=addcand]").forEach((b) =>
-      b.addEventListener("click", () => candidateForm(b.dataset.id))
+    grid.querySelectorAll("[data-act=toggle]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        expandedId = expandedId === b.dataset.id ? null : b.dataset.id;
+        draw();
+      })
     );
-    grid.querySelectorAll("[data-act=bulk]").forEach((b) =>
-      b.addEventListener("click", () => bulkUploadForm(b.dataset.id))
+    grid.querySelectorAll("[data-act=upload]").forEach((b) =>
+      b.addEventListener("click", (e) => { e.stopPropagation(); bulkUploadForm(b.dataset.id); })
     );
     grid.querySelectorAll("[data-act=screen]").forEach((b) =>
-      b.addEventListener("click", () => screenJob(b.dataset.id))
-    );
-    grid.querySelectorAll("[data-act=view]").forEach((b) =>
-      b.addEventListener("click", () => {
-        document.querySelectorAll(".nav-item").forEach((x) => x.classList.remove("active"));
-        document.querySelector('[data-view="candidates"]').classList.add("active");
-        S.view = "candidates";
-        render();
-      })
+      b.addEventListener("click", (e) => { e.stopPropagation(); screenJob(b.dataset.id); })
     );
   }
   draw();
@@ -719,50 +737,65 @@ async function screenJob(jobId) {
     .filter((c) => !attachedCandIds.has(c.id) && c.resume_raw_text)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+
   const f = el("div", "form-grid");
   f.innerHTML = `
     <p style="font-size:13px;color:var(--grey);margin-bottom:4px">
       <strong>${esc(job.title)}</strong> — ${jobApps.length} candidate${jobApps.length !== 1 ? "s" : ""} attached
     </p>
+
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px">
+      <label style="flex:1;min-width:120px;font-size:12px;font-weight:600;color:var(--grey)">From date
+        <input type="date" id="sc-from" class="input" value="${weekAgo}" style="font-size:12.5px;padding:5px 8px" />
+      </label>
+      <label style="flex:1;min-width:120px;font-size:12px;font-weight:600;color:var(--grey)">To date
+        <input type="date" id="sc-to" class="input" value="${today}" style="font-size:12.5px;padding:5px 8px" />
+      </label>
+      <button class="btn btn-outline btn-sm" id="sc-apply-dates" style="font-size:11px;padding:5px 10px;white-space:nowrap">Apply dates</button>
+    </div>
+
     ${jobApps.length ? `
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <strong style="font-size:12.5px">Select candidates to screen</strong>
-        <button class="btn btn-outline btn-sm" id="sc-sel-unscored" style="font-size:11px;padding:2px 8px">Select unscored</button>
-        <button class="btn btn-outline btn-sm" id="sc-sel-all" style="font-size:11px;padding:2px 8px">Select all</button>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">
+        <strong style="font-size:12.5px">Candidates</strong>
+        <button class="btn btn-outline btn-sm" id="sc-sel-unscored" style="font-size:11px;padding:2px 8px">Unscored</button>
+        <button class="btn btn-outline btn-sm" id="sc-sel-all" style="font-size:11px;padding:2px 8px">All</button>
         <button class="btn btn-outline btn-sm" id="sc-sel-none" style="font-size:11px;padding:2px 8px">Clear</button>
       </div>
-      <div id="sc-cand-list" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px">
+      <div id="sc-cand-list" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:4px">
         ${jobApps.map((a) => {
           const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
-          return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
-            <input type="checkbox" value="${a.id}" class="sc-check" ${a.match_score == null ? "checked" : ""} />
-            <div class="av" style="background:${avColor(c?.name)};width:28px;height:28px;font-size:10px;border-radius:8px;flex-shrink:0">${initials(c?.name)}</div>
-            <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c?.name || "Unknown")}</div></div>
+          const added = c?.created_at ? new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
+          return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
+            <input type="checkbox" value="${a.id}" class="sc-check" data-created="${c?.created_at || ""}" ${a.match_score == null ? "checked" : ""} />
+            <div class="av" style="background:${avColor(c?.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c?.name)}</div>
+            <div style="flex:1;min-width:0;overflow:hidden"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c?.name || "Unknown")}</div><div style="font-size:11px;color:var(--grey)">${added}</div></div>
             <div style="flex-shrink:0">${scoreBar(a.match_score)}</div>
           </label>`;
         }).join("")}
       </div>
     ` : `<p style="color:var(--grey);font-size:13px">No candidates attached yet. Upload resumes or add from pool below.</p>`}
     ${poolCands.length ? `
-      <div style="border-top:1px solid var(--line2);padding-top:12px;margin-top:4px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="font-size:12.5px">Add from candidate pool</strong>
+      <div style="border-top:1px solid var(--line2);padding-top:10px;margin-top:2px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <strong style="font-size:12.5px">Add from pool</strong>
           <button class="btn btn-outline btn-sm" id="sc-pool-all" style="font-size:11px;padding:2px 8px">Select all</button>
         </div>
-        <div id="sc-pool-list" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px">
+        <div id="sc-pool-list" style="max-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:4px">
           ${poolCands.slice(0, 50).map((c) => {
             const added = new Date(c.created_at);
             const dateStr = added.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-            return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
-              <input type="checkbox" value="${c.id}" class="sc-pool-check" />
-              <div class="av" style="background:${avColor(c.name)};width:28px;height:28px;font-size:10px;border-radius:8px;flex-shrink:0">${initials(c.name)}</div>
-              <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c.name)}</div><div style="font-size:11px;color:var(--grey)">${esc(c.email || "")} · added ${dateStr}</div></div>
+            return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
+              <input type="checkbox" value="${c.id}" class="sc-pool-check" data-created="${c.created_at || ""}" />
+              <div class="av" style="background:${avColor(c.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c.name)}</div>
+              <div style="flex:1;min-width:0;overflow:hidden"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div><div style="font-size:11px;color:var(--grey)">${esc(c.email || "")} · ${dateStr}</div></div>
             </label>`;
           }).join("")}
         </div>
       </div>
     ` : ""}
-    <div style="display:flex;gap:8px;margin-top:4px">
+    <div style="display:flex;gap:8px;margin-top:6px">
       <button class="btn btn-outline" id="sc-upload" style="flex:1">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload resumes
@@ -777,9 +810,29 @@ async function screenJob(jobId) {
       <div style="height:8px;background:var(--line2);border-radius:6px;overflow:hidden;margin-bottom:12px">
         <div id="sc-fill" style="height:100%;background:linear-gradient(90deg,var(--amber),var(--green));border-radius:6px;width:0%;transition:width .3s ease"></div>
       </div>
-      <div id="sc-log" style="max-height:200px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:4px"></div>
+      <div id="sc-log" style="max-height:180px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:4px"></div>
     </div>`;
   openModal("Screen candidates", f);
+
+  f.querySelector("#sc-apply-dates").onclick = () => {
+    const from = f.querySelector("#sc-from").value;
+    const to = f.querySelector("#sc-to").value;
+    if (!from || !to) return toast("Select both dates");
+    const fromDate = new Date(from + "T00:00:00");
+    const toDate = new Date(to + "T23:59:59");
+
+    f.querySelectorAll(".sc-check").forEach((cb) => {
+      const created = cb.dataset.created ? new Date(cb.dataset.created) : null;
+      cb.checked = created ? created >= fromDate && created <= toDate : false;
+    });
+    f.querySelectorAll(".sc-pool-check").forEach((cb) => {
+      const created = cb.dataset.created ? new Date(cb.dataset.created) : null;
+      cb.checked = created ? created >= fromDate && created <= toDate : false;
+    });
+
+    const checkedCount = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
+    toast(`${checkedCount} candidate${checkedCount !== 1 ? "s" : ""} selected in date range`);
+  };
 
   const candList = f.querySelector("#sc-cand-list");
   if (candList) {
