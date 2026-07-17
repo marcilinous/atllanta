@@ -777,7 +777,7 @@ async function screenJob(jobId) {
       <span style="font-size:12px;font-weight:600;color:var(--grey)">Method</span>
       <div class="sc-toggle">
         <button class="sc-toggle-btn active" data-method="ai">AI</button>
-        <button class="sc-toggle-btn" data-method="python">Python</button>
+        <button class="sc-toggle-btn" data-method="python">Basic</button>
       </div>
       <span class="sc-method-hint" id="sc-method-hint">1 credit per candidate</span>
     </div>
@@ -852,7 +852,7 @@ async function screenJob(jobId) {
       f.querySelectorAll(".sc-toggle-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       screenMethod = btn.dataset.method;
-      f.querySelector("#sc-method-hint").textContent = screenMethod === "ai" ? "1 credit per candidate" : "Free — no credits used";
+      f.querySelector("#sc-method-hint").textContent = screenMethod === "ai" ? "1 credit per candidate" : "Free — keyword matching";
       updateCounts();
     };
   });
