@@ -7,10 +7,10 @@ const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 // ---------- state ----------
 const S = {
   session: null,
-  org: null,          // current organization row
+  org: null,
   membership: null,
-  clients: [],        // clients visible to this user
-  clientId: null,     // active client
+  clients: [],
+  clientId: null,
   view: "jobs",
   cache: { jobs: [], candidates: [], applications: [] },
 };
@@ -29,22 +29,39 @@ const esc = (s) =>
   );
 function toast(msg, ms = 2600) {
   const t = $("#toast");
-  t.textContent = msg;
+  const m = $("#toast-msg");
+  m.textContent = msg;
   t.classList.remove("hidden");
+  t.classList.add("show");
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.classList.add("hidden"), ms);
+  t._h = setTimeout(() => { t.classList.remove("show"); t.classList.add("hidden"); }, ms);
 }
-function ringColor(score) {
-  if (score >= 70) return "var(--teal)";
-  if (score >= 45) return "var(--amber)";
-  return "var(--brick)";
-}
-function scoreRing(score, small = false) {
-  if (score === null || score === undefined)
-    return `<span class="stage-badge">unscored</span>`;
+
+function scoreBar(score) {
+  if (score === null || score === undefined) return `<span class="pill pill-new"><span class="dot"></span>unscored</span>`;
   const s = Math.round(score);
-  return `<div class="score-ring${small ? " small" : ""}" style="--pct:${s};--ring:${ringColor(s)}">${s}</div>`;
+  return `<div class="score-col"><div class="sbar"><div class="sbar-fill" style="width:${s}%"></div></div><div class="snum">${s}</div></div>`;
 }
+
+function stagePill(stage) {
+  const label = (stage || "new").replaceAll("_", " ");
+  return `<span class="pill pill-${stage}"><span class="dot"></span>${label}</span>`;
+}
+
+function initials(name) {
+  const parts = (name || "?").split(" ");
+  return parts.length > 1
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : (name || "?").slice(0, 2).toUpperCase();
+}
+
+const avColors = ["#5C8A72", "#E8963C", "#4A5578", "#D6604A", "#7B6CB5", "#3B7DD8"];
+function avColor(name) {
+  let h = 0;
+  for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return avColors[Math.abs(h) % avColors.length];
+}
+
 function openModal(title, bodyNode) {
   $("#modal-title").textContent = title;
   const body = $("#modal-body");
@@ -85,14 +102,6 @@ $("#logout-btn").addEventListener("click", async () => {
   location.reload();
 });
 
-$("#user-avatar").addEventListener("click", () =>
-  $("#rail-profile").classList.toggle("open")
-);
-document.addEventListener("click", (e) => {
-  if (!$("#rail-profile").contains(e.target))
-    $("#rail-profile").classList.remove("open");
-});
-
 // ---------- boot ----------
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
@@ -104,10 +113,9 @@ async function boot() {
   }
   $("#auth-screen").classList.add("hidden");
   $("#app-shell").classList.remove("hidden");
-  $("#user-avatar").textContent = (session.user.email || "?")[0];
+  $("#user-avatar").textContent = (session.user.email || "?")[0].toUpperCase();
   $("#menu-email").textContent = session.user.email;
 
-  // membership + org + clients (all RLS-scoped)
   const { data: memberships } = await sb
     .from("memberships")
     .select("*")
@@ -115,7 +123,7 @@ async function boot() {
   S.membership = memberships?.[0] || null;
 
   if (!S.membership) {
-    $("#menu-org").textContent = "No organization yet";
+    $("#menu-org").textContent = "No organization";
     $("#view-root").innerHTML =
       `<div class="empty"><strong>No organization linked to this account</strong>
        Ask your admin to add you to an organization, then sign in again.</div>`;
@@ -129,7 +137,7 @@ async function boot() {
   S.org = org;
   S.clients = clients || [];
   S.clientId = S.membership.client_id || S.clients[0]?.id || null;
-  $("#menu-org").textContent = org?.name || "—";
+  $("#menu-org").textContent = (S.membership.role || "member").replaceAll("_", " ") + " · " + (org?.name || "—");
   $("#credits-count").textContent = org?.credits_balance ?? "—";
 
   const sw = $("#client-switcher");
@@ -170,9 +178,17 @@ const TITLES = {
   jobs: "Jobs", candidates: "Candidates", interviews: "Interviews",
   chat: "Chat", rescore: "Re-score", analytics: "Analytics",
 };
-document.querySelectorAll(".rail-btn").forEach((b) =>
+const SUBS = {
+  jobs: "Manage your open roles and upload resumes for each one",
+  candidates: "Everyone in your pipeline — filter by job or stage",
+  interviews: "Upcoming interviews — all confirmed slots in one place",
+  chat: "Candidates who replied — continue the conversation here or on WhatsApp",
+  rescore: "Run the AI scoring algorithm again on stored resumes",
+  analytics: "Performance metrics across your hiring pipeline",
+};
+document.querySelectorAll(".nav-item").forEach((b) =>
   b.addEventListener("click", () => {
-    document.querySelectorAll(".rail-btn").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach((x) => x.classList.remove("active"));
     b.classList.add("active");
     S.view = b.dataset.view;
     render();
@@ -181,6 +197,7 @@ document.querySelectorAll(".rail-btn").forEach((b) =>
 
 async function render() {
   $("#view-title").textContent = TITLES[S.view];
+  $("#view-sub").textContent = SUBS[S.view] || "";
   const root = $("#view-root");
   root.innerHTML = `<div class="empty">Loading…</div>`;
   await loadData();
@@ -196,49 +213,79 @@ const VIEWS = { jobs, candidates, interviews, chat, rescore, analytics };
 // ---------- Jobs ----------
 function jobs(root) {
   const bar = el("div", "toolbar");
-  const chips = el("div", "chips");
+  const tabs = el("div", "cat-tabs");
   const statuses = ["all", "open", "paused", "closed"];
   let filter = "all";
+
+  function counts(s) {
+    return s === "all" ? S.cache.jobs.length : S.cache.jobs.filter((j) => j.status === s).length;
+  }
+
   statuses.forEach((s) => {
-    const c = el("button", `chip${s === "all" ? " active" : ""}`, s);
-    c.onclick = () => {
+    const t = el("button", `cat-tab${s === "all" ? " active" : ""}`,
+      `${s.charAt(0).toUpperCase() + s.slice(1)} · ${counts(s)}`);
+    t.onclick = () => {
       filter = s;
-      chips.querySelectorAll(".chip").forEach((x) => x.classList.remove("active"));
-      c.classList.add("active");
+      tabs.querySelectorAll(".cat-tab").forEach((x) => x.classList.remove("active"));
+      t.classList.add("active");
       draw();
     };
-    chips.appendChild(c);
+    tabs.appendChild(t);
   });
-  bar.appendChild(chips);
-  bar.appendChild(el("div", "spacer"));
-  const addBtn = el("button", "btn btn-primary", "+ New job");
-  addBtn.onclick = jobForm;
-  bar.appendChild(addBtn);
+  bar.appendChild(tabs);
   root.appendChild(bar);
 
-  const card = el("div", "card");
-  root.appendChild(card);
+  const grid = el("div", "job-grid");
+  root.appendChild(grid);
 
   function draw() {
     const rows = S.cache.jobs.filter((j) => filter === "all" || j.status === filter);
-    if (!rows.length) {
-      card.innerHTML = `<div class="empty"><strong>No jobs yet</strong>Add your first job with its JD text to start matching resumes.</div>`;
-      return;
-    }
-    card.innerHTML = `<table class="table">
-      <thead><tr><th>Title</th><th>Status</th><th>Candidates</th><th>Created</th><th></th></tr></thead>
-      <tbody>${rows.map((j) => {
-        const count = S.cache.applications.filter((a) => a.job_id === j.id).length;
-        return `<tr>
-          <td><strong>${esc(j.title)}</strong></td>
-          <td><span class="stage-badge ${j.status}">${j.status}</span></td>
-          <td>${count}</td>
-          <td>${new Date(j.created_at).toLocaleDateString()}</td>
-          <td><button class="btn btn-ghost btn-sm" data-id="${j.id}" data-act="attach">+ Candidate</button></td>
-        </tr>`;
-      }).join("")}</tbody></table>`;
-    card.querySelectorAll("[data-act=attach]").forEach((b) =>
+    const cards = rows.map((j) => {
+      const appCount = S.cache.applications.filter((a) => a.job_id === j.id).length;
+      const shortlisted = S.cache.applications.filter((a) => a.job_id === j.id &&
+        ["shortlisted", "interview_scheduled", "interviewed", "offered", "hired"].includes(a.stage)).length;
+      const hired = S.cache.applications.filter((a) => a.job_id === j.id && a.stage === "hired").length;
+      return `
+        <div class="job-card">
+          <div class="job-card-head">
+            <div>
+              <div class="job-title">${esc(j.title)}</div>
+              <div class="job-dept">${esc(j.description || "")}</div>
+            </div>
+            ${stagePill(j.status)}
+          </div>
+          <div class="job-stats">
+            <div class="jstat"><div class="n">${appCount}</div><div class="l">In pipeline</div></div>
+            <div class="jstat"><div class="n">${shortlisted}</div><div class="l">Shortlisted</div></div>
+            <div class="jstat"><div class="n">${hired}</div><div class="l">Hired</div></div>
+          </div>
+          <div class="job-actions">
+            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="attach">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              + Candidate
+            </button>
+            <button class="btn btn-dark btn-sm" style="flex:1" data-id="${j.id}" data-act="view">View</button>
+          </div>
+        </div>`;
+    }).join("");
+
+    grid.innerHTML = cards +
+      `<div class="new-job-card" id="new-job-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New role
+      </div>`;
+
+    grid.querySelector("#new-job-btn").onclick = jobForm;
+    grid.querySelectorAll("[data-act=attach]").forEach((b) =>
       b.addEventListener("click", () => attachCandidateForm(b.dataset.id))
+    );
+    grid.querySelectorAll("[data-act=view]").forEach((b) =>
+      b.addEventListener("click", () => {
+        document.querySelectorAll(".nav-item").forEach((x) => x.classList.remove("active"));
+        document.querySelector('[data-view="candidates"]').classList.add("active");
+        S.view = "candidates";
+        render();
+      })
     );
   }
   draw();
@@ -247,10 +294,10 @@ function jobs(root) {
 function jobForm() {
   const f = el("div", "form-grid");
   f.innerHTML = `
-    <label>Job title <input id="jf-title" placeholder="e.g. Senior Backend Engineer" /></label>
-    <label>Short description <input id="jf-desc" placeholder="One line for the list view" /></label>
-    <label>Job description (paste full JD text) <textarea id="jf-jd" placeholder="Paste the complete JD here — this is what resumes get scored against."></textarea></label>
-    <button class="btn btn-primary" id="jf-save">Create job</button>`;
+    <label>Job title <input id="jf-title" class="input" placeholder="e.g. Senior Backend Engineer" /></label>
+    <label>Short description <input id="jf-desc" class="input" placeholder="One line for the list view" /></label>
+    <label>Job description (paste full JD text) <textarea id="jf-jd" class="input" style="min-height:120px" placeholder="Paste the complete JD here — this is what resumes get scored against."></textarea></label>
+    <button class="btn btn-amber" id="jf-save">Create job</button>`;
   openModal("New job", f);
   f.querySelector("#jf-save").onclick = async () => {
     const title = f.querySelector("#jf-title").value.trim();
@@ -271,11 +318,10 @@ function jobForm() {
 // ---------- Candidates ----------
 function candidates(root) {
   const bar = el("div", "toolbar");
-  const jobSel = el("select", "select");
-  jobSel.innerHTML =
-    `<option value="all">All jobs</option>` +
-    S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("");
-  bar.appendChild(jobSel);
+
+  const searchBox = el("div", "search-box");
+  searchBox.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Search name or phone…" id="cand-search" />`;
+  bar.appendChild(searchBox);
 
   const chips = el("div", "chips");
   const stages = ["all", "new", "screened", "shortlisted", "interview_scheduled", "hired", "rejected"];
@@ -292,19 +338,24 @@ function candidates(root) {
   });
   bar.appendChild(chips);
   bar.appendChild(el("div", "spacer"));
-  const addBtn = el("button", "btn btn-primary", "+ Add candidate");
+  const addBtn = el("button", "btn btn-amber", "+ Add candidate");
   addBtn.onclick = () => candidateForm();
   bar.appendChild(addBtn);
   root.appendChild(bar);
 
-  const card = el("div", "card");
-  root.appendChild(card);
-  jobSel.onchange = draw;
+  const tableWrap = el("div", "cand-table");
+  tableWrap.innerHTML = `<div class="cand-table-head"><div>Candidate</div><div>Job</div><div>Match score</div><div>Stage</div><div>Actions</div></div>`;
+  const listEl = el("div", "", "");
+  listEl.id = "cand-list";
+  tableWrap.appendChild(listEl);
+  root.appendChild(tableWrap);
+
+  const searchIn = bar.querySelector("#cand-search");
+  searchIn.addEventListener("input", draw);
 
   function draw() {
-    const jobFilter = jobSel.value;
+    const q = searchIn.value.toLowerCase();
     let rows = S.cache.applications
-      .filter((a) => jobFilter === "all" || a.job_id === jobFilter)
       .filter((a) => stageFilter === "all" || a.stage === stageFilter)
       .map((a) => ({
         app: a,
@@ -313,46 +364,75 @@ function candidates(root) {
       }))
       .filter((r) => r.cand && r.job);
 
-    // also show candidates with no application yet when unfiltered
     const appliedIds = new Set(S.cache.applications.map((a) => a.candidate_id));
-    const unattached =
-      jobFilter === "all" && stageFilter === "all"
-        ? S.cache.candidates.filter((c) => !appliedIds.has(c.id))
-        : [];
+    const unattached = stageFilter === "all"
+      ? S.cache.candidates.filter((c) => !appliedIds.has(c.id))
+      : [];
+
+    if (q) {
+      rows = rows.filter((r) =>
+        r.cand.name.toLowerCase().includes(q) ||
+        (r.cand.phone || "").includes(q) ||
+        (r.cand.email || "").toLowerCase().includes(q)
+      );
+    }
 
     if (!rows.length && !unattached.length) {
-      card.innerHTML = `<div class="empty"><strong>No candidates yet</strong>Add a candidate and paste their resume text to score them against a job.</div>`;
+      listEl.innerHTML = `<div class="empty"><strong>No candidates yet</strong>Add a candidate with their resume to start scoring.</div>`;
       return;
     }
 
-    card.innerHTML = `<table class="table">
-      <thead><tr><th>Score</th><th>Candidate</th><th>Job</th><th>Stage</th><th></th></tr></thead>
-      <tbody>
-      ${rows.map((r) => `<tr>
-        <td>${scoreRing(r.app.match_score, true)}</td>
-        <td><strong>${esc(r.cand.name)}</strong><br><span style="color:var(--ink-soft);font-size:12px">${esc(r.cand.email || r.cand.phone || "")}</span></td>
-        <td>${esc(r.job.title)}</td>
-        <td><span class="stage-badge ${r.app.stage}">${r.app.stage.replaceAll("_", " ")}</span></td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-ghost btn-sm" data-app="${r.app.id}" data-act="score">${r.app.match_score == null ? "Score" : "View"}</button>
-          <button class="btn btn-ghost btn-sm" data-app="${r.app.id}" data-act="stage">Stage</button>
-        </td>
-      </tr>`).join("")}
-      ${unattached.map((c) => `<tr>
-        <td><span class="stage-badge">no job</span></td>
-        <td><strong>${esc(c.name)}</strong><br><span style="color:var(--ink-soft);font-size:12px">${esc(c.email || c.phone || "")}</span></td>
-        <td>—</td><td>—</td>
-        <td><button class="btn btn-ghost btn-sm" data-cand="${c.id}" data-act="attach">Attach to job</button></td>
-      </tr>`).join("")}
-      </tbody></table>`;
+    listEl.innerHTML = rows.map((r) => `
+      <div class="cand-row">
+        <div class="who">
+          <div class="av" style="background:${avColor(r.cand.name)}">${initials(r.cand.name)}</div>
+          <div><div class="cname">${esc(r.cand.name)}</div><div class="csub">${esc(r.cand.email || r.cand.phone || "")}</div></div>
+        </div>
+        <div style="font-size:12.5px;color:var(--ink2)">${esc(r.job.title)}</div>
+        <div>${scoreBar(r.app.match_score)}</div>
+        <div>${stagePill(r.app.stage)}</div>
+        <div class="row-actions">
+          <button class="icon-btn" title="${r.app.match_score == null ? 'Score' : 'View score'}" data-app="${r.app.id}" data-act="score">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </button>
+          <button class="icon-btn" title="Update stage" data-app="${r.app.id}" data-act="stage">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </button>
+          ${r.cand.phone ? `<button class="icon-btn wa" title="WhatsApp" data-phone="${esc(r.cand.phone)}" data-name="${esc(r.cand.name)}" data-act="wa">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          </button>` : ""}
+        </div>
+      </div>`).join("") +
+      unattached.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).map((c) => `
+      <div class="cand-row">
+        <div class="who">
+          <div class="av" style="background:${avColor(c.name)}">${initials(c.name)}</div>
+          <div><div class="cname">${esc(c.name)}</div><div class="csub">${esc(c.email || c.phone || "")}</div></div>
+        </div>
+        <div style="font-size:12.5px;color:var(--grey)">— no job —</div>
+        <div><span class="pill pill-new"><span class="dot"></span>unscored</span></div>
+        <div><span class="pill pill-new"><span class="dot"></span>unattached</span></div>
+        <div class="row-actions">
+          <button class="icon-btn" title="Attach to job" data-cand="${c.id}" data-act="attachjob">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>`).join("");
 
-    card.querySelectorAll("[data-act=score]").forEach((b) =>
+    listEl.querySelectorAll("[data-act=score]").forEach((b) =>
       b.addEventListener("click", () => scoreDetail(b.dataset.app))
     );
-    card.querySelectorAll("[data-act=stage]").forEach((b) =>
+    listEl.querySelectorAll("[data-act=stage]").forEach((b) =>
       b.addEventListener("click", () => stageForm(b.dataset.app))
     );
-    card.querySelectorAll("[data-act=attach]").forEach((b) =>
+    listEl.querySelectorAll("[data-act=wa]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const phone = b.dataset.phone.replace(/[^\d]/g, "");
+        window.open(`https://wa.me/${phone}`, "_blank", "noopener");
+        toast("Opening WhatsApp with " + b.dataset.name.split(" ")[0]);
+      })
+    );
+    listEl.querySelectorAll("[data-act=attachjob]").forEach((b) =>
       b.addEventListener("click", () => attachJobForm(b.dataset.cand))
     );
   }
@@ -362,22 +442,24 @@ function candidates(root) {
 function candidateForm() {
   const f = el("div", "form-grid");
   f.innerHTML = `
-    <label>Full name <input id="cf-name" /></label>
-    <label>Email <input id="cf-email" type="email" /></label>
-    <label>Phone (with country code, for WhatsApp) <input id="cf-phone" placeholder="91XXXXXXXXXX" /></label>
+    <label>Full name <input id="cf-name" class="input" /></label>
+    <label>Email <input id="cf-email" type="email" class="input" /></label>
+    <label>Phone (with country code, for WhatsApp) <input id="cf-phone" class="input" placeholder="91XXXXXXXXXX" /></label>
     <label>Upload resume (PDF or DOCX)
       <div class="file-drop" id="cf-drop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <input type="file" id="cf-file" accept=".pdf,.docx,.doc" hidden />
-        <span id="cf-drop-label">Click or drag a file here</span>
+        <span id="cf-drop-label">Click or drag a resume file here</span>
+        <span style="font-size:11px;color:var(--grey)">PDF, DOCX — max 3 MB</span>
       </div>
     </label>
     <div id="cf-parse-status" class="parse-status hidden"></div>
-    <label>Resume text <textarea id="cf-resume" placeholder="Upload a file above, or paste the resume text here."></textarea></label>
+    <label>Resume text <textarea id="cf-resume" class="input" style="min-height:120px" placeholder="Upload a file above, or paste the resume text here."></textarea></label>
     <label>Attach to job (optional)
-      <select id="cf-job"><option value="">— none —</option>
+      <select id="cf-job" class="input"><option value="">— none —</option>
       ${S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("")}</select>
     </label>
-    <button class="btn btn-primary" id="cf-save">Add candidate</button>`;
+    <button class="btn btn-amber" id="cf-save">Add candidate</button>`;
   openModal("Add candidate", f);
 
   const drop = f.querySelector("#cf-drop");
@@ -468,11 +550,11 @@ function attachCandidateForm(jobId) {
   const f = el("div", "form-grid");
   f.innerHTML = `
     <label>Candidate
-      <select id="af-cand">
+      <select id="af-cand" class="input">
         ${S.cache.candidates.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
       </select>
     </label>
-    <button class="btn btn-primary" id="af-save">Attach</button>`;
+    <button class="btn btn-amber" id="af-save">Attach</button>`;
   openModal("Attach candidate to job", f);
   f.querySelector("#af-save").onclick = async () => {
     const { error } = await sb
@@ -488,11 +570,11 @@ function attachJobForm(candId) {
   const f = el("div", "form-grid");
   f.innerHTML = `
     <label>Job
-      <select id="aj-job">
+      <select id="aj-job" class="input">
         ${S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("")}
       </select>
     </label>
-    <button class="btn btn-primary" id="aj-save">Attach</button>`;
+    <button class="btn btn-amber" id="aj-save">Attach</button>`;
   openModal("Attach to job", f);
   f.querySelector("#aj-save").onclick = async () => {
     const { error } = await sb
@@ -510,11 +592,11 @@ function stageForm(appId) {
   const f = el("div", "form-grid");
   f.innerHTML = `
     <label>Stage
-      <select id="sf-stage">${stages.map((s) =>
+      <select id="sf-stage" class="input">${stages.map((s) =>
         `<option value="${s}"${app?.stage === s ? " selected" : ""}>${s.replaceAll("_", " ")}</option>`).join("")}
       </select>
     </label>
-    <button class="btn btn-primary" id="sf-save">Update</button>`;
+    <button class="btn btn-amber" id="sf-save">Update</button>`;
   openModal("Update stage", f);
   f.querySelector("#sf-save").onclick = async () => {
     const { error } = await sb
@@ -549,17 +631,20 @@ function scoreDetail(appId) {
   const job = S.cache.jobs.find((j) => j.id === app.job_id);
   const f = el("div");
   const raw = app.match_raw_response || {};
+  const score = app.match_score;
+
   f.innerHTML = `
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
-      ${scoreRing(app.match_score)}
-      <div><strong>${esc(cand?.name)}</strong><br>
-      <span style="color:var(--ink-soft);font-size:12.5px">${esc(job?.title)}</span></div>
+      <div class="av" style="background:${avColor(cand?.name)};width:44px;height:44px;font-size:16px;border-radius:12px">${initials(cand?.name)}</div>
+      <div><strong style="font-size:15px">${esc(cand?.name)}</strong><br>
+      <span style="color:var(--grey);font-size:12.5px">${esc(job?.title)}</span></div>
+      ${score != null ? `<div style="margin-left:auto">${scoreBar(score)}</div>` : ""}
     </div>
-    ${app.match_summary ? `<p style="margin-bottom:12px">${esc(app.match_summary)}</p>` : ""}
-    ${raw.strengths?.length ? `<p style="font-weight:700;font-size:12.5px;margin-bottom:4px">Strengths</p><ul style="margin:0 0 12px 18px">${raw.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-    ${raw.gaps?.length ? `<p style="font-weight:700;font-size:12.5px;margin-bottom:4px">Gaps</p><ul style="margin:0 0 12px 18px">${raw.gaps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-    <button class="btn btn-primary" id="sd-run">${app.match_score == null ? "Run AI match (1 credit)" : "Re-run match (1 credit)"}</button>
-    <p id="sd-status" style="margin-top:8px;color:var(--ink-soft);font-size:12.5px"></p>`;
+    ${app.match_summary ? `<p style="margin-bottom:12px;font-size:13px;color:var(--ink2)">${esc(app.match_summary)}</p>` : ""}
+    ${raw.strengths?.length ? `<p style="font-weight:700;font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Strengths</p><ul style="margin:0 0 12px 18px;font-size:13px">${raw.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
+    ${raw.gaps?.length ? `<p style="font-weight:700;font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Gaps</p><ul style="margin:0 0 12px 18px;font-size:13px">${raw.gaps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
+    <button class="btn btn-amber" id="sd-run">${score == null ? "Run AI match (1 credit)" : "Re-run match (1 credit)"}</button>
+    <p id="sd-status" style="margin-top:8px;color:var(--grey);font-size:12.5px"></p>`;
   openModal("Match detail", f);
   f.querySelector("#sd-run").onclick = async (e) => {
     e.target.disabled = true;
@@ -567,7 +652,7 @@ function scoreDetail(appId) {
     try {
       await runMatch(appId);
       closeModal();
-      toast("Scored ✓");
+      toast("Scored");
       render();
     } catch (err) {
       f.querySelector("#sd-status").textContent = err.message;
@@ -587,56 +672,111 @@ function interviews(root) {
     }))
     .filter((r) => r.cand && r.job);
 
-  const card = el("div", "card");
   if (!rows.length) {
-    card.innerHTML = `<div class="empty"><strong>No interviews scheduled</strong>Move a candidate's stage to "interview scheduled" and they'll appear here. Slot booking via WhatsApp links lands in Phase 1.</div>`;
-  } else {
-    card.innerHTML = `<table class="table">
-      <thead><tr><th>Candidate</th><th>Job</th><th>Stage</th><th>Last update</th></tr></thead>
-      <tbody>${rows.map((r) => `<tr>
-        <td><strong>${esc(r.cand.name)}</strong></td>
-        <td>${esc(r.job.title)}</td>
-        <td><span class="stage-badge ${r.app.stage}">${r.app.stage.replaceAll("_", " ")}</span></td>
-        <td>${new Date(r.app.updated_at).toLocaleString()}</td>
-      </tr>`).join("")}</tbody></table>`;
+    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Move a candidate's stage to "interview scheduled" and they'll appear here.</div>`));
+    return;
   }
-  root.appendChild(card);
+
+  const list = el("div", "interview-list");
+  rows.forEach((r) => {
+    const d = new Date(r.app.updated_at);
+    const card = el("div", "interview-card");
+    card.innerHTML = `
+      <div class="date-block">
+        <div class="day">${d.getDate()}</div>
+        <div class="mon">${d.toLocaleString("en", { month: "short" })}</div>
+      </div>
+      <div class="int-info">
+        <div class="int-name">${esc(r.cand.name)}</div>
+        <div class="int-meta">${esc(r.job.title)} · ${r.app.stage.replaceAll("_", " ")}</div>
+        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+      </div>
+      <div class="int-actions">
+        <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="stage">Update stage</button>
+        ${r.cand.phone ? `<button class="btn btn-outline btn-sm" data-phone="${esc(r.cand.phone)}" data-name="${esc(r.cand.name)}" data-act="wa">WhatsApp</button>` : ""}
+      </div>`;
+    list.appendChild(card);
+  });
+  root.appendChild(list);
+
+  list.querySelectorAll("[data-act=stage]").forEach((b) =>
+    b.addEventListener("click", () => stageForm(b.dataset.app))
+  );
+  list.querySelectorAll("[data-act=wa]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const phone = b.dataset.phone.replace(/[^\d]/g, "");
+      window.open(`https://wa.me/${phone}`, "_blank", "noopener");
+    })
+  );
 }
 
 // ---------- Chat ----------
 function chat(root) {
-  const card = el("div", "card");
-  card.innerHTML = `
-    <div class="card-title">WhatsApp composer</div>
-    <p style="color:var(--ink-soft);font-size:13px;margin-bottom:12px">
-      Zero-cost outreach via <strong>wa.me</strong> deep links — opens WhatsApp Web with the message pre-filled.
-      Built-in threading arrives with the paid Business API in Phase 3.
-    </p>
-    <div class="form-grid">
-      <label>Candidate
-        <select id="wa-cand">
-          ${S.cache.candidates.filter((c) => c.phone).map((c) =>
-            `<option value="${esc(c.phone)}" data-name="${esc(c.name)}">${esc(c.name)} — ${esc(c.phone)}</option>`).join("")}
-        </select>
-      </label>
-      <label>Message
-        <textarea id="wa-msg">Hi {name}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?</textarea>
-      </label>
-      <button class="btn btn-primary" id="wa-open">Open in WhatsApp</button>
-    </div>`;
-  root.appendChild(card);
+  const candsWithPhone = S.cache.candidates.filter((c) => c.phone);
 
-  const sel = card.querySelector("#wa-cand");
-  if (!sel.options.length) {
-    card.innerHTML = `<div class="empty"><strong>No candidates with phone numbers</strong>Add a candidate with a phone number (incl. country code) to compose WhatsApp messages.</div>`;
+  if (!candsWithPhone.length) {
+    root.appendChild(el("div", "card", `<div class="empty"><strong>No candidates with phone numbers</strong>Add a candidate with a phone number to compose WhatsApp messages.</div>`));
     return;
   }
-  card.querySelector("#wa-open").onclick = () => {
-    const opt = sel.selectedOptions[0];
-    const phone = opt.value.replace(/[^\d]/g, "");
-    const msg = card.querySelector("#wa-msg").value.replaceAll("{name}", opt.dataset.name.split(" ")[0]);
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
-  };
+
+  const layout = el("div", "chat-layout");
+  const listCol = el("div", "chat-list");
+  listCol.innerHTML = `<div class="chat-list-head">WhatsApp Composer</div>`;
+
+  candsWithPhone.forEach((c) => {
+    const item = el("div", "chat-item");
+    item.innerHTML = `
+      <div class="ci-av" style="background:${avColor(c.name)}">${initials(c.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="ci-name">${esc(c.name)}</div>
+        <div class="ci-last">${esc(c.phone)}</div>
+      </div>`;
+    item.onclick = () => openComposer(c);
+    listCol.appendChild(item);
+  });
+
+  const windowCol = el("div", "chat-window");
+  windowCol.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--grey);font-size:13px;">Select a candidate to compose a message</div>`;
+
+  layout.appendChild(listCol);
+  layout.appendChild(windowCol);
+  root.appendChild(layout);
+
+  function openComposer(c) {
+    listCol.querySelectorAll(".chat-item").forEach((i) => i.classList.remove("active-chat"));
+    const items = listCol.querySelectorAll(".chat-item");
+    const idx = candsWithPhone.indexOf(c);
+    if (items[idx]) items[idx].classList.add("active-chat");
+
+    windowCol.innerHTML = `
+      <div class="chat-head">
+        <div>
+          <div class="ch-name">${esc(c.name)}</div>
+          <div class="ch-sub">${esc(c.phone)}</div>
+        </div>
+        <a class="wa-link" href="https://wa.me/${c.phone.replace(/[^\d]/g, "")}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          Open in WhatsApp
+        </a>
+      </div>
+      <div class="chat-messages">
+        <div class="msg us">
+          Hi ${esc(c.name.split(" ")[0])}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?
+          <div class="msg-time">Template</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <textarea id="wa-msg" placeholder="Type a message…">Hi ${esc(c.name.split(" ")[0])}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?</textarea>
+        <button class="btn btn-dark btn-sm" id="wa-send">Send via WA</button>
+      </div>`;
+
+    windowCol.querySelector("#wa-send").onclick = () => {
+      const phone = c.phone.replace(/[^\d]/g, "");
+      const msg = windowCol.querySelector("#wa-msg").value;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+      toast("Opening WhatsApp");
+    };
+  }
 }
 
 // ---------- Re-score ----------
@@ -649,21 +789,24 @@ function rescore(root) {
     }))
     .filter((r) => r.cand && r.job && r.cand.resume_raw_text && (r.job.jd_raw_text || r.job.description));
 
-  const card = el("div", "card");
-  card.innerHTML = `<div class="card-title">Re-run AI matching on stored resumes</div>`;
+  const card = el("div", "rescore-card");
+  card.innerHTML = `<h2>Re-run AI matching on stored resumes</h2>
+    <p>The AI will re-read all stored resumes and update their match scores based on the latest JD requirements.</p>`;
+
   if (!rows.length) {
     card.innerHTML += `<div class="empty"><strong>Nothing to re-score</strong>Applications need both resume text and JD text stored.</div>`;
     root.appendChild(card);
     return;
   }
+
   const table = el("table", "table");
   table.innerHTML = `
     <thead><tr><th>Score</th><th>Candidate</th><th>Job</th><th></th></tr></thead>
     <tbody>${rows.map((r) => `<tr>
-      <td>${scoreRing(r.app.match_score, true)}</td>
+      <td>${scoreBar(r.app.match_score)}</td>
       <td><strong>${esc(r.cand.name)}</strong></td>
       <td>${esc(r.job.title)}</td>
-      <td><button class="btn btn-ghost btn-sm" data-app="${r.app.id}">Re-score (1 credit)</button></td>
+      <td><button class="btn btn-outline btn-sm" data-app="${r.app.id}">Re-score (1 credit)</button></td>
     </tr>`).join("")}</tbody>`;
   card.appendChild(table);
   root.appendChild(card);
@@ -673,7 +816,7 @@ function rescore(root) {
       b.textContent = "Scoring…";
       try {
         await runMatch(b.dataset.app);
-        toast("Re-scored ✓");
+        toast("Re-scored");
         render();
       } catch (e) {
         toast(e.message);
@@ -694,7 +837,7 @@ function analytics(root) {
 
   const metrics = el("div", "metric-row");
   const cards = [
-    [S.cache.jobs.length, "Open jobs", S.cache.jobs.filter((j) => j.status === "open").length + " open"],
+    [S.cache.jobs.length, "Open jobs"],
     [S.cache.candidates.length, "Candidates"],
     [scored.length, "Resumes scored"],
     [avg || "—", "Avg match score"],
@@ -707,7 +850,6 @@ function analytics(root) {
 
   const grid = el("div", "two-col");
 
-  // funnel
   const stages = ["new","screened","shortlisted","interview_scheduled","interviewed","offered","hired"];
   const funnel = el("div", "card", `<div class="card-title">Hiring funnel</div>`);
   const maxStage = Math.max(1, ...stages.map((s) => apps.filter((a) => a.stage === s).length));
@@ -720,7 +862,6 @@ function analytics(root) {
   });
   grid.appendChild(funnel);
 
-  // score distribution
   const dist = el("div", "card", `<div class="card-title">Score distribution</div>`);
   const buckets = [[0,20],[20,40],[40,60],[60,80],[80,101]];
   const maxB = Math.max(1, ...buckets.map(([lo, hi]) =>
@@ -729,13 +870,12 @@ function analytics(root) {
     const n = scored.filter((a) => a.match_score >= lo && a.match_score < hi).length;
     dist.innerHTML += `<div class="bar-row">
       <span class="bar-label">${lo}–${hi > 100 ? 100 : hi}</span>
-      <div class="bar-track"><div class="bar-fill teal" style="width:${(n / maxB) * 100}%"></div></div>
+      <div class="bar-track"><div class="bar-fill green" style="width:${(n / maxB) * 100}%"></div></div>
       <span class="bar-num">${n}</span></div>`;
   });
   grid.appendChild(dist);
   root.appendChild(grid);
 
-  // per-job table
   const perJob = el("div", "card", `<div class="card-title">Per-job breakdown</div>`);
   if (!S.cache.jobs.length) {
     perJob.innerHTML += `<div class="empty">No jobs yet.</div>`;
