@@ -759,13 +759,6 @@ async function screenJob(jobId) {
 
   const f = el("div", "form-grid");
   f.innerHTML = `
-    <div class="sc-summary">
-      <div class="sc-stat"><div class="n">${jobApps.length}</div><div class="l">In pipeline</div></div>
-      <div class="sc-stat"><div class="n">${unscoredCount}</div><div class="l">Unscored</div></div>
-      <div class="sc-stat"><div class="n" id="sc-sel-count">0</div><div class="l">Selected</div></div>
-      <div class="sc-stat"><div class="n">${creditsBalance}</div><div class="l">Balance</div></div>
-    </div>
-
     <div class="sc-filters">
       <label>From <input type="date" id="sc-from" class="input" value="${weekAgo}" /></label>
       <label>To <input type="date" id="sc-to" class="input" value="${today}" /></label>
@@ -839,7 +832,6 @@ async function screenJob(jobId) {
 
   function updateCounts() {
     const count = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
-    f.querySelector("#sc-sel-count").textContent = count;
     f.querySelector("#sc-start-count").textContent = count;
     const bar = f.querySelector("#sc-credit-bar");
     if (screenMethod === "ai") {
