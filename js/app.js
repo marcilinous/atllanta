@@ -260,7 +260,11 @@ function jobs(root) {
             <div class="jstat"><div class="n">${hired}</div><div class="l">Hired</div></div>
           </div>
           <div class="job-actions">
-            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="bulk">
+            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="addcand" title="Add single candidate">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+              Add
+            </button>
+            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="bulk" title="Bulk upload resumes">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Upload
             </button>
@@ -280,6 +284,9 @@ function jobs(root) {
       </div>`;
 
     grid.querySelector("#new-job-btn").onclick = jobForm;
+    grid.querySelectorAll("[data-act=addcand]").forEach((b) =>
+      b.addEventListener("click", () => candidateForm(b.dataset.id))
+    );
     grid.querySelectorAll("[data-act=bulk]").forEach((b) =>
       b.addEventListener("click", () => bulkUploadForm(b.dataset.id))
     );
@@ -450,37 +457,24 @@ function candidates(root) {
   draw();
 }
 
-function candidateForm() {
+function candidateForm(preselectedJobId) {
   const f = el("div", "form-grid");
   f.innerHTML = `
-    <label>Upload resume (PDF or DOCX)
-      <div class="file-drop" id="cf-drop">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <input type="file" id="cf-file" accept=".pdf,.docx,.doc" hidden />
-        <span id="cf-drop-label">Click or drag a resume file here</span>
-        <span style="font-size:11px;color:var(--grey)">PDF, DOCX — max 3 MB</span>
-      </div>
-    </label>
+    <div class="file-drop" id="cf-drop">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <input type="file" id="cf-file" accept=".pdf,.docx,.doc" hidden />
+      <span id="cf-drop-label">Click or drag a resume file here</span>
+      <span style="font-size:11px;color:var(--grey)">PDF, DOCX — max 3 MB</span>
+    </div>
     <div id="cf-parse-status" class="parse-status hidden"></div>
-    <div id="cf-fields" class="hidden">
-      <label>Full name <input id="cf-name" class="input" /></label>
-      <label>Email <input id="cf-email" type="email" class="input" /></label>
-      <label>Phone (with country code) <input id="cf-phone" class="input" placeholder="+91XXXXXXXXXX" /></label>
-      <label>Summary <input id="cf-summary" class="input" /></label>
-      <label>Resume text <textarea id="cf-resume" class="input" style="min-height:120px"></textarea></label>
-      <label>Attach to job (optional)
-        <select id="cf-job" class="input"><option value="">— none —</option>
-        ${S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("")}</select>
-      </label>
-      <button class="btn btn-amber" id="cf-save">Add candidate</button>
-    </div>`;
+    <div id="cf-result" class="hidden"></div>`;
   openModal("Add candidate", f);
 
   const drop = f.querySelector("#cf-drop");
   const fileInput = f.querySelector("#cf-file");
   const dropLabel = f.querySelector("#cf-drop-label");
   const parseStatus = f.querySelector("#cf-parse-status");
-  const fieldsDiv = f.querySelector("#cf-fields");
+  const resultDiv = f.querySelector("#cf-result");
 
   drop.addEventListener("click", () => fileInput.click());
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("dragover"); });
@@ -499,85 +493,75 @@ function candidateForm() {
 
   async function handleFile(file) {
     const ext = file.name.split(".").pop().toLowerCase();
-    if (!["pdf", "docx", "doc"].includes(ext)) {
-      return toast("Only PDF and DOCX files are supported");
-    }
-    if (file.size > 3 * 1024 * 1024) {
-      return toast("File too large (max 3 MB)");
-    }
+    if (!["pdf", "docx", "doc"].includes(ext)) return toast("Only PDF and DOCX files are supported");
+    if (file.size > 3 * 1024 * 1024) return toast("File too large (max 3 MB)");
+
     dropLabel.textContent = file.name;
     drop.classList.add("has-file");
     parseStatus.textContent = "Extracting text from resume…";
     parseStatus.classList.remove("hidden", "error");
-    fieldsDiv.classList.add("hidden");
+    resultDiv.classList.add("hidden");
 
     try {
       const base64 = await readFileAsBase64(file);
       const { data: { session } } = await sb.auth.getSession();
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      };
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` };
 
-      const parseResp = await fetch("/api/parse-resume", {
-        method: "POST", headers,
-        body: JSON.stringify({ filename: file.name, data: base64 }),
-      });
+      const parseResp = await fetch("/api/parse-resume", { method: "POST", headers, body: JSON.stringify({ filename: file.name, data: base64 }) });
       const parseResult = await parseResp.json();
       if (!parseResp.ok) throw new Error(parseResult.error || "Parse failed");
 
-      const resumeText = parseResult.text;
       parseStatus.textContent = "Extracting candidate details with AI…";
 
-      const extResp = await fetch("/api/extract-candidate", {
-        method: "POST", headers,
-        body: JSON.stringify({ resume_text: resumeText }),
-      });
+      const extResp = await fetch("/api/extract-candidate", { method: "POST", headers, body: JSON.stringify({ resume_text: parseResult.text }) });
       const extResult = await extResp.json();
       if (!extResp.ok) throw new Error(extResult.error || "Extraction failed");
 
-      f.querySelector("#cf-name").value = extResult.name || "";
-      f.querySelector("#cf-email").value = extResult.email || "";
-      f.querySelector("#cf-phone").value = extResult.phone || "";
-      f.querySelector("#cf-summary").value = extResult.summary || "";
-      f.querySelector("#cf-resume").value = resumeText;
+      const candName = extResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
+      parseStatus.textContent = "Saving candidate profile…";
 
-      parseStatus.textContent = "Details extracted — review and save below";
-      fieldsDiv.classList.remove("hidden");
+      const { data: cand, error } = await sb.from("candidates").insert({
+        client_id: S.clientId,
+        name: candName,
+        email: extResult.email || null,
+        phone: extResult.phone || null,
+        resume_raw_text: parseResult.text,
+      }).select().single();
+      if (error) throw new Error(error.message);
+
+      if (preselectedJobId) {
+        await sb.from("applications").insert({ job_id: preselectedJobId, candidate_id: cand.id });
+      }
+
+      parseStatus.classList.add("hidden");
+      resultDiv.classList.remove("hidden");
+      resultDiv.innerHTML = `
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+          <div class="av" style="background:${avColor(candName)};width:44px;height:44px;font-size:16px;border-radius:12px">${initials(candName)}</div>
+          <div>
+            <strong style="font-size:15px">${esc(candName)}</strong><br>
+            <span style="color:var(--grey);font-size:12.5px">${esc(extResult.email || "")} ${extResult.phone ? "· " + esc(extResult.phone) : ""}</span>
+          </div>
+        </div>
+        ${extResult.summary ? `<p style="font-size:13px;color:var(--ink2);margin-bottom:12px">${esc(extResult.summary)}</p>` : ""}
+        <p style="font-size:12.5px;color:var(--green);font-weight:600;margin-bottom:12px">Profile created successfully</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-amber" id="cf-another">Upload another</button>
+          <button class="btn btn-dark" id="cf-done">Done</button>
+        </div>`;
+      resultDiv.querySelector("#cf-another").onclick = () => {
+        resultDiv.classList.add("hidden");
+        drop.classList.remove("has-file");
+        dropLabel.textContent = "Click or drag a resume file here";
+        fileInput.value = "";
+      };
+      resultDiv.querySelector("#cf-done").onclick = () => { closeModal(); render(); };
+      toast("Candidate added — " + candName);
     } catch (err) {
       parseStatus.textContent = err.message;
       parseStatus.classList.add("error");
     }
   }
-
-  f.addEventListener("click", (e) => {
-    if (e.target.id !== "cf-save") return;
-    e.target.onclick();
-  });
-
-  f.querySelector("#cf-save").onclick = async () => {
-    const name = f.querySelector("#cf-name").value.trim();
-    if (!name) return toast("Name is required");
-    const resumeText = f.querySelector("#cf-resume").value.trim() || null;
-    if (!resumeText) return toast("Resume text is required");
-    const { data: cand, error } = await sb
-      .from("candidates")
-      .insert({
-        client_id: S.clientId,
-        name,
-        email: f.querySelector("#cf-email").value.trim() || null,
-        phone: f.querySelector("#cf-phone").value.trim() || null,
-        resume_raw_text: resumeText,
-      })
-      .select()
-      .single();
-    if (error) return toast(error.message);
-    const jobId = f.querySelector("#cf-job").value;
-    if (jobId) await sb.from("applications").insert({ job_id: jobId, candidate_id: cand.id });
-    closeModal();
-    toast("Candidate added");
-    render();
-  };
 }
 
 // ---------- Bulk upload ----------
@@ -729,28 +713,65 @@ async function screenJob(jobId) {
   const job = S.cache.jobs.find((j) => j.id === jobId);
   if (!job) return;
 
-  const unscoredCount = S.cache.applications.filter(
-    (a) => a.job_id === jobId && a.match_score == null
-  ).length;
-  const totalCount = S.cache.applications.filter((a) => a.job_id === jobId).length;
-
-  if (!totalCount) return toast("No candidates attached to this job yet");
+  const jobApps = S.cache.applications.filter((a) => a.job_id === jobId);
+  const attachedCandIds = new Set(jobApps.map((a) => a.candidate_id));
+  const poolCands = S.cache.candidates
+    .filter((c) => !attachedCandIds.has(c.id) && c.resume_raw_text)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   const f = el("div", "form-grid");
   f.innerHTML = `
     <p style="font-size:13px;color:var(--grey);margin-bottom:4px">
-      <strong>${esc(job.title)}</strong> — ${totalCount} candidate${totalCount !== 1 ? "s" : ""} in pipeline, ${unscoredCount} unscored
+      <strong>${esc(job.title)}</strong> — ${jobApps.length} candidate${jobApps.length !== 1 ? "s" : ""} attached
     </p>
-    <label>Which candidates to screen?
-      <select id="sc-mode" class="input">
-        <option value="unscored">Only unscored (${unscoredCount})</option>
-        <option value="all">All candidates (${totalCount}) — re-score everyone</option>
-      </select>
-    </label>
-    <button class="btn btn-amber" id="sc-start">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Run screening now
-    </button>
+    ${jobApps.length ? `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <strong style="font-size:12.5px">Select candidates to screen</strong>
+        <button class="btn btn-outline btn-sm" id="sc-sel-unscored" style="font-size:11px;padding:2px 8px">Select unscored</button>
+        <button class="btn btn-outline btn-sm" id="sc-sel-all" style="font-size:11px;padding:2px 8px">Select all</button>
+        <button class="btn btn-outline btn-sm" id="sc-sel-none" style="font-size:11px;padding:2px 8px">Clear</button>
+      </div>
+      <div id="sc-cand-list" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px">
+        ${jobApps.map((a) => {
+          const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
+          return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
+            <input type="checkbox" value="${a.id}" class="sc-check" ${a.match_score == null ? "checked" : ""} />
+            <div class="av" style="background:${avColor(c?.name)};width:28px;height:28px;font-size:10px;border-radius:8px;flex-shrink:0">${initials(c?.name)}</div>
+            <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c?.name || "Unknown")}</div></div>
+            <div style="flex-shrink:0">${scoreBar(a.match_score)}</div>
+          </label>`;
+        }).join("")}
+      </div>
+    ` : `<p style="color:var(--grey);font-size:13px">No candidates attached yet. Upload resumes or add from pool below.</p>`}
+    ${poolCands.length ? `
+      <div style="border-top:1px solid var(--line2);padding-top:12px;margin-top:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:12.5px">Add from candidate pool</strong>
+          <button class="btn btn-outline btn-sm" id="sc-pool-all" style="font-size:11px;padding:2px 8px">Select all</button>
+        </div>
+        <div id="sc-pool-list" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px">
+          ${poolCands.slice(0, 50).map((c) => {
+            const added = new Date(c.created_at);
+            const dateStr = added.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+            return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px;background:var(--bg2)">
+              <input type="checkbox" value="${c.id}" class="sc-pool-check" />
+              <div class="av" style="background:${avColor(c.name)};width:28px;height:28px;font-size:10px;border-radius:8px;flex-shrink:0">${initials(c.name)}</div>
+              <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(c.name)}</div><div style="font-size:11px;color:var(--grey)">${esc(c.email || "")} · added ${dateStr}</div></div>
+            </label>`;
+          }).join("")}
+        </div>
+      </div>
+    ` : ""}
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-outline" id="sc-upload" style="flex:1">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload resumes
+      </button>
+      <button class="btn btn-amber" id="sc-start" style="flex:1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Screen selected
+      </button>
+    </div>
     <div id="sc-progress" class="hidden">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px" id="sc-label">Screening…</div>
       <div style="height:8px;background:var(--line2);border-radius:6px;overflow:hidden;margin-bottom:12px">
@@ -760,8 +781,34 @@ async function screenJob(jobId) {
     </div>`;
   openModal("Screen candidates", f);
 
+  const candList = f.querySelector("#sc-cand-list");
+  if (candList) {
+    f.querySelector("#sc-sel-unscored").onclick = () => {
+      candList.querySelectorAll(".sc-check").forEach((cb) => {
+        const app = jobApps.find((a) => a.id === cb.value);
+        cb.checked = app?.match_score == null;
+      });
+    };
+    f.querySelector("#sc-sel-all").onclick = () => candList.querySelectorAll(".sc-check").forEach((cb) => { cb.checked = true; });
+    f.querySelector("#sc-sel-none").onclick = () => candList.querySelectorAll(".sc-check").forEach((cb) => { cb.checked = false; });
+  }
+
+  const poolAllBtn = f.querySelector("#sc-pool-all");
+  if (poolAllBtn) {
+    poolAllBtn.onclick = () => f.querySelectorAll(".sc-pool-check").forEach((cb) => { cb.checked = true; });
+  }
+
+  f.querySelector("#sc-upload").onclick = () => {
+    closeModal();
+    bulkUploadForm(jobId);
+  };
+
   f.querySelector("#sc-start").onclick = async () => {
-    const mode = f.querySelector("#sc-mode").value;
+    const selectedAppIds = Array.from(f.querySelectorAll(".sc-check:checked")).map((cb) => cb.value);
+    const selectedPoolIds = Array.from(f.querySelectorAll(".sc-pool-check:checked")).map((cb) => cb.value);
+
+    if (!selectedAppIds.length && !selectedPoolIds.length) return toast("Select at least one candidate");
+
     const startBtn = f.querySelector("#sc-start");
     startBtn.disabled = true;
     startBtn.textContent = "Screening…";
@@ -771,44 +818,45 @@ async function screenJob(jobId) {
     const label = f.querySelector("#sc-label");
     const log = f.querySelector("#sc-log");
     progress.classList.remove("hidden");
-
     fill.style.width = "10%";
-    label.textContent = "Sending to AI for scoring…";
 
     try {
       const { data: { session } } = await sb.auth.getSession();
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` };
+
+      if (selectedPoolIds.length) {
+        label.textContent = `Adding ${selectedPoolIds.length} candidate${selectedPoolIds.length !== 1 ? "s" : ""} from pool…`;
+        for (const candId of selectedPoolIds) {
+          const { data: app, error } = await sb.from("applications").insert({ job_id: jobId, candidate_id: candId }).select().single();
+          if (!error && app) selectedAppIds.push(app.id);
+        }
+      }
+
+      label.textContent = `Scoring ${selectedAppIds.length} candidate${selectedAppIds.length !== 1 ? "s" : ""}…`;
+      fill.style.width = "30%";
+
       const resp = await fetch("/api/screen-job", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ job_id: jobId, mode }),
+        method: "POST", headers,
+        body: JSON.stringify({ job_id: jobId, mode: "all", application_ids: selectedAppIds }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Screening failed");
 
       fill.style.width = "100%";
-      label.textContent = `Done — ${data.results.filter((r) => r.score != null).length} scored, ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`;
+      const scored = data.results.filter((r) => r.score != null).length;
+      label.textContent = `Done — ${scored} scored, ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`;
 
-      if (data.credits_remaining != null) {
-        $("#credits-count").textContent = data.credits_remaining;
-      }
+      if (data.credits_remaining != null) $("#credits-count").textContent = data.credits_remaining;
 
       data.results.forEach((r) => {
         const entry = el("div");
-        if (r.score != null) {
-          entry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(r.candidate_name)} — score: <strong>${r.score}</strong>`;
-        } else {
-          entry.innerHTML = `<span style="color:var(--red)">&#10007;</span> ${esc(r.candidate_name)} — ${esc(r.error || "skipped")}`;
-        }
+        entry.innerHTML = r.score != null
+          ? `<span style="color:var(--green)">&#10003;</span> ${esc(r.candidate_name)} — score: <strong>${r.score}</strong>`
+          : `<span style="color:var(--red)">&#10007;</span> ${esc(r.candidate_name)} — ${esc(r.error || "skipped")}`;
         log.appendChild(entry);
       });
 
-      if (!data.results.length) {
-        log.innerHTML = `<div style="color:var(--grey)">No candidates to screen.</div>`;
-      }
-
+      if (!data.results.length) log.innerHTML = `<div style="color:var(--grey)">No candidates to screen.</div>`;
       toast(`Screening complete — ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`);
     } catch (err) {
       fill.style.width = "100%";

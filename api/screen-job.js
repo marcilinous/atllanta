@@ -1,6 +1,6 @@
 // POST /api/screen-job
-// Batch-scores all unscored (or all) candidates for a given job.
-// Body: { job_id, mode: "unscored" | "all" }
+// Batch-scores candidates for a given job.
+// Body: { job_id, mode: "unscored" | "all", application_ids?: string[] }
 // Returns: { results: [{ application_id, candidate_name, score, error? }], credits_used }
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   }
 
   const db = supabaseAdmin();
-  const { job_id, mode } = req.body || {};
+  const { job_id, mode, application_ids } = req.body || {};
   if (!job_id) return res.status(400).json({ error: "job_id is required" });
 
   const { data: job } = await db
@@ -68,7 +68,9 @@ export default async function handler(req, res) {
     .select("id, candidate_id, match_score")
     .eq("job_id", job_id);
 
-  if (mode !== "all") {
+  if (Array.isArray(application_ids) && application_ids.length) {
+    appsQuery = appsQuery.in("id", application_ids);
+  } else if (mode !== "all") {
     appsQuery = appsQuery.is("match_score", null);
   }
 
