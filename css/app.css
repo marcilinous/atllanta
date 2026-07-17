@@ -491,7 +491,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 body.modal-open { overflow: hidden; }
 
 /* ── Screen candidate list ────────────────── */
-.sc-summary { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; flex-shrink: 0; }
+.sc-summary { display: flex; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; flex-shrink: 0; }
 .sc-stat {
   flex: 1; min-width: 80px; text-align: center;
   background: var(--bg2); border-radius: 10px; padding: 10px 8px;
