@@ -365,16 +365,85 @@ function candidateForm() {
     <label>Full name <input id="cf-name" /></label>
     <label>Email <input id="cf-email" type="email" /></label>
     <label>Phone (with country code, for WhatsApp) <input id="cf-phone" placeholder="91XXXXXXXXXX" /></label>
-    <label>Resume text (paste) <textarea id="cf-resume" placeholder="Paste the resume text here — this is what gets scored."></textarea></label>
+    <label>Upload resume (PDF or DOCX)
+      <div class="file-drop" id="cf-drop">
+        <input type="file" id="cf-file" accept=".pdf,.docx,.doc" hidden />
+        <span id="cf-drop-label">Click or drag a file here</span>
+      </div>
+    </label>
+    <div id="cf-parse-status" class="parse-status hidden"></div>
+    <label>Resume text <textarea id="cf-resume" placeholder="Upload a file above, or paste the resume text here."></textarea></label>
     <label>Attach to job (optional)
       <select id="cf-job"><option value="">— none —</option>
       ${S.cache.jobs.map((j) => `<option value="${j.id}">${esc(j.title)}</option>`).join("")}</select>
     </label>
     <button class="btn btn-primary" id="cf-save">Add candidate</button>`;
   openModal("Add candidate", f);
+
+  const drop = f.querySelector("#cf-drop");
+  const fileInput = f.querySelector("#cf-file");
+  const dropLabel = f.querySelector("#cf-drop-label");
+  const parseStatus = f.querySelector("#cf-parse-status");
+  const resumeTA = f.querySelector("#cf-resume");
+
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("dragover"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+
+  async function handleFile(file) {
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["pdf", "docx", "doc"].includes(ext)) {
+      return toast("Only PDF and DOCX files are supported");
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      return toast("File too large (max 3 MB)");
+    }
+    dropLabel.textContent = file.name;
+    drop.classList.add("has-file");
+    parseStatus.textContent = "Extracting text from resume…";
+    parseStatus.classList.remove("hidden", "error");
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result.split(",")[1];
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        const resp = await fetch("/api/parse-resume", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ filename: file.name, data: base64 }),
+        });
+        const result = await resp.json();
+        if (!resp.ok) throw new Error(result.error || "Parse failed");
+        resumeTA.value = result.text;
+        parseStatus.textContent = `Extracted ${result.text.length.toLocaleString()} characters`;
+      } catch (err) {
+        parseStatus.textContent = err.message;
+        parseStatus.classList.add("error");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   f.querySelector("#cf-save").onclick = async () => {
     const name = f.querySelector("#cf-name").value.trim();
     if (!name) return toast("Name is required");
+    const resumeText = resumeTA.value.trim() || null;
+    if (!resumeText) return toast("Resume text is required — upload a file or paste text");
     const { data: cand, error } = await sb
       .from("candidates")
       .insert({
@@ -382,7 +451,7 @@ function candidateForm() {
         name,
         email: f.querySelector("#cf-email").value.trim() || null,
         phone: f.querySelector("#cf-phone").value.trim() || null,
-        resume_raw_text: f.querySelector("#cf-resume").value.trim() || null,
+        resume_raw_text: resumeText,
       })
       .select()
       .single();

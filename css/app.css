@@ -413,6 +413,33 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .wa-link:hover { text-decoration: underline; }
 
+/* file upload drop zone */
+.file-drop {
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+.file-drop:hover, .file-drop.dragover {
+  border-color: var(--marigold);
+  background: rgba(232, 137, 12, .04);
+}
+.file-drop.has-file {
+  border-color: var(--teal);
+  color: var(--teal);
+  border-style: solid;
+}
+.parse-status {
+  font-size: 12.5px;
+  color: var(--teal);
+  padding: 2px 0;
+}
+.parse-status.error { color: var(--brick); }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
