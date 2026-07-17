@@ -260,9 +260,13 @@ function jobs(root) {
             <div class="jstat"><div class="n">${hired}</div><div class="l">Hired</div></div>
           </div>
           <div class="job-actions">
-            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="attach">
+            <button class="btn btn-outline btn-sm" style="flex:1" data-id="${j.id}" data-act="bulk">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              + Candidate
+              Upload
+            </button>
+            <button class="btn btn-amber btn-sm" style="flex:1" data-id="${j.id}" data-act="screen">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Screen
             </button>
             <button class="btn btn-dark btn-sm" style="flex:1" data-id="${j.id}" data-act="view">View</button>
           </div>
@@ -276,8 +280,11 @@ function jobs(root) {
       </div>`;
 
     grid.querySelector("#new-job-btn").onclick = jobForm;
-    grid.querySelectorAll("[data-act=attach]").forEach((b) =>
-      b.addEventListener("click", () => attachCandidateForm(b.dataset.id))
+    grid.querySelectorAll("[data-act=bulk]").forEach((b) =>
+      b.addEventListener("click", () => bulkUploadForm(b.dataset.id))
+    );
+    grid.querySelectorAll("[data-act=screen]").forEach((b) =>
+      b.addEventListener("click", () => screenJob(b.dataset.id))
     );
     grid.querySelectorAll("[data-act=view]").forEach((b) =>
       b.addEventListener("click", () => {
@@ -338,6 +345,10 @@ function candidates(root) {
   });
   bar.appendChild(chips);
   bar.appendChild(el("div", "spacer"));
+  const bulkBtn = el("button", "btn btn-outline", "Bulk upload");
+  bulkBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Bulk upload`;
+  bulkBtn.onclick = () => bulkUploadForm(null);
+  bar.appendChild(bulkBtn);
   const addBtn = el("button", "btn btn-amber", "+ Add candidate");
   addBtn.onclick = () => candidateForm();
   bar.appendChild(addBtn);
@@ -543,6 +554,251 @@ function candidateForm() {
     closeModal();
     toast("Candidate added");
     render();
+  };
+}
+
+// ---------- Bulk upload ----------
+function bulkUploadForm(preselectedJobId) {
+  const f = el("div", "form-grid");
+  f.innerHTML = `
+    <label>Attach all to job (optional)
+      <select id="bu-job" class="input">
+        <option value="">— none (add to pool) —</option>
+        ${S.cache.jobs.map((j) => `<option value="${j.id}"${j.id === preselectedJobId ? " selected" : ""}>${esc(j.title)}</option>`).join("")}
+      </select>
+    </label>
+    <label>Drop resume files (PDF / DOCX — up to 100)
+      <div class="file-drop bulk-drop" id="bu-drop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <input type="file" id="bu-files" accept=".pdf,.docx,.doc" multiple hidden />
+        <span id="bu-drop-label">Click or drag files here</span>
+        <span style="font-size:11px;color:var(--grey)">PDF, DOCX — max 3 MB each, up to 100 files</span>
+      </div>
+    </label>
+    <div id="bu-file-list" style="font-size:12.5px;color:var(--grey)"></div>
+    <button class="btn btn-amber" id="bu-start" disabled>Process resumes</button>
+    <div id="bu-progress" class="hidden">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px" id="bu-prog-label">Processing…</div>
+      <div style="height:8px;background:var(--line2);border-radius:6px;overflow:hidden;margin-bottom:12px">
+        <div id="bu-prog-fill" style="height:100%;background:linear-gradient(90deg,var(--amber),var(--green));border-radius:6px;width:0%;transition:width .3s ease"></div>
+      </div>
+      <div id="bu-prog-log" style="max-height:200px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:4px"></div>
+    </div>`;
+  openModal("Bulk resume upload", f);
+
+  let files = [];
+  const drop = f.querySelector("#bu-drop");
+  const fileInput = f.querySelector("#bu-files");
+  const dropLabel = f.querySelector("#bu-drop-label");
+  const fileList = f.querySelector("#bu-file-list");
+  const startBtn = f.querySelector("#bu-start");
+
+  function setFiles(fl) {
+    const valid = Array.from(fl).filter((f) => {
+      const ext = f.name.split(".").pop().toLowerCase();
+      return ["pdf", "docx", "doc"].includes(ext) && f.size <= 3 * 1024 * 1024;
+    }).slice(0, 100);
+    files = valid;
+    dropLabel.textContent = `${files.length} file${files.length !== 1 ? "s" : ""} selected`;
+    drop.classList.toggle("has-file", files.length > 0);
+    fileList.innerHTML = files.map((f) => esc(f.name)).join(", ");
+    startBtn.disabled = files.length === 0;
+    if (fl.length > valid.length) {
+      toast(`${fl.length - valid.length} file(s) skipped (wrong type or >3 MB)`);
+    }
+  }
+
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("dragover"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault(); drop.classList.remove("dragover");
+    if (e.dataTransfer.files.length) setFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener("change", () => { if (fileInput.files.length) setFiles(fileInput.files); });
+
+  startBtn.onclick = async () => {
+    startBtn.disabled = true;
+    const jobId = f.querySelector("#bu-job").value || null;
+    const progress = f.querySelector("#bu-progress");
+    const progFill = f.querySelector("#bu-prog-fill");
+    const progLabel = f.querySelector("#bu-prog-label");
+    const progLog = f.querySelector("#bu-prog-log");
+    progress.classList.remove("hidden");
+
+    const { data: { session } } = await sb.auth.getSession();
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    };
+
+    let done = 0;
+    let success = 0;
+
+    for (const file of files) {
+      done++;
+      progFill.style.width = `${Math.round((done / files.length) * 100)}%`;
+      progLabel.textContent = `Processing ${done} of ${files.length}…`;
+
+      const logEntry = el("div", "", `<span style="color:var(--amber)">⏳</span> ${esc(file.name)}`);
+      progLog.appendChild(logEntry);
+      progLog.scrollTop = progLog.scrollHeight;
+
+      try {
+        const base64 = await readFileAsBase64(file);
+
+        const parseResp = await fetch("/api/parse-resume", {
+          method: "POST", headers,
+          body: JSON.stringify({ filename: file.name, data: base64 }),
+        });
+        const parseResult = await parseResp.json();
+        if (!parseResp.ok) throw new Error(parseResult.error || "Parse failed");
+
+        const extractResp = await fetch("/api/extract-candidate", {
+          method: "POST", headers,
+          body: JSON.stringify({ resume_text: parseResult.text }),
+        });
+        const extractResult = await extractResp.json();
+        if (!extractResp.ok) throw new Error(extractResult.error || "Extract failed");
+
+        const { data: cand, error } = await sb.from("candidates").insert({
+          client_id: S.clientId,
+          name: extractResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "),
+          email: extractResult.email || null,
+          phone: extractResult.phone || null,
+          resume_raw_text: parseResult.text,
+        }).select().single();
+
+        if (error) throw new Error(error.message);
+        if (jobId) {
+          await sb.from("applications").insert({ job_id: jobId, candidate_id: cand.id });
+        }
+
+        logEntry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(extractResult.name || file.name)} — ${esc(extractResult.email || "")}`;
+        success++;
+      } catch (err) {
+        logEntry.innerHTML = `<span style="color:var(--red)">&#10007;</span> ${esc(file.name)} — ${esc(err.message)}`;
+      }
+    }
+
+    progLabel.textContent = `Done — ${success} of ${files.length} resumes processed`;
+    progFill.style.width = "100%";
+    toast(`${success} candidate${success !== 1 ? "s" : ""} added`);
+
+    const doneBtn = el("button", "btn btn-dark", "Close");
+    doneBtn.style.marginTop = "12px";
+    doneBtn.onclick = () => { closeModal(); render(); };
+    progress.appendChild(doneBtn);
+  };
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- Screen job ----------
+async function screenJob(jobId) {
+  const job = S.cache.jobs.find((j) => j.id === jobId);
+  if (!job) return;
+
+  const unscoredCount = S.cache.applications.filter(
+    (a) => a.job_id === jobId && a.match_score == null
+  ).length;
+  const totalCount = S.cache.applications.filter((a) => a.job_id === jobId).length;
+
+  if (!totalCount) return toast("No candidates attached to this job yet");
+
+  const f = el("div", "form-grid");
+  f.innerHTML = `
+    <p style="font-size:13px;color:var(--grey);margin-bottom:4px">
+      <strong>${esc(job.title)}</strong> — ${totalCount} candidate${totalCount !== 1 ? "s" : ""} in pipeline, ${unscoredCount} unscored
+    </p>
+    <label>Which candidates to screen?
+      <select id="sc-mode" class="input">
+        <option value="unscored">Only unscored (${unscoredCount})</option>
+        <option value="all">All candidates (${totalCount}) — re-score everyone</option>
+      </select>
+    </label>
+    <button class="btn btn-amber" id="sc-start">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Run screening now
+    </button>
+    <div id="sc-progress" class="hidden">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px" id="sc-label">Screening…</div>
+      <div style="height:8px;background:var(--line2);border-radius:6px;overflow:hidden;margin-bottom:12px">
+        <div id="sc-fill" style="height:100%;background:linear-gradient(90deg,var(--amber),var(--green));border-radius:6px;width:0%;transition:width .3s ease"></div>
+      </div>
+      <div id="sc-log" style="max-height:200px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:4px"></div>
+    </div>`;
+  openModal("Screen candidates", f);
+
+  f.querySelector("#sc-start").onclick = async () => {
+    const mode = f.querySelector("#sc-mode").value;
+    const startBtn = f.querySelector("#sc-start");
+    startBtn.disabled = true;
+    startBtn.textContent = "Screening…";
+
+    const progress = f.querySelector("#sc-progress");
+    const fill = f.querySelector("#sc-fill");
+    const label = f.querySelector("#sc-label");
+    const log = f.querySelector("#sc-log");
+    progress.classList.remove("hidden");
+
+    fill.style.width = "10%";
+    label.textContent = "Sending to AI for scoring…";
+
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch("/api/screen-job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ job_id: jobId, mode }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Screening failed");
+
+      fill.style.width = "100%";
+      label.textContent = `Done — ${data.results.filter((r) => r.score != null).length} scored, ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`;
+
+      if (data.credits_remaining != null) {
+        $("#credits-count").textContent = data.credits_remaining;
+      }
+
+      data.results.forEach((r) => {
+        const entry = el("div");
+        if (r.score != null) {
+          entry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(r.candidate_name)} — score: <strong>${r.score}</strong>`;
+        } else {
+          entry.innerHTML = `<span style="color:var(--red)">&#10007;</span> ${esc(r.candidate_name)} — ${esc(r.error || "skipped")}`;
+        }
+        log.appendChild(entry);
+      });
+
+      if (!data.results.length) {
+        log.innerHTML = `<div style="color:var(--grey)">No candidates to screen.</div>`;
+      }
+
+      toast(`Screening complete — ${data.credits_used} credit${data.credits_used !== 1 ? "s" : ""} used`);
+    } catch (err) {
+      fill.style.width = "100%";
+      fill.style.background = "var(--red)";
+      label.textContent = "Screening failed";
+      log.innerHTML = `<div style="color:var(--red)">${esc(err.message)}</div>`;
+      toast(err.message);
+    }
+
+    const doneBtn = el("button", "btn btn-dark", "Close");
+    doneBtn.style.marginTop = "12px";
+    doneBtn.onclick = () => { closeModal(); render(); };
+    progress.appendChild(doneBtn);
   };
 }
 
