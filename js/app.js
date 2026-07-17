@@ -62,10 +62,11 @@ function avColor(name) {
   return avColors[Math.abs(h) % avColors.length];
 }
 
-function openModal(title, bodyNode) {
+function openModal(title, bodyNode, opts) {
   $("#modal-title").textContent = title;
   const body = $("#modal-body");
   body.innerHTML = "";
+  body.className = "modal-body" + (opts?.scrollList ? " sc-body" : "");
   body.appendChild(bodyNode);
   $("#modal-backdrop").classList.remove("hidden");
   document.body.classList.add("modal-open");
@@ -821,7 +822,7 @@ async function screenJob(jobId) {
       </div>
       <div id="sc-log" style="max-height:180px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column;gap:4px"></div>
     </div>`;
-  openModal("Screen — " + job.title, f);
+  openModal("Screen — " + job.title, f, { scrollList: true });
 
   function updateCounts() {
     const count = f.querySelectorAll(".sc-check:checked, .sc-pool-check:checked").length;
