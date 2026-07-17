@@ -770,7 +770,7 @@ async function screenJob(jobId) {
     <div class="sc-filters">
       <label>From <input type="date" id="sc-from" class="input" value="${weekAgo}" /></label>
       <label>To <input type="date" id="sc-to" class="input" value="${today}" /></label>
-      <button class="btn btn-outline btn-sm" id="sc-apply-dates" style="padding:5px 10px;white-space:nowrap;font-size:11px">Apply</button>
+      <button class="btn btn-amber btn-sm" id="sc-apply-dates" style="white-space:nowrap">Apply</button>
     </div>
 
     <div class="sc-method">
@@ -786,9 +786,9 @@ async function screenJob(jobId) {
       <div class="sc-toolbar">
         <strong>Candidates (${jobApps.length})</strong>
         <input type="text" id="sc-search" class="input" placeholder="Search…" style="flex:1;min-width:80px;padding:4px 8px;font-size:12px" />
-        <button class="btn btn-outline btn-sm" id="sc-sel-unscored" style="font-size:11px;padding:2px 8px">Unscored</button>
-        <button class="btn btn-outline btn-sm" id="sc-sel-all" style="font-size:11px;padding:2px 8px">All</button>
-        <button class="btn btn-outline btn-sm" id="sc-sel-none" style="font-size:11px;padding:2px 8px">Clear</button>
+        <button class="btn btn-outline btn-sm sc-tbtn" id="sc-sel-unscored">Unscored</button>
+        <button class="btn btn-outline btn-sm sc-tbtn" id="sc-sel-all">All</button>
+        <button class="btn btn-outline btn-sm sc-tbtn" id="sc-sel-none">Clear</button>
       </div>
       <div class="sc-list" id="sc-cand-list">
         ${jobApps.map((a) => {
@@ -804,7 +804,7 @@ async function screenJob(jobId) {
       <div class="sc-toolbar" style="border-top:1px solid var(--line2);padding-top:10px;margin-top:4px">
         <strong>From pool (${poolCands.length})</strong>
         <input type="text" id="sc-pool-search" class="input" placeholder="Search…" style="flex:1;min-width:80px;padding:4px 8px;font-size:12px" />
-        <button class="btn btn-outline btn-sm" id="sc-pool-all" style="font-size:11px;padding:2px 8px">Select all</button>
+        <button class="btn btn-outline btn-sm sc-tbtn" id="sc-pool-all">Select all</button>
       </div>
       <div class="sc-list" id="sc-pool-list">
         ${poolCands.slice(0, 200).map((c) => {
