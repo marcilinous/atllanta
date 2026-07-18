@@ -1,5 +1,6 @@
-// GET  /api/schedule?token=<uuid>  — public: fetch job info + available slots
+// GET  /api/schedule?token=<uuid>  — public: fetch job info + candidate-specific slots
 // POST /api/schedule { token, slot_id } — public: book a slot
+// Each candidate gets a unique link with 24hr auto-expiry.
 
 import { supabaseAdmin } from "../lib/supabaseServer.js";
 
@@ -16,10 +17,14 @@ export default async function handler(req, res) {
 
     const { data: app } = await db
       .from("applications")
-      .select("id, job_id, candidate_id, stage, interview_at")
+      .select("id, job_id, candidate_id, stage, interview_at, schedule_expires_at")
       .eq("schedule_token", token)
       .single();
     if (!app) return res.status(404).json({ error: "Invalid or expired link" });
+
+    if (app.schedule_expires_at && new Date(app.schedule_expires_at) < new Date()) {
+      return res.status(410).json({ error: "This scheduling link has expired. Please ask the hiring team for a new link." });
+    }
 
     const [{ data: job }, { data: cand }] = await Promise.all([
       db.from("jobs").select("id, title, client_id").eq("id", app.job_id).single(),
@@ -47,10 +52,12 @@ export default async function handler(req, res) {
     const { data: slots } = await db
       .from("interview_slots")
       .select("id, slot_start, slot_end")
-      .eq("job_id", app.job_id)
+      .eq("application_id", app.id)
       .is("booked_by", null)
       .gte("slot_start", new Date().toISOString())
       .order("slot_start");
+
+    const expiresAt = app.schedule_expires_at || null;
 
     return res.json({
       booked: false,
@@ -58,6 +65,7 @@ export default async function handler(req, res) {
       org_name: org?.name || client?.name || "",
       candidate_name: cand?.name || "",
       slots: slots || [],
+      expires_at: expiresAt,
     });
   }
 
@@ -67,17 +75,22 @@ export default async function handler(req, res) {
 
     const { data: app } = await db
       .from("applications")
-      .select("id, job_id, interview_at")
+      .select("id, job_id, interview_at, schedule_expires_at")
       .eq("schedule_token", token)
       .single();
     if (!app) return res.status(404).json({ error: "Invalid link" });
+
+    if (app.schedule_expires_at && new Date(app.schedule_expires_at) < new Date()) {
+      return res.status(410).json({ error: "This scheduling link has expired" });
+    }
+
     if (app.interview_at) return res.status(409).json({ error: "Already booked" });
 
     const { data: slot } = await db
       .from("interview_slots")
       .select("*")
       .eq("id", slot_id)
-      .eq("job_id", app.job_id)
+      .eq("application_id", app.id)
       .is("booked_by", null)
       .single();
     if (!slot) return res.status(409).json({ error: "Slot no longer available" });

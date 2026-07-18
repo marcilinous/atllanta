@@ -43,6 +43,7 @@ body{font-family:var(--font-body);background:var(--paper);color:var(--ink);min-h
 .empty-msg{text-align:center;padding:32px 20px;color:var(--grey);font-size:14px;line-height:1.6}
 .loading{text-align:center;padding:60px 20px;color:var(--grey);font-size:14px}
 .error-msg{text-align:center;padding:40px 20px;color:var(--brick);font-size:14px}
+.expiry-bar{text-align:center;font-size:12.5px;color:var(--amber);background:#fef3c7;padding:8px 14px;border-radius:10px;margin-bottom:16px}
 @media(max-width:480px){.card{padding:24px 20px;border-radius:12px}body{padding:12px}}
 </style>
 </head>
@@ -84,6 +85,12 @@ async function init() {
   try {
     const res = await fetch(`${API}?token=${token}`);
     const data = await res.json();
+    if (res.status === 410) {
+      card.innerHTML = `<div class="error-msg">
+        <div style="font-size:32px;margin-bottom:12px">⏰</div>
+        <strong>Link expired</strong><br>This scheduling link is no longer active.<br>Please ask the hiring team for a new link.</div>`;
+      return;
+    }
     if (!res.ok) { card.innerHTML = `<div class="error-msg">${esc(data.error)}</div>`; return; }
 
     if (data.booked) {
@@ -116,11 +123,23 @@ function renderSlots(data) {
     grouped[key].push(s);
   });
 
+  let expiryHtml = "";
+  if (data.expires_at) {
+    const exp = new Date(data.expires_at);
+    const remain = exp - Date.now();
+    if (remain > 0) {
+      const hrs = Math.floor(remain / 3600000);
+      const mins = Math.floor((remain % 3600000) / 60000);
+      expiryHtml = `<div class="expiry-bar">Link expires in <strong>${hrs}h ${mins}m</strong></div>`;
+    }
+  }
+
   let html = `
     <div class="header">
       <h1>${esc(data.job_title)}</h1>
       <p>Hi ${esc(data.candidate_name.split(" ")[0])}, ${data.org_name ? `<span class="org-name">${esc(data.org_name)}</span>` : "the team"} would like to interview you. Pick a time that works for you.</p>
     </div>
+    ${expiryHtml}
     <div class="section-title">Available slots</div>`;
 
   for (const [dateKey, slots] of Object.entries(grouped)) {

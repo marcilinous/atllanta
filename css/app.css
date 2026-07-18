@@ -546,6 +546,9 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .slot-past-toggle { margin-top: 12px; }
 .slot-past-toggle summary { font-size: 12px; color: var(--grey); cursor: pointer; padding: 6px 0; }
 .slot-past { opacity: .6; margin-top: 8px; }
+.slot-link-status { font-size: 12.5px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-weight: 600; }
+.slot-link-active { background: #dcfce7; color: var(--green); }
+.slot-link-expired { background: #fef3c7; color: var(--amber); }
 @media (max-width: 640px) {
   .slot-add-row { grid-template-columns: 1fr 1fr; }
   .slot-row { grid-template-columns: 1fr 1fr; }

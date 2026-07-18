@@ -1256,26 +1256,42 @@ function scoreDetail(appId) {
   };
 }
 
-// ---------- Manage interview slots ----------
-async function manageSlots(jobId) {
-  const job = S.cache.jobs.find((j) => j.id === jobId);
-  if (!job) return;
+// ---------- Manage interview slots (per candidate) ----------
+async function manageSlots(appId) {
+  const app = S.cache.applications.find((a) => a.id === appId);
+  if (!app) return;
+  const cand = S.cache.candidates.find((c) => c.id === app.candidate_id);
+  const job = S.cache.jobs.find((j) => j.id === app.job_id);
+  if (!cand || !job) return;
 
   const f = el("div", "slots-modal");
   f.innerHTML = `<div class="slots-loading">Loading slots…</div>`;
-  openModal("Interview slots — " + (job.title || ""), f, { scrollList: true });
+  openModal(`Slots for ${cand.name} — ${job.title}`, f, { scrollList: true });
 
   const { data: slots } = await sb
     .from("interview_slots")
     .select("*")
-    .eq("job_id", jobId)
+    .eq("application_id", appId)
     .order("slot_start");
 
   function renderSlotList() {
     const future = (slots || []).filter((s) => new Date(s.slot_start) > new Date());
     const past = (slots || []).filter((s) => new Date(s.slot_start) <= new Date());
 
+    const linkActive = app.schedule_expires_at && new Date(app.schedule_expires_at) > new Date();
+    const linkExpired = app.schedule_expires_at && new Date(app.schedule_expires_at) <= new Date();
+    let linkStatus = "";
+    if (linkActive) {
+      const remain = new Date(app.schedule_expires_at) - Date.now();
+      const hrs = Math.floor(remain / 3600000);
+      const mins = Math.floor((remain % 3600000) / 60000);
+      linkStatus = `<div class="slot-link-status slot-link-active">Link active — expires in ${hrs}h ${mins}m</div>`;
+    } else if (linkExpired) {
+      linkStatus = `<div class="slot-link-status slot-link-expired">Link expired — send a new invite to generate a fresh link</div>`;
+    }
+
     f.innerHTML = `
+      ${linkStatus}
       <div class="slot-add-form">
         <div class="slot-add-row">
           <label class="slot-field">
@@ -1299,17 +1315,15 @@ async function manageSlots(jobId) {
         </div>
       </div>
       <div class="slot-list">
-        ${!future.length ? `<div class="empty" style="padding:16px 0">No upcoming slots. Add time slots above.</div>` : ""}
+        ${!future.length ? `<div class="empty" style="padding:16px 0">No upcoming slots. Add time slots above, then send an invite via Chat.</div>` : ""}
         ${future.map((s) => {
           const st = new Date(s.slot_start);
           const en = new Date(s.slot_end);
           const booked = !!s.booked_by;
-          const app = booked ? S.cache.applications.find((a) => a.id === s.booked_by) : null;
-          const cand = app ? S.cache.candidates.find((c) => c.id === app.candidate_id) : null;
           return `<div class="slot-row${booked ? " slot-booked" : ""}">
             <div class="slot-date">${st.toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</div>
             <div class="slot-time">${st.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} – ${en.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
-            <div class="slot-status">${booked ? `<span class="pill pill-interview_scheduled"><span class="dot"></span>${esc(cand?.name || "Booked")}</span>` : `<span class="pill pill-new"><span class="dot"></span>open</span>`}</div>
+            <div class="slot-status">${booked ? `<span class="pill pill-interview_scheduled"><span class="dot"></span>booked</span>` : `<span class="pill pill-new"><span class="dot"></span>open</span>`}</div>
             ${!booked ? `<button class="btn-icon slot-del" data-slot="${s.id}" title="Remove">✕</button>` : ""}
           </div>`;
         }).join("")}
@@ -1351,7 +1365,8 @@ async function manageSlots(jobId) {
 
     const { data, error } = await sb.from("interview_slots").insert({
       organization_id: S.org.id,
-      job_id: jobId,
+      job_id: job.id,
+      application_id: appId,
       slot_start,
       slot_end,
       created_by: S.session.user.id,
@@ -1380,7 +1395,7 @@ async function manageSlots(jobId) {
       const slot_end = new Date(`${date}T${eh}:${em}:00`).toISOString();
       const exists = slots.some((s) => s.slot_start === slot_start && s.slot_end === slot_end);
       if (!exists) {
-        newSlots.push({ organization_id: S.org.id, job_id: jobId, slot_start, slot_end, created_by: S.session.user.id });
+        newSlots.push({ organization_id: S.org.id, job_id: job.id, application_id: appId, slot_start, slot_end, created_by: S.session.user.id });
       }
       h = mEnd / 60;
     }
@@ -1396,10 +1411,17 @@ async function manageSlots(jobId) {
   renderSlotList();
 }
 
-function scheduleLink(appId) {
+async function generateScheduleLink(appId) {
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const newToken = crypto.randomUUID();
+  const { error } = await sb
+    .from("applications")
+    .update({ schedule_token: newToken, schedule_expires_at: expires })
+    .eq("id", appId);
+  if (error) { toast(error.message); return ""; }
   const app = S.cache.applications.find((a) => a.id === appId);
-  if (!app?.schedule_token) { toast("No schedule token — re-save the candidate"); return ""; }
-  return `${window.location.origin}/schedule?token=${app.schedule_token}`;
+  if (app) { app.schedule_token = newToken; app.schedule_expires_at = expires; }
+  return `${window.location.origin}/schedule?token=${newToken}`;
 }
 
 // ---------- Interviews ----------
@@ -1413,22 +1435,31 @@ function interviews(root) {
     }))
     .filter((r) => r.cand && r.job);
 
-  // Slot management per job
-  const jobsWithApps = [...new Set(S.cache.applications.map((a) => a.job_id))];
-  const slotBar = el("div", "int-slot-bar");
-  slotBar.innerHTML = `<div class="int-slot-label">Manage interview slots:</div>
-    <div class="int-slot-btns">${jobsWithApps.map((jid) => {
-      const j = S.cache.jobs.find((x) => x.id === jid);
-      return j ? `<button class="btn btn-outline btn-sm" data-act="manage-slots" data-job="${jid}">${esc(j.title)}</button>` : "";
-    }).join("")}</div>`;
-  root.appendChild(slotBar);
+  // Show all candidates that can be scheduled
+  const schedulable = S.cache.applications
+    .filter((a) => !["rejected","hired"].includes(a.stage) && !a.interview_at)
+    .map((a) => ({
+      app: a,
+      cand: S.cache.candidates.find((c) => c.id === a.candidate_id),
+      job: S.cache.jobs.find((j) => j.id === a.job_id),
+    }))
+    .filter((r) => r.cand && r.job);
 
-  slotBar.querySelectorAll("[data-act=manage-slots]").forEach((b) =>
-    b.addEventListener("click", () => manageSlots(b.dataset.job))
-  );
+  if (schedulable.length) {
+    const schedBar = el("div", "int-slot-bar");
+    schedBar.innerHTML = `<div class="int-slot-label">Assign interview slots to candidates:</div>
+      <div class="int-slot-btns">${schedulable.map((r) =>
+        `<button class="btn btn-outline btn-sm" data-act="manage-slots" data-app="${r.app.id}">${esc(r.cand.name)} · ${esc(r.job.title)}</button>`
+      ).join("")}</div>`;
+    root.appendChild(schedBar);
+
+    schedBar.querySelectorAll("[data-act=manage-slots]").forEach((b) =>
+      b.addEventListener("click", () => manageSlots(b.dataset.app))
+    );
+  }
 
   if (!rows.length) {
-    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Add time slots above, then send a scheduling link via Chat → Interview invite.</div>`));
+    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Assign slots to a candidate above, then send a scheduling link via Chat → Interview invite.</div>`));
     return;
   }
 
@@ -1444,9 +1475,10 @@ function interviews(root) {
       <div class="int-info">
         <div class="int-name">${esc(r.cand.name)}</div>
         <div class="int-meta">${esc(r.job.title)} · ${r.app.stage.replaceAll("_", " ")}</div>
-        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${r.app.interview_at ? "" : " (not scheduled via link)"}</div>
+        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${r.app.interview_at ? "" : " (manual)"}</div>
       </div>
       <div class="int-actions">
+        <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="slots">Manage slots</button>
         <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="stage">Update stage</button>
         ${r.cand.phone ? `<button class="btn btn-outline btn-sm" data-phone="${esc(r.cand.phone)}" data-name="${esc(r.cand.name)}" data-act="wa">WhatsApp</button>` : ""}
       </div>`;
@@ -1454,6 +1486,9 @@ function interviews(root) {
   });
   root.appendChild(list);
 
+  list.querySelectorAll("[data-act=slots]").forEach((b) =>
+    b.addEventListener("click", () => manageSlots(b.dataset.app))
+  );
   list.querySelectorAll("[data-act=stage]").forEach((b) =>
     b.addEventListener("click", () => stageForm(b.dataset.app))
   );
@@ -1510,10 +1545,11 @@ function chat(root) {
     const orgName = S.org?.name || "[Company]";
 
     const app = candApps.length ? candApps[0] : null;
-    const link = app ? scheduleLink(app.id) : "";
+
+    const inviteBase = (link) => `Hi ${firstName}, this is ${orgName}. We reviewed your profile for the ${jobTitle} role and would like to invite you for an interview.\n\nPick a time that works for you:\n${link}\n\nThis link is valid for 24 hours. Looking forward to meeting you!`;
 
     const templates = [
-      { label: "Interview invite", text: `Hi ${firstName}, this is ${orgName}. We reviewed your profile for the ${jobTitle} role and would like to invite you for an interview.\n\nPick a time that works for you:\n${link}\n\nLooking forward to meeting you!` },
+      { label: "Interview invite", text: inviteBase("[generating link…]"), async: true },
       { label: "Job offer", text: `Hi ${firstName}, congratulations! We're pleased to offer you the ${jobTitle} position at ${orgName}. We were impressed with your profile and believe you'd be a great fit for our team. We'll be sharing the offer details shortly. Please confirm your interest so we can proceed. Welcome aboard!` },
       { label: "Schedule call", text: `Hi ${firstName}, thank you for your interest in the ${jobTitle} role at ${orgName}. We'd like to schedule a brief call to discuss the opportunity and next steps. Could you share your availability for a 15-20 minute call this week?` },
       { label: "Follow-up", text: `Hi ${firstName}, just following up regarding the ${jobTitle} position at ${orgName}. We wanted to check if you're still interested and available. Please let us know at your earliest convenience.` },
@@ -1533,24 +1569,33 @@ function chat(root) {
         </a>
       </div>
       <div class="tpl-picker">
-        ${templates.map((t, i) => `<button class="tpl-chip${i === 0 ? " active" : ""}" data-tpl="${i}">${t.label}</button>`).join("")}
+        ${templates.map((t, i) => `<button class="tpl-chip${i === 2 ? " active" : ""}" data-tpl="${i}">${t.label}</button>`).join("")}
       </div>
       <div class="chat-messages">
         <div class="msg us">
-          ${esc(templates[0].text).replace(/\n/g, "<br>")}
+          ${esc(templates[2].text).replace(/\n/g, "<br>")}
           <div class="msg-time">Preview</div>
         </div>
       </div>
       <div class="chat-input-row">
-        <textarea id="wa-msg" placeholder="Edit message or pick a template above…">${templates[0].text}</textarea>
+        <textarea id="wa-msg" placeholder="Edit message or pick a template above…">${templates[2].text}</textarea>
         <button class="btn btn-dark btn-sm" id="wa-send">Send via WA</button>
       </div>`;
 
     windowCol.querySelectorAll(".tpl-chip").forEach((chip) => {
-      chip.onclick = () => {
+      chip.onclick = async () => {
         windowCol.querySelectorAll(".tpl-chip").forEach((c) => c.classList.remove("active"));
         chip.classList.add("active");
         const tpl = templates[+chip.dataset.tpl];
+
+        if (tpl.async && app) {
+          windowCol.querySelector("#wa-msg").value = "[Generating 24hr scheduling link…]";
+          windowCol.querySelector(".msg.us").innerHTML = `Generating scheduling link…<div class="msg-time">Please wait</div>`;
+          const link = await generateScheduleLink(app.id);
+          if (!link) return;
+          tpl.text = inviteBase(link);
+        }
+
         windowCol.querySelector("#wa-msg").value = tpl.text;
         windowCol.querySelector(".msg.us").innerHTML = `${esc(tpl.text).replace(/\n/g, "<br>")}<div class="msg-time">Preview</div>`;
       };
