@@ -2,7 +2,7 @@
 -- Direct org gets its self-client automatically via trg_create_self_client.
 
 insert into organizations (name, org_type, plan_tier)
-values ('TechNova Pvt Ltd', 'direct', 'starter');
+values ('Atllanta Pvt Ltd', 'direct', 'starter');
 
 insert into organizations (name, org_type, plan_tier, commission_percent)
 values ('BlueHire Consultants', 'agency', 'agency_partner', 10.00);

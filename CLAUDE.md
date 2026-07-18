@@ -108,7 +108,7 @@ The live Supabase project already has this schema applied. **Do not re-run the f
 
 | Organization | Type | Tier | Clients |
 |---|---|---|---|
-| TechNova Pvt Ltd | direct | starter | TechNova Pvt Ltd (self) |
+| Atllanta Pvt Ltd | direct | starter | Atllanta Pvt Ltd (self) |
 | BlueHire Consultants | agency | agency_partner | Meridian Retail Ltd |
 
 ---

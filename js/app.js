@@ -107,6 +107,12 @@ $("#logout-btn").addEventListener("click", async () => {
   location.reload();
 });
 
+$("#settings-btn").addEventListener("click", () => {
+  document.querySelectorAll(".nav-item").forEach((x) => x.classList.remove("active"));
+  S.view = "settings";
+  render();
+});
+
 // ---------- boot ----------
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
@@ -153,6 +159,13 @@ async function boot() {
   sw.onchange = () => { S.clientId = sw.value; render(); };
   sw.classList.toggle("hidden", S.clients.length <= 1);
 
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("google") === "connected") {
+    toast("Google Calendar connected!");
+    window.history.replaceState({}, "", window.location.pathname);
+    S.view = "settings";
+  }
+
   render();
 }
 
@@ -181,7 +194,7 @@ async function loadData() {
 // ---------- navigation ----------
 const TITLES = {
   jobs: "Jobs", candidates: "Candidates", interviews: "Interviews",
-  chat: "Chat", rescore: "Re-score", analytics: "Analytics",
+  chat: "Chat", rescore: "Re-score", analytics: "Analytics", settings: "Settings",
 };
 const SUBS = {
   jobs: "Manage your open roles and upload resumes for each one",
@@ -190,6 +203,7 @@ const SUBS = {
   chat: "Candidates who replied — continue the conversation here or on WhatsApp",
   rescore: "Run the AI scoring algorithm again on stored resumes",
   analytics: "Performance metrics across your hiring pipeline",
+  settings: "Organization, team members, and integrations",
 };
 document.querySelectorAll(".nav-item").forEach((b) =>
   b.addEventListener("click", () => {
@@ -213,7 +227,7 @@ async function render() {
 // =====================================================================
 // VIEWS
 // =====================================================================
-const VIEWS = { jobs, candidates, interviews, chat, rescore, analytics };
+const VIEWS = { jobs, candidates, interviews, chat, rescore, analytics, settings };
 
 // ---------- Jobs ----------
 function jobs(root) {
@@ -257,21 +271,45 @@ function jobs(root) {
 
       let detailHTML = "";
       if (isExpanded) {
-        const candRows = jobApps.map((a) => {
+        const scored = jobApps.filter((a) => a.match_score != null).sort((a, b) => b.match_score - a.match_score);
+        const unscored = jobApps.filter((a) => a.match_score == null);
+        const sorted = [...scored, ...unscored];
+
+        const candRows = sorted.map((a) => {
           const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line2)">
-            <div class="av" style="background:${avColor(c?.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c?.name)}</div>
-            <div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c?.name || "Unknown")}</div>
-            <div style="flex-shrink:0">${scoreBar(a.match_score)}</div>
-            <div style="flex-shrink:0">${stagePill(a.stage)}</div>
+          const contact = c?.email || c?.phone || "";
+          const phone = (c?.phone || "").replace(/[^\d]/g, "");
+          const summary = a.match_summary ? `<div class="jc-summary">${esc(a.match_summary)}</div>` : "";
+          return `<div class="jc-row">
+            <div class="av" style="background:${avColor(c?.name)}">${initials(c?.name)}</div>
+            <div class="jc-info jc-info-link" data-act="match-detail" data-app-id="${a.id}">
+              <div class="jc-name">${esc(c?.name || "Unknown")}</div>
+              <div class="jc-contact">${esc(contact)}</div>
+              ${summary}
+            </div>
+            <div class="jc-score">${scoreBar(a.match_score)}</div>
+            <div class="jc-stage">${stagePill(a.stage)}</div>
+            <div class="jc-actions">
+              ${phone ? `<button class="btn-icon" title="WhatsApp ${esc(c?.name)}" data-act="wa-cand" data-phone="${phone}" data-name="${esc(c?.name)}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              </button>` : ""}
+              <button class="btn-icon" title="Update stage" data-act="stage-cand" data-app-id="${a.id}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </button>
+            </div>
           </div>`;
         }).join("");
 
         detailHTML = `
           <div class="job-detail" data-id="${j.id}">
-            ${jdPreview ? `<div style="font-size:12.5px;color:var(--ink2);line-height:1.5;margin-bottom:10px;white-space:pre-wrap;word-break:break-word">${esc(jdPreview)}${(j.jd_raw_text || "").length > 200 ? "…" : ""}</div>` : ""}
-            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey);margin-bottom:6px">Candidates (${appCount})</div>
-            ${candRows || `<div style="font-size:12.5px;color:var(--grey);padding:8px 0">No candidates yet</div>`}
+            ${jdPreview ? `<div class="jd-preview">${esc(jdPreview)}${(j.jd_raw_text || "").length > 200 ? "…" : ""}</div>` : ""}
+            <div class="jc-header">
+              <span>Candidates (${appCount})</span>
+              ${scored.length ? `<span class="jc-scored-tag">${scored.length} scored</span>` : ""}
+            </div>
+            <div class="jc-list">
+              ${candRows || `<div class="jc-empty">No candidates yet</div>`}
+            </div>
           </div>`;
       }
 
@@ -323,6 +361,26 @@ function jobs(root) {
     );
     grid.querySelectorAll("[data-act=screen]").forEach((b) =>
       b.addEventListener("click", (e) => { e.stopPropagation(); screenJob(b.dataset.id); })
+    );
+    grid.querySelectorAll("[data-act=wa-cand]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const phone = b.dataset.phone;
+        window.open(`https://wa.me/${phone}`, "_blank", "noopener");
+        toast("Opening WhatsApp with " + (b.dataset.name || "").split(" ")[0]);
+      })
+    );
+    grid.querySelectorAll("[data-act=stage-cand]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        updateStageForm(b.dataset.appId);
+      })
+    );
+    grid.querySelectorAll("[data-act=match-detail]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        scoreDetail(b.dataset.appId);
+      })
     );
   }
   draw();
@@ -425,7 +483,7 @@ function candidates(root) {
 
     listEl.innerHTML = rows.map((r) => `
       <div class="cand-row">
-        <div class="who">
+        <div class="who cand-link" data-cand="${r.cand.id}" data-act="detail">
           <div class="av" style="background:${avColor(r.cand.name)}">${initials(r.cand.name)}</div>
           <div><div class="cname">${esc(r.cand.name)}</div><div class="csub">${esc(r.cand.email || r.cand.phone || "")}</div></div>
         </div>
@@ -446,7 +504,7 @@ function candidates(root) {
       </div>`).join("") +
       unattached.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).map((c) => `
       <div class="cand-row">
-        <div class="who">
+        <div class="who cand-link" data-cand="${c.id}" data-act="detail">
           <div class="av" style="background:${avColor(c.name)}">${initials(c.name)}</div>
           <div><div class="cname">${esc(c.name)}</div><div class="csub">${esc(c.email || c.phone || "")}</div></div>
         </div>
@@ -476,8 +534,65 @@ function candidates(root) {
     listEl.querySelectorAll("[data-act=attachjob]").forEach((b) =>
       b.addEventListener("click", () => attachJobForm(b.dataset.cand))
     );
+    listEl.querySelectorAll("[data-act=detail]").forEach((b) =>
+      b.addEventListener("click", () => candidateDetail(b.dataset.cand))
+    );
   }
   draw();
+}
+
+function candidateDetail(candId) {
+  const cand = S.cache.candidates.find((c) => c.id === candId);
+  if (!cand) return;
+
+  const apps = S.cache.applications.filter((a) => a.candidate_id === candId);
+  const f = el("div", "cd-modal");
+
+  const contactParts = [];
+  if (cand.email) contactParts.push(`<a href="mailto:${esc(cand.email)}" class="cd-contact-link">${esc(cand.email)}</a>`);
+  if (cand.phone) contactParts.push(`<a href="https://wa.me/${cand.phone.replace(/[^\d]/g, "")}" target="_blank" rel="noopener" class="cd-contact-link">${esc(cand.phone)}</a>`);
+
+  const jobRows = apps.map((a) => {
+    const job = S.cache.jobs.find((j) => j.id === a.job_id);
+    return `<div class="cd-job-row">
+      <div class="cd-job-title">${esc(job?.title || "Unknown")}</div>
+      <div>${scoreBar(a.match_score)}</div>
+      <div>${stagePill(a.stage)}</div>
+    </div>`;
+  }).join("");
+
+  const resumePreview = cand.resume_raw_text || "";
+
+  f.innerHTML = `
+    <div class="cd-header">
+      <div class="av" style="background:${avColor(cand.name)};width:52px;height:52px;font-size:18px;border-radius:14px">${initials(cand.name)}</div>
+      <div class="cd-header-info">
+        <div class="cd-name">${esc(cand.name)}</div>
+        <div class="cd-contacts">${contactParts.join('<span class="cd-sep">·</span>') || '<span class="cd-no-contact">No contact info</span>'}</div>
+      </div>
+    </div>
+    ${apps.length ? `<div class="cd-section"><div class="cd-section-title">Applications</div><div class="cd-jobs">${jobRows}</div></div>` : '<div class="cd-section"><div class="cd-no-contact">Not attached to any job</div></div>'}
+    ${resumePreview ? `<div class="cd-section"><div class="cd-section-title">Resume</div><pre class="cd-resume">${esc(resumePreview)}</pre></div>` : ""}
+    <div class="cd-meta">Added ${new Date(cand.created_at).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })}${cand.source ? " · Source: " + esc(cand.source) : ""}</div>`;
+
+  openModal("Candidate profile", f);
+}
+
+async function findExistingCandidate(email, phone) {
+  if (email) {
+    const { data } = await sb.from("candidates").select("*").eq("client_id", S.clientId).eq("email", email).limit(1).maybeSingle();
+    if (data) return data;
+  }
+  if (phone) {
+    const normalized = phone.replace(/[\s\-()]/g, "");
+    const { data } = await sb.from("candidates").select("*").eq("client_id", S.clientId).eq("phone", phone).limit(1).maybeSingle();
+    if (data) return data;
+    if (normalized !== phone) {
+      const { data: d2 } = await sb.from("candidates").select("*").eq("client_id", S.clientId).eq("phone", normalized).limit(1).maybeSingle();
+      if (d2) return d2;
+    }
+  }
+  return null;
 }
 
 function candidateForm(preselectedJobId) {
@@ -543,17 +658,34 @@ function candidateForm(preselectedJobId) {
       const candName = extResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
       parseStatus.textContent = "Saving candidate profile…";
 
-      const { data: cand, error } = await sb.from("candidates").insert({
-        client_id: S.clientId,
-        name: candName,
-        email: extResult.email || null,
-        phone: extResult.phone || null,
-        resume_raw_text: parseResult.text,
-      }).select().single();
-      if (error) throw new Error(error.message);
+      let cand = null;
+      let isUpdate = false;
+      const existing = await findExistingCandidate(extResult.email, extResult.phone);
+      if (existing) {
+        const updates = { resume_raw_text: parseResult.text, name: candName };
+        if (extResult.email && !existing.email) updates.email = extResult.email;
+        if (extResult.phone && !existing.phone) updates.phone = extResult.phone;
+        const { data, error } = await sb.from("candidates").update(updates).eq("id", existing.id).select().single();
+        if (error) throw new Error(error.message);
+        cand = data;
+        isUpdate = true;
+      } else {
+        const { data, error } = await sb.from("candidates").insert({
+          client_id: S.clientId,
+          name: candName,
+          email: extResult.email || null,
+          phone: extResult.phone || null,
+          resume_raw_text: parseResult.text,
+        }).select().single();
+        if (error) throw new Error(error.message);
+        cand = data;
+      }
 
       if (preselectedJobId) {
-        await sb.from("applications").insert({ job_id: preselectedJobId, candidate_id: cand.id });
+        const { data: existingApp } = await sb.from("applications").select("id").eq("job_id", preselectedJobId).eq("candidate_id", cand.id).maybeSingle();
+        if (!existingApp) {
+          await sb.from("applications").insert({ job_id: preselectedJobId, candidate_id: cand.id });
+        }
       }
 
       parseStatus.classList.add("hidden");
@@ -567,7 +699,7 @@ function candidateForm(preselectedJobId) {
           </div>
         </div>
         ${extResult.summary ? `<p style="font-size:13px;color:var(--ink2);margin-bottom:12px">${esc(extResult.summary)}</p>` : ""}
-        <p style="font-size:12.5px;color:var(--green);font-weight:600;margin-bottom:12px">Profile created successfully</p>
+        <p style="font-size:12.5px;color:var(--green);font-weight:600;margin-bottom:12px">${isUpdate ? "Resume updated for existing candidate" : "Profile created successfully"}</p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-amber" id="cf-another">Upload another</button>
           <button class="btn btn-dark" id="cf-done">Done</button>
@@ -579,7 +711,7 @@ function candidateForm(preselectedJobId) {
         fileInput.value = "";
       };
       resultDiv.querySelector("#cf-done").onclick = () => { closeModal(); render(); };
-      toast("Candidate added — " + candName);
+      toast(isUpdate ? "Resume updated — " + candName : "Candidate added — " + candName);
     } catch (err) {
       parseStatus.textContent = err.message;
       parseStatus.classList.add("error");
@@ -691,20 +823,38 @@ function bulkUploadForm(preselectedJobId) {
         const extractResult = await extractResp.json();
         if (!extractResp.ok) throw new Error(extractResult.error || "Extract failed");
 
-        const { data: cand, error } = await sb.from("candidates").insert({
-          client_id: S.clientId,
-          name: extractResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "),
-          email: extractResult.email || null,
-          phone: extractResult.phone || null,
-          resume_raw_text: parseResult.text,
-        }).select().single();
-
-        if (error) throw new Error(error.message);
-        if (jobId) {
-          await sb.from("applications").insert({ job_id: jobId, candidate_id: cand.id });
+        const candName = extractResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
+        let cand = null;
+        let isUpdate = false;
+        const existing = await findExistingCandidate(extractResult.email, extractResult.phone);
+        if (existing) {
+          const updates = { resume_raw_text: parseResult.text, name: candName };
+          if (extractResult.email && !existing.email) updates.email = extractResult.email;
+          if (extractResult.phone && !existing.phone) updates.phone = extractResult.phone;
+          const { data, error } = await sb.from("candidates").update(updates).eq("id", existing.id).select().single();
+          if (error) throw new Error(error.message);
+          cand = data;
+          isUpdate = true;
+        } else {
+          const { data, error } = await sb.from("candidates").insert({
+            client_id: S.clientId,
+            name: candName,
+            email: extractResult.email || null,
+            phone: extractResult.phone || null,
+            resume_raw_text: parseResult.text,
+          }).select().single();
+          if (error) throw new Error(error.message);
+          cand = data;
         }
 
-        logEntry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(extractResult.name || file.name)} — ${esc(extractResult.email || "")}`;
+        if (jobId) {
+          const { data: existingApp } = await sb.from("applications").select("id").eq("job_id", jobId).eq("candidate_id", cand.id).maybeSingle();
+          if (!existingApp) {
+            await sb.from("applications").insert({ job_id: jobId, candidate_id: cand.id });
+          }
+        }
+
+        logEntry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(candName)}${isUpdate ? " (updated)" : ""} — ${esc(extractResult.email || "")}`;
         success++;
       } catch (err) {
         logEntry.innerHTML = `<span style="color:var(--red)">&#10007;</span> ${esc(file.name)} — ${esc(err.message)}`;
@@ -1071,23 +1221,40 @@ function scoreDetail(appId) {
   const app = S.cache.applications.find((a) => a.id === appId);
   const cand = S.cache.candidates.find((c) => c.id === app.candidate_id);
   const job = S.cache.jobs.find((j) => j.id === app.job_id);
-  const f = el("div");
+  const f = el("div", "sd-modal");
   const raw = app.match_raw_response || {};
   const score = app.match_score;
 
+  const scoreRing = score != null
+    ? `<div class="sd-ring" style="--score:${score}"><span class="sd-ring-num">${Math.round(score)}</span></div>`
+    : "";
+
   f.innerHTML = `
-    <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
-      <div class="av" style="background:${avColor(cand?.name)};width:44px;height:44px;font-size:16px;border-radius:12px">${initials(cand?.name)}</div>
-      <div><strong style="font-size:15px">${esc(cand?.name)}</strong><br>
-      <span style="color:var(--grey);font-size:12.5px">${esc(job?.title)}</span></div>
-      ${score != null ? `<div style="margin-left:auto">${scoreBar(score)}</div>` : ""}
+    <div class="sd-header">
+      <div class="av" style="background:${avColor(cand?.name)};width:48px;height:48px;font-size:17px;border-radius:13px">${initials(cand?.name)}</div>
+      <div class="sd-header-info">
+        <div class="sd-cand-name">${esc(cand?.name)}</div>
+        <div class="sd-job-title">${esc(job?.title)}</div>
+        ${cand?.email ? `<div class="sd-contact">${esc(cand.email)}${cand.phone ? " · " + esc(cand.phone) : ""}</div>` : ""}
+      </div>
+      ${scoreRing}
     </div>
-    ${app.match_summary ? `<p style="margin-bottom:12px;font-size:13px;color:var(--ink2)">${esc(app.match_summary)}</p>` : ""}
-    ${raw.strengths?.length ? `<p style="font-weight:700;font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Strengths</p><ul style="margin:0 0 12px 18px;font-size:13px">${raw.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-    ${raw.gaps?.length ? `<p style="font-weight:700;font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Gaps</p><ul style="margin:0 0 12px 18px;font-size:13px">${raw.gaps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-    <button class="btn btn-amber" id="sd-run">${score == null ? "Run AI match (1 credit)" : "Re-run match (1 credit)"}</button>
+    ${app.match_summary ? `<div class="sd-section"><div class="sd-section-title">Summary</div><p class="sd-summary">${esc(app.match_summary)}</p></div>` : ""}
+    ${raw.strengths?.length ? `<div class="sd-section"><div class="sd-section-title sd-green">Strengths</div><ul class="sd-list sd-list-green">${raw.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+    ${raw.gaps?.length ? `<div class="sd-section"><div class="sd-section-title sd-red">Gaps</div><ul class="sd-list sd-list-red">${raw.gaps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+    ${score == null ? '<div class="sd-section"><p class="sd-no-score">Not scored yet — run a match to see the full analysis.</p></div>' : ""}
+    <div class="sd-actions">
+      <button class="btn btn-amber" id="sd-run">${score == null ? "Run AI match (1 credit)" : "Re-run match (1 credit)"}</button>
+      ${cand?.phone ? `<button class="btn btn-outline" id="sd-wa">WhatsApp</button>` : ""}
+    </div>
     <p id="sd-status" style="margin-top:8px;color:var(--grey);font-size:12.5px"></p>`;
   openModal("Match detail", f);
+  if (cand?.phone) {
+    f.querySelector("#sd-wa").onclick = () => {
+      window.open(`https://wa.me/${cand.phone.replace(/[^\d]/g, "")}`, "_blank", "noopener");
+      toast("Opening WhatsApp with " + cand.name.split(" ")[0]);
+    };
+  }
   f.querySelector("#sd-run").onclick = async (e) => {
     e.target.disabled = true;
     f.querySelector("#sd-status").textContent = "Scoring resume against JD…";
@@ -1103,6 +1270,174 @@ function scoreDetail(appId) {
   };
 }
 
+// ---------- Manage interview slots (per candidate) ----------
+async function manageSlots(appId) {
+  const app = S.cache.applications.find((a) => a.id === appId);
+  if (!app) return;
+  const cand = S.cache.candidates.find((c) => c.id === app.candidate_id);
+  const job = S.cache.jobs.find((j) => j.id === app.job_id);
+  if (!cand || !job) return;
+
+  const f = el("div", "slots-modal");
+  f.innerHTML = `<div class="slots-loading">Loading slots…</div>`;
+  openModal(`Slots for ${cand.name} — ${job.title}`, f, { scrollList: true });
+
+  const { data: slots } = await sb
+    .from("interview_slots")
+    .select("*")
+    .eq("application_id", appId)
+    .order("slot_start");
+
+  function renderSlotList() {
+    const future = (slots || []).filter((s) => new Date(s.slot_start) > new Date());
+    const past = (slots || []).filter((s) => new Date(s.slot_start) <= new Date());
+
+    const linkActive = app.schedule_expires_at && new Date(app.schedule_expires_at) > new Date();
+    const linkExpired = app.schedule_expires_at && new Date(app.schedule_expires_at) <= new Date();
+    let linkStatus = "";
+    if (linkActive) {
+      const remain = new Date(app.schedule_expires_at) - Date.now();
+      const hrs = Math.floor(remain / 3600000);
+      const mins = Math.floor((remain % 3600000) / 60000);
+      linkStatus = `<div class="slot-link-status slot-link-active">Link active — expires in ${hrs}h ${mins}m</div>`;
+    } else if (linkExpired) {
+      linkStatus = `<div class="slot-link-status slot-link-expired">Link expired — send a new invite to generate a fresh link</div>`;
+    }
+
+    f.innerHTML = `
+      ${linkStatus}
+      <div class="slot-add-form">
+        <div class="slot-add-row">
+          <label class="slot-field">
+            <span>Date</span>
+            <input type="date" id="sl-date" class="input" min="${new Date().toISOString().slice(0,10)}">
+          </label>
+          <label class="slot-field">
+            <span>Start</span>
+            <input type="time" id="sl-start" class="input" value="10:00">
+          </label>
+          <label class="slot-field">
+            <span>End</span>
+            <input type="time" id="sl-end" class="input" value="10:30">
+          </label>
+          <button class="btn btn-amber btn-sm" id="sl-add">Add slot</button>
+        </div>
+        <div class="slot-quick-row">
+          <span class="slot-quick-label">Quick add:</span>
+          <button class="btn btn-outline btn-sm" data-quick="30">+30 min slots</button>
+          <button class="btn btn-outline btn-sm" data-quick="60">+1 hr slots</button>
+        </div>
+      </div>
+      <div class="slot-list">
+        ${!future.length ? `<div class="empty" style="padding:16px 0">No upcoming slots. Add time slots above, then send an invite via Chat.</div>` : ""}
+        ${future.map((s) => {
+          const st = new Date(s.slot_start);
+          const en = new Date(s.slot_end);
+          const booked = !!s.booked_by;
+          return `<div class="slot-row${booked ? " slot-booked" : ""}">
+            <div class="slot-date">${st.toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</div>
+            <div class="slot-time">${st.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} – ${en.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
+            <div class="slot-status">${booked ? `<span class="pill pill-interview_scheduled"><span class="dot"></span>booked</span>` : `<span class="pill pill-new"><span class="dot"></span>open</span>`}</div>
+            ${!booked ? `<button class="btn-icon slot-del" data-slot="${s.id}" title="Remove">✕</button>` : ""}
+          </div>`;
+        }).join("")}
+      </div>
+      ${past.length ? `<details class="slot-past-toggle"><summary>${past.length} past slot${past.length>1?"s":""}</summary>
+        <div class="slot-list slot-past">${past.map((s) => {
+          const st = new Date(s.slot_start);
+          const en = new Date(s.slot_end);
+          return `<div class="slot-row slot-dim"><div class="slot-date">${st.toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</div><div class="slot-time">${st.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} – ${en.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div><div class="slot-status">${s.booked_by ? "booked" : "expired"}</div></div>`;
+        }).join("")}</div></details>` : ""}`;
+
+    f.querySelector("#sl-add").onclick = addSlot;
+
+    f.querySelectorAll("[data-quick]").forEach((btn) => {
+      btn.onclick = () => quickAdd(+btn.dataset.quick);
+    });
+
+    f.querySelectorAll(".slot-del").forEach((btn) => {
+      btn.onclick = async () => {
+        const { error } = await sb.from("interview_slots").delete().eq("id", btn.dataset.slot);
+        if (error) return toast(error.message);
+        const idx = slots.findIndex((s) => s.id === btn.dataset.slot);
+        if (idx !== -1) slots.splice(idx, 1);
+        renderSlotList();
+        toast("Slot removed");
+      };
+    });
+  }
+
+  async function addSlot() {
+    const date = f.querySelector("#sl-date").value;
+    const start = f.querySelector("#sl-start").value;
+    const end = f.querySelector("#sl-end").value;
+    if (!date || !start || !end) return toast("Fill in date, start and end time");
+    if (start >= end) return toast("End time must be after start time");
+
+    const slot_start = new Date(`${date}T${start}:00`).toISOString();
+    const slot_end = new Date(`${date}T${end}:00`).toISOString();
+
+    const { data, error } = await sb.from("interview_slots").insert({
+      organization_id: S.org.id,
+      job_id: job.id,
+      application_id: appId,
+      slot_start,
+      slot_end,
+      created_by: S.session.user.id,
+    }).select().single();
+    if (error) return toast(error.message);
+    slots.push(data);
+    slots.sort((a, b) => a.slot_start.localeCompare(b.slot_start));
+    renderSlotList();
+    toast("Slot added");
+  }
+
+  async function quickAdd(mins) {
+    const date = f.querySelector("#sl-date").value;
+    if (!date) return toast("Pick a date first");
+    const startH = 9, endH = 18;
+    const newSlots = [];
+    for (let h = startH; h < endH; ) {
+      const m = h * 60;
+      const mEnd = m + mins;
+      if (mEnd / 60 > endH) break;
+      const sh = String(Math.floor(m/60)).padStart(2,"0");
+      const sm = String(m%60).padStart(2,"0");
+      const eh = String(Math.floor(mEnd/60)).padStart(2,"0");
+      const em = String(mEnd%60).padStart(2,"0");
+      const slot_start = new Date(`${date}T${sh}:${sm}:00`).toISOString();
+      const slot_end = new Date(`${date}T${eh}:${em}:00`).toISOString();
+      const exists = slots.some((s) => s.slot_start === slot_start && s.slot_end === slot_end);
+      if (!exists) {
+        newSlots.push({ organization_id: S.org.id, job_id: job.id, application_id: appId, slot_start, slot_end, created_by: S.session.user.id });
+      }
+      h = mEnd / 60;
+    }
+    if (!newSlots.length) return toast("All slots for that day already exist");
+    const { data, error } = await sb.from("interview_slots").insert(newSlots).select();
+    if (error) return toast(error.message);
+    slots.push(...data);
+    slots.sort((a, b) => a.slot_start.localeCompare(b.slot_start));
+    renderSlotList();
+    toast(`${data.length} slots added`);
+  }
+
+  renderSlotList();
+}
+
+async function generateScheduleLink(appId) {
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const newToken = crypto.randomUUID();
+  const { error } = await sb
+    .from("applications")
+    .update({ schedule_token: newToken, schedule_expires_at: expires })
+    .eq("id", appId);
+  if (error) { toast(error.message); return ""; }
+  const app = S.cache.applications.find((a) => a.id === appId);
+  if (app) { app.schedule_token = newToken; app.schedule_expires_at = expires; }
+  return `${window.location.origin}/schedule?token=${newToken}`;
+}
+
 // ---------- Interviews ----------
 function interviews(root) {
   const rows = S.cache.applications
@@ -1114,14 +1449,37 @@ function interviews(root) {
     }))
     .filter((r) => r.cand && r.job);
 
+  // Show all candidates that can be scheduled
+  const schedulable = S.cache.applications
+    .filter((a) => !["rejected","hired"].includes(a.stage) && !a.interview_at)
+    .map((a) => ({
+      app: a,
+      cand: S.cache.candidates.find((c) => c.id === a.candidate_id),
+      job: S.cache.jobs.find((j) => j.id === a.job_id),
+    }))
+    .filter((r) => r.cand && r.job);
+
+  if (schedulable.length) {
+    const schedBar = el("div", "int-slot-bar");
+    schedBar.innerHTML = `<div class="int-slot-label">Assign interview slots to candidates:</div>
+      <div class="int-slot-btns">${schedulable.map((r) =>
+        `<button class="btn btn-outline btn-sm" data-act="manage-slots" data-app="${r.app.id}">${esc(r.cand.name)} · ${esc(r.job.title)}</button>`
+      ).join("")}</div>`;
+    root.appendChild(schedBar);
+
+    schedBar.querySelectorAll("[data-act=manage-slots]").forEach((b) =>
+      b.addEventListener("click", () => manageSlots(b.dataset.app))
+    );
+  }
+
   if (!rows.length) {
-    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Move a candidate's stage to "interview scheduled" and they'll appear here.</div>`));
+    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Assign slots to a candidate above, then send a scheduling link via Chat → Interview invite.</div>`));
     return;
   }
 
   const list = el("div", "interview-list");
   rows.forEach((r) => {
-    const d = new Date(r.app.updated_at);
+    const d = r.app.interview_at ? new Date(r.app.interview_at) : new Date(r.app.updated_at);
     const card = el("div", "interview-card");
     card.innerHTML = `
       <div class="date-block">
@@ -1131,9 +1489,11 @@ function interviews(root) {
       <div class="int-info">
         <div class="int-name">${esc(r.cand.name)}</div>
         <div class="int-meta">${esc(r.job.title)} · ${r.app.stage.replaceAll("_", " ")}</div>
-        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${r.app.interview_at ? "" : " (manual)"}</div>
+        ${r.app.meet_link ? `<a href="${esc(r.app.meet_link)}" target="_blank" rel="noopener" class="int-meet-link">Google Meet</a>` : ""}
       </div>
       <div class="int-actions">
+        <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="slots">Manage slots</button>
         <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="stage">Update stage</button>
         ${r.cand.phone ? `<button class="btn btn-outline btn-sm" data-phone="${esc(r.cand.phone)}" data-name="${esc(r.cand.name)}" data-act="wa">WhatsApp</button>` : ""}
       </div>`;
@@ -1141,6 +1501,9 @@ function interviews(root) {
   });
   root.appendChild(list);
 
+  list.querySelectorAll("[data-act=slots]").forEach((b) =>
+    b.addEventListener("click", () => manageSlots(b.dataset.app))
+  );
   list.querySelectorAll("[data-act=stage]").forEach((b) =>
     b.addEventListener("click", () => stageForm(b.dataset.app))
   );
@@ -1190,27 +1553,72 @@ function chat(root) {
     const idx = candsWithPhone.indexOf(c);
     if (items[idx]) items[idx].classList.add("active-chat");
 
+    const firstName = c.name.split(" ")[0];
+    const candApps = S.cache.applications.filter((a) => a.candidate_id === c.id);
+    const candJob = candApps.length ? S.cache.jobs.find((j) => j.id === candApps[0].job_id) : null;
+    const jobTitle = candJob ? candJob.title : "[Position]";
+    const orgName = S.org?.name || "[Company]";
+
+    const app = candApps.length ? candApps[0] : null;
+
+    const inviteBase = (link) => `Hi ${firstName}, this is ${orgName}. We reviewed your profile for the ${jobTitle} role and would like to invite you for an interview.\n\nPick a time that works for you:\n${link}\n\nThis link is valid for 24 hours. Looking forward to meeting you!`;
+
+    const templates = [
+      { label: "Interview invite", text: inviteBase("[generating link…]"), async: true },
+      { label: "Job offer", text: `Hi ${firstName}, congratulations! We're pleased to offer you the ${jobTitle} position at ${orgName}. We were impressed with your profile and believe you'd be a great fit for our team. We'll be sharing the offer details shortly. Please confirm your interest so we can proceed. Welcome aboard!` },
+      { label: "Schedule call", text: `Hi ${firstName}, thank you for your interest in the ${jobTitle} role at ${orgName}. We'd like to schedule a brief call to discuss the opportunity and next steps. Could you share your availability for a 15-20 minute call this week?` },
+      { label: "Follow-up", text: `Hi ${firstName}, just following up regarding the ${jobTitle} position at ${orgName}. We wanted to check if you're still interested and available. Please let us know at your earliest convenience.` },
+      { label: "Document request", text: `Hi ${firstName}, thank you for your interest in the ${jobTitle} role at ${orgName}. To move forward with your application, could you please share the following documents:\n\n1. Updated resume\n2. ID proof\n3. Relevant certifications\n\nPlease share at your earliest convenience.` },
+      { label: "Custom", text: `Hi ${firstName},\n\n` },
+    ];
+
     windowCol.innerHTML = `
       <div class="chat-head">
         <div>
           <div class="ch-name">${esc(c.name)}</div>
-          <div class="ch-sub">${esc(c.phone)}</div>
+          <div class="ch-sub">${esc(c.phone)}${candJob ? ` · ${esc(jobTitle)}` : ""}</div>
         </div>
         <a class="wa-link" href="https://wa.me/${c.phone.replace(/[^\d]/g, "")}" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
           Open in WhatsApp
         </a>
       </div>
+      <div class="tpl-picker">
+        ${templates.map((t, i) => `<button class="tpl-chip${i === 2 ? " active" : ""}" data-tpl="${i}">${t.label}</button>`).join("")}
+      </div>
       <div class="chat-messages">
         <div class="msg us">
-          Hi ${esc(c.name.split(" ")[0])}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?
-          <div class="msg-time">Template</div>
+          ${esc(templates[2].text).replace(/\n/g, "<br>")}
+          <div class="msg-time">Preview</div>
         </div>
       </div>
       <div class="chat-input-row">
-        <textarea id="wa-msg" placeholder="Type a message…">Hi ${esc(c.name.split(" ")[0])}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?</textarea>
+        <textarea id="wa-msg" placeholder="Edit message or pick a template above…">${templates[2].text}</textarea>
         <button class="btn btn-dark btn-sm" id="wa-send">Send via WA</button>
       </div>`;
+
+    windowCol.querySelectorAll(".tpl-chip").forEach((chip) => {
+      chip.onclick = async () => {
+        windowCol.querySelectorAll(".tpl-chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        const tpl = templates[+chip.dataset.tpl];
+
+        if (tpl.async && app) {
+          windowCol.querySelector("#wa-msg").value = "[Generating 24hr scheduling link…]";
+          windowCol.querySelector(".msg.us").innerHTML = `Generating scheduling link…<div class="msg-time">Please wait</div>`;
+          const link = await generateScheduleLink(app.id);
+          if (!link) return;
+          tpl.text = inviteBase(link);
+        }
+
+        windowCol.querySelector("#wa-msg").value = tpl.text;
+        windowCol.querySelector(".msg.us").innerHTML = `${esc(tpl.text).replace(/\n/g, "<br>")}<div class="msg-time">Preview</div>`;
+      };
+    });
+
+    windowCol.querySelector("#wa-msg").addEventListener("input", (e) => {
+      windowCol.querySelector(".msg.us").innerHTML = `${esc(e.target.value).replace(/\n/g, "<br>")}<div class="msg-time">Preview</div>`;
+    });
 
     windowCol.querySelector("#wa-send").onclick = () => {
       const phone = c.phone.replace(/[^\d]/g, "");
@@ -1318,6 +1726,95 @@ function analytics(root) {
   grid.appendChild(dist);
   root.appendChild(grid);
 
+  // ── Daily activity (date range) ──
+  const activity = el("div", "card", "");
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 6);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+
+  activity.innerHTML = `<div class="da-header">
+    <div class="card-title">Daily activity</div>
+    <div class="da-dates">
+      <input type="date" class="da-date-input" id="da-from" value="${weekAgoStr}" max="${todayStr}">
+      <span class="da-date-sep">to</span>
+      <input type="date" class="da-date-input" id="da-to" value="${todayStr}" max="${todayStr}">
+    </div>
+  </div>
+  <div id="da-chart-area"></div>`;
+  root.appendChild(activity);
+
+  function renderActivityChart() {
+    const fromVal = activity.querySelector("#da-from").value;
+    const toVal = activity.querySelector("#da-to").value;
+    if (!fromVal || !toVal || fromVal > toVal) return;
+
+    const from = new Date(fromVal + "T00:00:00");
+    const to = new Date(toVal + "T00:00:00");
+    const diffDays = Math.round((to - from) / 86400000) + 1;
+    if (diffDays > 90) { activity.querySelector("#da-chart-area").innerHTML = `<div class="empty">Max 90 days range</div>`; return; }
+
+    const days = [];
+    for (let i = 0; i < diffDays; i++) {
+      const d = new Date(from);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const isToday = key === todayStr;
+      const compact = diffDays > 14;
+      const label = compact
+        ? d.toLocaleDateString("en", { day: "numeric", month: "short" })
+        : d.toLocaleDateString("en", { weekday: "short", day: "numeric", month: "short" });
+
+      const dayApps = apps.filter((a) => (a.updated_at || a.created_at || "").slice(0, 10) === key);
+      const dayCands = S.cache.candidates.filter((c) => (c.created_at || "").slice(0, 10) === key);
+      const dayScored = dayApps.filter((a) => a.match_score != null);
+      const dayStageChanges = dayApps.filter((a) => a.stage !== "new");
+      const dayShortlisted = dayApps.filter((a) => ["shortlisted", "interview_scheduled", "interviewed", "offered", "hired"].includes(a.stage));
+
+      days.push({ key, label, isToday, uploaded: dayCands.length, scored: dayScored.length, stageChanges: dayStageChanges.length, shortlisted: dayShortlisted.length });
+    }
+
+    const maxAct = Math.max(1, ...days.map((d) => d.uploaded + d.scored));
+    const scrollable = diffDays > 14;
+    const colW = scrollable ? "48px" : "";
+
+    const totals = days.reduce((t, d) => ({ uploaded: t.uploaded + d.uploaded, scored: t.scored + d.scored, shortlisted: t.shortlisted + d.shortlisted, stageChanges: t.stageChanges + d.stageChanges }), { uploaded: 0, scored: 0, shortlisted: 0, stageChanges: 0 });
+
+    activity.querySelector("#da-chart-area").innerHTML = `
+    <div class="da-grid${scrollable ? " da-scrollable" : ""}">
+      ${days.map((d) => {
+        const total = d.uploaded + d.scored;
+        const barH = Math.max(4, (total / maxAct) * 100);
+        return `<div class="da-col${d.isToday ? " da-today" : ""}" ${colW ? `style="min-width:${colW}"` : ""}>
+          <div class="da-bar-wrap">
+            <div class="da-bar" style="height:${barH}%">
+              ${d.scored ? `<div class="da-bar-seg da-scored" style="flex:${d.scored}"></div>` : ""}
+              ${d.uploaded ? `<div class="da-bar-seg da-uploaded" style="flex:${d.uploaded}"></div>` : ""}
+            </div>
+          </div>
+          <div class="da-num">${total || ""}</div>
+          <div class="da-label">${d.label}</div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="da-legend">
+      <span class="da-leg"><span class="da-dot da-scored"></span> Scored</span>
+      <span class="da-leg"><span class="da-dot da-uploaded"></span> Uploaded</span>
+    </div>
+    <div class="da-today-summary">
+      <div class="da-today-title">Period summary</div>
+      <div class="da-today-stats">
+        <span>${totals.uploaded} uploaded</span>
+        <span>${totals.scored} scored</span>
+        <span>${totals.shortlisted} shortlisted</span>
+        <span>${totals.stageChanges} stage updates</span>
+      </div>
+    </div>`;
+  }
+
+  renderActivityChart();
+  activity.querySelector("#da-from").addEventListener("change", renderActivityChart);
+  activity.querySelector("#da-to").addEventListener("change", renderActivityChart);
+
   const perJob = el("div", "card", `<div class="card-title">Per-job breakdown</div>`);
   if (!S.cache.jobs.length) {
     perJob.innerHTML += `<div class="empty">No jobs yet.</div>`;
@@ -1334,6 +1831,279 @@ function analytics(root) {
   }
   perJob.style.marginTop = "14px";
   root.appendChild(perJob);
+}
+
+// ---------- Settings ----------
+async function settings(root) {
+  const role = S.membership?.role || "";
+  const isSuperAdmin = role === "super_admin";
+  const isAgencyAdmin = role === "agency_admin";
+  const isAdmin = ["super_admin", "agency_admin", "client_admin"].includes(role);
+  const token = S.session?.access_token;
+
+  // -- Organization info --
+  const orgCard = el("div", "card set-card");
+  orgCard.innerHTML = `<div class="card-title">Organization</div>
+    <div class="set-org-info">
+      <div class="set-field"><span class="set-label">Name</span><span class="set-val">${esc(S.org?.name || "—")}</span></div>
+      <div class="set-field"><span class="set-label">Type</span><span class="set-val">${esc(S.org?.org_type || "—")}</span></div>
+      <div class="set-field"><span class="set-label">Plan</span><span class="set-val">${esc(S.org?.plan_tier || "—")}</span></div>
+      <div class="set-field"><span class="set-label">Credits</span><span class="set-val">${S.org?.credits_balance ?? "—"}</span></div>
+      <div class="set-field"><span class="set-label">Your role</span><span class="set-val">${esc(role.replaceAll("_", " "))}</span></div>
+    </div>`;
+  root.appendChild(orgCard);
+
+  // -- Team members --
+  const teamCard = el("div", "card set-card");
+  teamCard.innerHTML = `<div class="card-title">Team members</div>
+    <div id="team-list" class="set-team"><span class="set-loading">Loading…</span></div>`;
+  root.appendChild(teamCard);
+
+  (async () => {
+    const teamEl = teamCard.querySelector("#team-list");
+    try {
+      const r = await fetch("/api/team", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      const members = d.members || [];
+      if (!members.length) { teamEl.innerHTML = `<div class="empty">No members found.</div>`; return; }
+      let html = `<div class="set-team-grid">
+        <div class="set-team-hd">User</div><div class="set-team-hd">Role</div><div class="set-team-hd">Client</div>`;
+      members.forEach((m) => {
+        const client = S.clients.find((c) => c.id === m.client_id);
+        html += `<div class="set-team-cell">${esc(m.email)}</div>
+          <div class="set-team-cell"><span class="pill pill-${m.role}">${(m.role || "member").replaceAll("_", " ")}</span></div>
+          <div class="set-team-cell">${client ? esc(client.name) : "All"}</div>`;
+      });
+      teamEl.innerHTML = html + `</div>`;
+    } catch { teamEl.innerHTML = `<div class="empty">Could not load members.</div>`; }
+  })();
+
+  // -- Add team member (admin only) --
+  if (isAdmin) {
+    const addCard = el("div", "card set-card");
+    addCard.innerHTML = `<div class="card-title">Add team member</div>
+      <p class="set-desc">Create an account for a team member. They'll receive credentials to log in.</p>
+      <form class="set-invite-form" id="invite-form">
+        <label class="set-inv-lbl">Email
+          <input type="email" id="inv-email" required placeholder="colleague@company.com" class="set-input" />
+        </label>
+        <label class="set-inv-lbl">Role
+          <select id="inv-role" class="set-input">
+            <option value="client_member">Member</option>
+            <option value="client_admin">Client Admin</option>
+            ${isSuperAdmin || isAgencyAdmin ? `<option value="agency_admin">Agency Admin</option>` : ""}
+          </select>
+        </label>
+        ${S.clients.length > 1 ? `<label class="set-inv-lbl">Assign to client
+          <select id="inv-client" class="set-input">
+            <option value="">All clients</option>
+            ${S.clients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+          </select>
+        </label>` : ""}
+        <button type="submit" class="btn btn-amber" id="inv-btn">Create account</button>
+        <div id="inv-result" class="set-inv-result hidden"></div>
+      </form>`;
+    root.appendChild(addCard);
+
+    addCard.querySelector("#invite-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = addCard.querySelector("#inv-btn");
+      const resEl = addCard.querySelector("#inv-result");
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      resEl.classList.add("hidden");
+      try {
+        const r = await fetch("/api/invite", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: addCard.querySelector("#inv-email").value.trim(),
+            role: addCard.querySelector("#inv-role").value,
+            client_id: addCard.querySelector("#inv-client")?.value || undefined,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          resEl.textContent = d.error || "Failed";
+          resEl.className = "set-inv-result set-inv-err";
+        } else if (d.new_account) {
+          resEl.innerHTML = `Account created for <strong>${esc(d.email)}</strong><br>
+            Temp password: <code>${esc(d.temp_password)}</code><br>
+            Share these credentials — they should change their password after first login.`;
+          resEl.className = "set-inv-result set-inv-ok";
+          addCard.querySelector("#inv-email").value = "";
+        } else {
+          resEl.textContent = `${d.email} already has an account — added to your organization.`;
+          resEl.className = "set-inv-result set-inv-ok";
+          addCard.querySelector("#inv-email").value = "";
+        }
+      } catch {
+        resEl.textContent = "Network error — try again.";
+        resEl.className = "set-inv-result set-inv-err";
+      }
+      btn.disabled = false;
+      btn.textContent = "Create account";
+    });
+  }
+
+  // -- Create agency (super_admin only) --
+  if (isSuperAdmin) {
+    const agencyCard = el("div", "card set-card");
+    agencyCard.innerHTML = `<div class="card-title">Create agency</div>
+      <p class="set-desc">Set up a new staffing agency. An admin account will be created for the agency head.</p>
+      <form class="set-invite-form" id="agency-form">
+        <label class="set-inv-lbl">Agency name
+          <input type="text" id="ag-name" required placeholder="BlueHire Consultants" class="set-input" />
+        </label>
+        <label class="set-inv-lbl">Agency admin email
+          <input type="email" id="ag-email" required placeholder="admin@agency.com" class="set-input" />
+        </label>
+        <button type="submit" class="btn btn-amber" id="ag-btn">Create agency</button>
+        <div id="ag-result" class="set-inv-result hidden"></div>
+      </form>`;
+    root.appendChild(agencyCard);
+
+    agencyCard.querySelector("#agency-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = agencyCard.querySelector("#ag-btn");
+      const resEl = agencyCard.querySelector("#ag-result");
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      resEl.classList.add("hidden");
+      try {
+        const r = await fetch("/api/create-org", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "agency",
+            name: agencyCard.querySelector("#ag-name").value.trim(),
+            admin_email: agencyCard.querySelector("#ag-email").value.trim(),
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          resEl.textContent = d.error || "Failed";
+          resEl.className = "set-inv-result set-inv-err";
+        } else {
+          let msg = `Agency "${esc(d.org_name)}" created with ${esc(d.admin_email)} as admin.`;
+          if (d.new_account && d.temp_password) {
+            msg += `<br>Temp password: <code>${esc(d.temp_password)}</code><br>Share these credentials with the agency admin.`;
+          }
+          resEl.innerHTML = msg;
+          resEl.className = "set-inv-result set-inv-ok";
+          agencyCard.querySelector("#ag-name").value = "";
+          agencyCard.querySelector("#ag-email").value = "";
+          toast("Agency created");
+        }
+      } catch {
+        resEl.textContent = "Network error — try again.";
+        resEl.className = "set-inv-result set-inv-err";
+      }
+      btn.disabled = false;
+      btn.textContent = "Create agency";
+    });
+  }
+
+  // -- Onboard client organization (agency_admin only) --
+  if (isAgencyAdmin) {
+    const clientCard = el("div", "card set-card");
+    clientCard.innerHTML = `<div class="card-title">Onboard client organization</div>
+      <p class="set-desc">Add a client company to your agency. An admin account will be created for their team lead.</p>
+      <form class="set-invite-form" id="client-form">
+        <label class="set-inv-lbl">Company name
+          <input type="text" id="cl-name" required placeholder="Meridian Retail Ltd" class="set-input" />
+        </label>
+        <label class="set-inv-lbl">Client admin email
+          <input type="email" id="cl-email" required placeholder="hr@company.com" class="set-input" />
+        </label>
+        <button type="submit" class="btn btn-amber" id="cl-btn">Onboard client</button>
+        <div id="cl-result" class="set-inv-result hidden"></div>
+      </form>`;
+    root.appendChild(clientCard);
+
+    clientCard.querySelector("#client-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = clientCard.querySelector("#cl-btn");
+      const resEl = clientCard.querySelector("#cl-result");
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      resEl.classList.add("hidden");
+      try {
+        const r = await fetch("/api/create-org", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "client",
+            name: clientCard.querySelector("#cl-name").value.trim(),
+            admin_email: clientCard.querySelector("#cl-email").value.trim(),
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          resEl.textContent = d.error || "Failed";
+          resEl.className = "set-inv-result set-inv-err";
+        } else {
+          let msg = `Client "${esc(d.client_name)}" onboarded with ${esc(d.admin_email)} as admin.`;
+          if (d.new_account && d.temp_password) {
+            msg += `<br>Temp password: <code>${esc(d.temp_password)}</code><br>Share these credentials with the client admin.`;
+          } else {
+            msg += `<br>Existing account — added as client admin.`;
+          }
+          resEl.innerHTML = msg;
+          resEl.className = "set-inv-result set-inv-ok";
+          clientCard.querySelector("#cl-name").value = "";
+          clientCard.querySelector("#cl-email").value = "";
+          toast("Client onboarded");
+        }
+      } catch {
+        resEl.textContent = "Network error — try again.";
+        resEl.className = "set-inv-result set-inv-err";
+      }
+      btn.disabled = false;
+      btn.textContent = "Onboard client";
+    });
+  }
+
+  // -- Google Calendar --
+  const gcalCard = el("div", "card set-card");
+  gcalCard.innerHTML = `<div class="card-title">Google Calendar</div>
+    <p class="set-desc">Connect your Google account to auto-create Meet links when candidates book interviews.</p>
+    <div class="set-gcal-status" id="gcal-status"><span class="set-loading">Checking…</span></div>`;
+  root.appendChild(gcalCard);
+
+  (async () => {
+    const statusEl = gcalCard.querySelector("#gcal-status");
+    try {
+      const r = await fetch(`/api/google-auth?action=status`, { headers: { Authorization: `Bearer ${token}` } });
+      if (r.status === 501) { statusEl.innerHTML = `<span class="set-warn">Google OAuth not configured on this deployment.</span>`; return; }
+      const d = await r.json();
+      if (d.connected) {
+        statusEl.innerHTML = `<div class="set-gcal-connected">
+          <span class="set-check">&#10003;</span>
+          <span>Connected as <strong>${esc(d.google_email)}</strong></span>
+          <button class="btn btn-sm btn-outline" id="gcal-disconnect">Disconnect</button>
+        </div>`;
+        statusEl.querySelector("#gcal-disconnect").onclick = async () => {
+          if (!confirm("Disconnect Google Calendar? Meet links won't be created automatically.")) return;
+          await fetch(`/api/google-auth`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "disconnect" }),
+          });
+          toast("Google disconnected");
+          render();
+        };
+      } else {
+        statusEl.innerHTML = `<button class="btn btn-amber" id="gcal-connect">Connect Google Calendar</button>`;
+        statusEl.querySelector("#gcal-connect").onclick = async () => {
+          const r2 = await fetch(`/api/google-auth?action=url`, { headers: { Authorization: `Bearer ${token}` } });
+          const d2 = await r2.json();
+          if (d2.url) window.location.href = d2.url;
+          else toast("Could not start Google auth");
+        };
+      }
+    } catch { statusEl.innerHTML = `<span class="set-warn">Could not check Google status.</span>`; }
+  })();
 }
 
 // go

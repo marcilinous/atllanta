@@ -26,6 +26,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST" });
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel → Settings → Environment Variables (enable for Preview)." });
+  }
+
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) return res.status(401).json({ error: "Missing auth token" });
 
@@ -53,9 +57,9 @@ export default async function handler(req, res) {
 
   try {
     if (ext === "pdf") {
-      const pdfParse = (await import("pdf-parse")).default;
-      const result = await pdfParse(buffer);
-      text = result.text || "";
+      const { extractText } = await import("unpdf");
+      const result = await extractText(new Uint8Array(buffer));
+      text = (result.text || []).join("\n");
     } else {
       const mammoth = await import("mammoth");
       const result = await mammoth.extractRawText({ buffer });
@@ -64,10 +68,15 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(422).json({
       error: "Could not extract text from this file. It may be scanned or corrupted.",
+      detail: err?.message || String(err),
     });
   }
 
-  text = text.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  text = text
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   if (!text) {
     return res.status(422).json({
