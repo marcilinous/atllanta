@@ -1879,6 +1879,92 @@ async function settings(root) {
     } catch { teamEl.innerHTML = `<div class="empty">Could not load members.</div>`; }
   })();
 
+  // -- Agencies & Clients browser (super_admin + agency_admin) --
+  if (isSuperAdmin || isAgencyAdmin) {
+    const browseCard = el("div", "card set-card");
+    browseCard.innerHTML = `<div class="card-title">${isSuperAdmin ? "Agencies" : "Client organizations"}</div>
+      <div id="org-browser" class="set-team"><span class="set-loading">Loading…</span></div>`;
+    root.appendChild(browseCard);
+
+    (async () => {
+      const browserEl = browseCard.querySelector("#org-browser");
+      try {
+        const r = await fetch("/api/orgs", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await r.json();
+        const agencies = d.agencies || [];
+
+        if (!agencies.length) {
+          browserEl.innerHTML = `<div class="empty">${isSuperAdmin ? "No agencies yet. Create one below." : "No clients onboarded yet."}</div>`;
+          return;
+        }
+
+        let html = "";
+        agencies.forEach((ag) => {
+          html += `<div class="ob-agency" data-org-id="${ag.id}">
+            <div class="ob-agency-head">
+              <span class="ob-agency-name">${esc(ag.name)}</span>
+              <span class="ob-agency-meta">${esc(ag.plan_tier || "")} · ${ag.clients.length} client${ag.clients.length !== 1 ? "s" : ""}</span>
+              <span class="ob-toggle">&#9662;</span>
+            </div>
+            <div class="ob-clients hidden">
+              ${ag.clients.length ? ag.clients.map((cl) => `
+                <div class="ob-client" data-org-id="${ag.id}" data-client-id="${cl.id}">
+                  <span class="ob-client-name">${esc(cl.name)}</span>
+                  <span class="ob-client-arrow">&#8250;</span>
+                  <div class="ob-client-team hidden"></div>
+                </div>
+              `).join("") : `<div class="ob-empty">No clients yet</div>`}
+            </div>
+          </div>`;
+        });
+        browserEl.innerHTML = html;
+
+        // Toggle agency → show/hide clients
+        browserEl.querySelectorAll(".ob-agency-head").forEach((head) => {
+          head.onclick = () => {
+            const clients = head.nextElementSibling;
+            clients.classList.toggle("hidden");
+            head.querySelector(".ob-toggle").textContent = clients.classList.contains("hidden") ? "▾" : "▴";
+          };
+        });
+
+        // Click client → load its team members
+        browserEl.querySelectorAll(".ob-client").forEach((clientEl) => {
+          const nameEl = clientEl.querySelector(".ob-client-name");
+          const teamDiv = clientEl.querySelector(".ob-client-team");
+          let loaded = false;
+          nameEl.onclick = async () => {
+            if (loaded) { teamDiv.classList.toggle("hidden"); return; }
+            teamDiv.classList.remove("hidden");
+            teamDiv.innerHTML = `<span class="set-loading">Loading…</span>`;
+            try {
+              const orgId = clientEl.dataset.orgId;
+              const clientId = clientEl.dataset.clientId;
+              const r2 = await fetch(`/api/team?org_id=${orgId}&client_id=${clientId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const d2 = await r2.json();
+              const members = d2.members || [];
+              if (!members.length) {
+                teamDiv.innerHTML = `<div class="ob-empty">No members</div>`;
+              } else {
+                const roleLabels = { super_admin: "Super Admin", agency_admin: "Agency Admin", client_admin: "HR Admin", client_member: "Recruiter" };
+                teamDiv.innerHTML = members.map((m) =>
+                  `<div class="ob-member"><span>${esc(m.email)}</span><span class="pill pill-${m.role}">${roleLabels[m.role] || m.role}</span></div>`
+                ).join("");
+              }
+              loaded = true;
+            } catch {
+              teamDiv.innerHTML = `<div class="ob-empty">Could not load</div>`;
+            }
+          };
+        });
+      } catch {
+        browserEl.innerHTML = `<div class="empty">Could not load organizations.</div>`;
+      }
+    })();
+  }
+
   // -- Add team member (admin only) --
   if (isAdmin) {
     const addCard = el("div", "card set-card");
