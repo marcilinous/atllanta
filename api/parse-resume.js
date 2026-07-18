@@ -53,9 +53,12 @@ export default async function handler(req, res) {
 
   try {
     if (ext === "pdf") {
-      const pdfParse = (await import("pdf-parse")).default;
-      const result = await pdfParse(buffer);
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: buffer });
+      await parser.load();
+      const result = await parser.getText();
       text = result.text || "";
+      await parser.destroy();
     } else {
       const mammoth = await import("mammoth");
       const result = await mammoth.extractRawText({ buffer });
@@ -67,7 +70,12 @@ export default async function handler(req, res) {
     });
   }
 
-  text = text.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  text = text
+    .replace(/\n*--\s*\d+\s+of\s+\d+\s*--\n*/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   if (!text) {
     return res.status(422).json({
