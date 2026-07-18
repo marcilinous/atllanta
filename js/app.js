@@ -541,9 +541,7 @@ function candidateDetail(candId) {
     </div>`;
   }).join("");
 
-  const resumePreview = cand.resume_raw_text
-    ? cand.resume_raw_text.slice(0, 2000) + (cand.resume_raw_text.length > 2000 ? "\n…" : "")
-    : "";
+  const resumePreview = cand.resume_raw_text || "";
 
   f.innerHTML = `
     <div class="cd-header">
