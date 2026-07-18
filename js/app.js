@@ -463,7 +463,7 @@ function candidates(root) {
 
     listEl.innerHTML = rows.map((r) => `
       <div class="cand-row">
-        <div class="who">
+        <div class="who cand-link" data-cand="${r.cand.id}" data-act="detail">
           <div class="av" style="background:${avColor(r.cand.name)}">${initials(r.cand.name)}</div>
           <div><div class="cname">${esc(r.cand.name)}</div><div class="csub">${esc(r.cand.email || r.cand.phone || "")}</div></div>
         </div>
@@ -484,7 +484,7 @@ function candidates(root) {
       </div>`).join("") +
       unattached.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).map((c) => `
       <div class="cand-row">
-        <div class="who">
+        <div class="who cand-link" data-cand="${c.id}" data-act="detail">
           <div class="av" style="background:${avColor(c.name)}">${initials(c.name)}</div>
           <div><div class="cname">${esc(c.name)}</div><div class="csub">${esc(c.email || c.phone || "")}</div></div>
         </div>
@@ -514,8 +514,50 @@ function candidates(root) {
     listEl.querySelectorAll("[data-act=attachjob]").forEach((b) =>
       b.addEventListener("click", () => attachJobForm(b.dataset.cand))
     );
+    listEl.querySelectorAll("[data-act=detail]").forEach((b) =>
+      b.addEventListener("click", () => candidateDetail(b.dataset.cand))
+    );
   }
   draw();
+}
+
+function candidateDetail(candId) {
+  const cand = S.cache.candidates.find((c) => c.id === candId);
+  if (!cand) return;
+
+  const apps = S.cache.applications.filter((a) => a.candidate_id === candId);
+  const f = el("div", "cd-modal");
+
+  const contactParts = [];
+  if (cand.email) contactParts.push(`<a href="mailto:${esc(cand.email)}" class="cd-contact-link">${esc(cand.email)}</a>`);
+  if (cand.phone) contactParts.push(`<a href="https://wa.me/${cand.phone.replace(/[^\d]/g, "")}" target="_blank" rel="noopener" class="cd-contact-link">${esc(cand.phone)}</a>`);
+
+  const jobRows = apps.map((a) => {
+    const job = S.cache.jobs.find((j) => j.id === a.job_id);
+    return `<div class="cd-job-row">
+      <div class="cd-job-title">${esc(job?.title || "Unknown")}</div>
+      <div>${scoreBar(a.match_score)}</div>
+      <div>${stagePill(a.stage)}</div>
+    </div>`;
+  }).join("");
+
+  const resumePreview = cand.resume_raw_text
+    ? cand.resume_raw_text.slice(0, 2000) + (cand.resume_raw_text.length > 2000 ? "\n…" : "")
+    : "";
+
+  f.innerHTML = `
+    <div class="cd-header">
+      <div class="av" style="background:${avColor(cand.name)};width:52px;height:52px;font-size:18px;border-radius:14px">${initials(cand.name)}</div>
+      <div class="cd-header-info">
+        <div class="cd-name">${esc(cand.name)}</div>
+        <div class="cd-contacts">${contactParts.join('<span class="cd-sep">·</span>') || '<span class="cd-no-contact">No contact info</span>'}</div>
+      </div>
+    </div>
+    ${apps.length ? `<div class="cd-section"><div class="cd-section-title">Applications</div><div class="cd-jobs">${jobRows}</div></div>` : '<div class="cd-section"><div class="cd-no-contact">Not attached to any job</div></div>'}
+    ${resumePreview ? `<div class="cd-section"><div class="cd-section-title">Resume</div><pre class="cd-resume">${esc(resumePreview)}</pre></div>` : ""}
+    <div class="cd-meta">Added ${new Date(cand.created_at).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })}${cand.source ? " · Source: " + esc(cand.source) : ""}</div>`;
+
+  openModal("Candidate profile", f);
 }
 
 function candidateForm(preselectedJobId) {

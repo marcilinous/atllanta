@@ -390,6 +390,27 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .icon-btn.wa:hover { background: var(--green); border-color: var(--green); color: #fff; }
 .icon-btn.chat:hover { background: var(--amber); border-color: var(--amber); color: var(--ink); }
 
+.cand-link { cursor: pointer; border-radius: 8px; padding: 4px 6px; margin: -4px -6px; transition: background .12s; }
+.cand-link:hover { background: var(--line2); }
+.cand-link:hover .cname { color: var(--amber2); }
+
+.cd-header { display: flex; gap: 16px; align-items: center; margin-bottom: 20px; }
+.cd-header-info { min-width: 0; }
+.cd-name { font-size: 17px; font-weight: 700; font-family: var(--font-display); }
+.cd-contacts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.cd-contact-link { font-size: 13px; color: var(--amber2); text-decoration: none; }
+.cd-contact-link:hover { text-decoration: underline; }
+.cd-sep { color: var(--grey); font-size: 12px; }
+.cd-no-contact { font-size: 12.5px; color: var(--grey); font-style: italic; }
+.cd-section { margin-bottom: 18px; }
+.cd-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--grey); margin-bottom: 8px; }
+.cd-jobs { border: 1px solid var(--line2); border-radius: 10px; overflow: hidden; }
+.cd-job-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line2); }
+.cd-job-row:last-child { border-bottom: none; }
+.cd-job-title { font-size: 13px; font-weight: 600; }
+.cd-resume { font-size: 12px; line-height: 1.6; color: var(--ink2); background: var(--line2); border-radius: 10px; padding: 14px 16px; max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-family: var(--font-body); margin: 0; }
+.cd-meta { font-size: 11.5px; color: var(--grey); padding-top: 8px; border-top: 1px solid var(--line2); }
+
 .search-box {
   display: flex; align-items: center; gap: 8px;
   background: var(--white); border: 1px solid var(--line); border-radius: 9px;
