@@ -57,23 +57,9 @@ export default async function handler(req, res) {
 
   try {
     if (ext === "pdf") {
-      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-      const doc = await pdfjsLib.getDocument({
-        data: new Uint8Array(buffer),
-        useSystemFonts: true,
-        disableFontFace: true,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-      }).promise;
-      const pages = [];
-      for (let i = 1; i <= doc.numPages; i++) {
-        const page = await doc.getPage(i);
-        const tc = await page.getTextContent();
-        pages.push(tc.items.map((it) => it.str).join(" "));
-      }
-      text = pages.join("\n");
-      await doc.destroy();
+      const { extractText } = await import("unpdf");
+      const result = await extractText(new Uint8Array(buffer));
+      text = (result.text || []).join("\n");
     } else {
       const mammoth = await import("mammoth");
       const result = await mammoth.extractRawText({ buffer });
