@@ -57,8 +57,15 @@ export default async function handler(req, res) {
 
   try {
     if (ext === "pdf") {
-      const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+      const doc = await pdfjsLib.getDocument({
+        data: new Uint8Array(buffer),
+        useSystemFonts: true,
+        disableFontFace: true,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+      }).promise;
       const pages = [];
       for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
@@ -75,6 +82,7 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(422).json({
       error: "Could not extract text from this file. It may be scanned or corrupted.",
+      detail: err?.message || String(err),
     });
   }
 
