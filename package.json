@@ -5,6 +5,8 @@
   "type": "module",
   "description": "AI-powered resume-to-JD matching, scheduling and outreach for HR teams and staffing agencies.",
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "mammoth": "^1.12.0",
+    "pdf-parse": "^2.4.5"
   }
 }

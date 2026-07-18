@@ -1,5 +1,16 @@
 {
   "cleanUrls": true,
+  "functions": {
+    "api/parse-resume.js": {
+      "maxDuration": 30
+    },
+    "api/extract-candidate.js": {
+      "maxDuration": 15
+    },
+    "api/screen-job.js": {
+      "maxDuration": 60
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
