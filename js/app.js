@@ -558,6 +558,23 @@ function candidateDetail(candId) {
   openModal("Candidate profile", f);
 }
 
+async function findExistingCandidate(email, phone) {
+  if (email) {
+    const { data } = await sb.from("candidates").select("*").eq("client_id", S.clientId).eq("email", email).limit(1).maybeSingle();
+    if (data) return data;
+  }
+  if (phone) {
+    const normalized = phone.replace(/[\s\-()]/g, "");
+    const { data } = await sb.from("candidates").select("*").eq("client_id", S.clientId).eq("phone", phone).limit(1).maybeSingle();
+    if (data) return data;
+    if (normalized !== phone) {
+      const { data: d2 } = await sb.from("candidates").select("*").eq("client_id", S.clientId).eq("phone", normalized).limit(1).maybeSingle();
+      if (d2) return d2;
+    }
+  }
+  return null;
+}
+
 function candidateForm(preselectedJobId) {
   const f = el("div", "form-grid");
   f.innerHTML = `
@@ -621,17 +638,34 @@ function candidateForm(preselectedJobId) {
       const candName = extResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
       parseStatus.textContent = "Saving candidate profile…";
 
-      const { data: cand, error } = await sb.from("candidates").insert({
-        client_id: S.clientId,
-        name: candName,
-        email: extResult.email || null,
-        phone: extResult.phone || null,
-        resume_raw_text: parseResult.text,
-      }).select().single();
-      if (error) throw new Error(error.message);
+      let cand = null;
+      let isUpdate = false;
+      const existing = await findExistingCandidate(extResult.email, extResult.phone);
+      if (existing) {
+        const updates = { resume_raw_text: parseResult.text, name: candName };
+        if (extResult.email && !existing.email) updates.email = extResult.email;
+        if (extResult.phone && !existing.phone) updates.phone = extResult.phone;
+        const { data, error } = await sb.from("candidates").update(updates).eq("id", existing.id).select().single();
+        if (error) throw new Error(error.message);
+        cand = data;
+        isUpdate = true;
+      } else {
+        const { data, error } = await sb.from("candidates").insert({
+          client_id: S.clientId,
+          name: candName,
+          email: extResult.email || null,
+          phone: extResult.phone || null,
+          resume_raw_text: parseResult.text,
+        }).select().single();
+        if (error) throw new Error(error.message);
+        cand = data;
+      }
 
       if (preselectedJobId) {
-        await sb.from("applications").insert({ job_id: preselectedJobId, candidate_id: cand.id });
+        const { data: existingApp } = await sb.from("applications").select("id").eq("job_id", preselectedJobId).eq("candidate_id", cand.id).maybeSingle();
+        if (!existingApp) {
+          await sb.from("applications").insert({ job_id: preselectedJobId, candidate_id: cand.id });
+        }
       }
 
       parseStatus.classList.add("hidden");
@@ -645,7 +679,7 @@ function candidateForm(preselectedJobId) {
           </div>
         </div>
         ${extResult.summary ? `<p style="font-size:13px;color:var(--ink2);margin-bottom:12px">${esc(extResult.summary)}</p>` : ""}
-        <p style="font-size:12.5px;color:var(--green);font-weight:600;margin-bottom:12px">Profile created successfully</p>
+        <p style="font-size:12.5px;color:var(--green);font-weight:600;margin-bottom:12px">${isUpdate ? "Resume updated for existing candidate" : "Profile created successfully"}</p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-amber" id="cf-another">Upload another</button>
           <button class="btn btn-dark" id="cf-done">Done</button>
@@ -657,7 +691,7 @@ function candidateForm(preselectedJobId) {
         fileInput.value = "";
       };
       resultDiv.querySelector("#cf-done").onclick = () => { closeModal(); render(); };
-      toast("Candidate added — " + candName);
+      toast(isUpdate ? "Resume updated — " + candName : "Candidate added — " + candName);
     } catch (err) {
       parseStatus.textContent = err.message;
       parseStatus.classList.add("error");
@@ -769,20 +803,38 @@ function bulkUploadForm(preselectedJobId) {
         const extractResult = await extractResp.json();
         if (!extractResp.ok) throw new Error(extractResult.error || "Extract failed");
 
-        const { data: cand, error } = await sb.from("candidates").insert({
-          client_id: S.clientId,
-          name: extractResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " "),
-          email: extractResult.email || null,
-          phone: extractResult.phone || null,
-          resume_raw_text: parseResult.text,
-        }).select().single();
-
-        if (error) throw new Error(error.message);
-        if (jobId) {
-          await sb.from("applications").insert({ job_id: jobId, candidate_id: cand.id });
+        const candName = extractResult.name || file.name.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
+        let cand = null;
+        let isUpdate = false;
+        const existing = await findExistingCandidate(extractResult.email, extractResult.phone);
+        if (existing) {
+          const updates = { resume_raw_text: parseResult.text, name: candName };
+          if (extractResult.email && !existing.email) updates.email = extractResult.email;
+          if (extractResult.phone && !existing.phone) updates.phone = extractResult.phone;
+          const { data, error } = await sb.from("candidates").update(updates).eq("id", existing.id).select().single();
+          if (error) throw new Error(error.message);
+          cand = data;
+          isUpdate = true;
+        } else {
+          const { data, error } = await sb.from("candidates").insert({
+            client_id: S.clientId,
+            name: candName,
+            email: extractResult.email || null,
+            phone: extractResult.phone || null,
+            resume_raw_text: parseResult.text,
+          }).select().single();
+          if (error) throw new Error(error.message);
+          cand = data;
         }
 
-        logEntry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(extractResult.name || file.name)} — ${esc(extractResult.email || "")}`;
+        if (jobId) {
+          const { data: existingApp } = await sb.from("applications").select("id").eq("job_id", jobId).eq("candidate_id", cand.id).maybeSingle();
+          if (!existingApp) {
+            await sb.from("applications").insert({ job_id: jobId, candidate_id: cand.id });
+          }
+        }
+
+        logEntry.innerHTML = `<span style="color:var(--green)">&#10003;</span> ${esc(candName)}${isUpdate ? " (updated)" : ""} — ${esc(extractResult.email || "")}`;
         success++;
       } catch (err) {
         logEntry.innerHTML = `<span style="color:var(--red)">&#10007;</span> ${esc(file.name)} — ${esc(err.message)}`;
