@@ -257,21 +257,45 @@ function jobs(root) {
 
       let detailHTML = "";
       if (isExpanded) {
-        const candRows = jobApps.map((a) => {
+        const scored = jobApps.filter((a) => a.match_score != null).sort((a, b) => b.match_score - a.match_score);
+        const unscored = jobApps.filter((a) => a.match_score == null);
+        const sorted = [...scored, ...unscored];
+
+        const candRows = sorted.map((a) => {
           const c = S.cache.candidates.find((x) => x.id === a.candidate_id);
-          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line2)">
-            <div class="av" style="background:${avColor(c?.name)};width:26px;height:26px;font-size:9px;border-radius:7px;flex-shrink:0">${initials(c?.name)}</div>
-            <div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c?.name || "Unknown")}</div>
-            <div style="flex-shrink:0">${scoreBar(a.match_score)}</div>
-            <div style="flex-shrink:0">${stagePill(a.stage)}</div>
+          const contact = c?.email || c?.phone || "";
+          const phone = (c?.phone || "").replace(/[^\d]/g, "");
+          const summary = a.match_summary ? `<div class="jc-summary">${esc(a.match_summary)}</div>` : "";
+          return `<div class="jc-row">
+            <div class="av" style="background:${avColor(c?.name)}">${initials(c?.name)}</div>
+            <div class="jc-info">
+              <div class="jc-name">${esc(c?.name || "Unknown")}</div>
+              <div class="jc-contact">${esc(contact)}</div>
+              ${summary}
+            </div>
+            <div class="jc-score">${scoreBar(a.match_score)}</div>
+            <div class="jc-stage">${stagePill(a.stage)}</div>
+            <div class="jc-actions">
+              ${phone ? `<button class="btn-icon" title="WhatsApp ${esc(c?.name)}" data-act="wa-cand" data-phone="${phone}" data-name="${esc(c?.name)}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              </button>` : ""}
+              <button class="btn-icon" title="Update stage" data-act="stage-cand" data-app-id="${a.id}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </button>
+            </div>
           </div>`;
         }).join("");
 
         detailHTML = `
           <div class="job-detail" data-id="${j.id}">
-            ${jdPreview ? `<div style="font-size:12.5px;color:var(--ink2);line-height:1.5;margin-bottom:10px;white-space:pre-wrap;word-break:break-word">${esc(jdPreview)}${(j.jd_raw_text || "").length > 200 ? "…" : ""}</div>` : ""}
-            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey);margin-bottom:6px">Candidates (${appCount})</div>
-            ${candRows || `<div style="font-size:12.5px;color:var(--grey);padding:8px 0">No candidates yet</div>`}
+            ${jdPreview ? `<div class="jd-preview">${esc(jdPreview)}${(j.jd_raw_text || "").length > 200 ? "…" : ""}</div>` : ""}
+            <div class="jc-header">
+              <span>Candidates (${appCount})</span>
+              ${scored.length ? `<span class="jc-scored-tag">${scored.length} scored</span>` : ""}
+            </div>
+            <div class="jc-list">
+              ${candRows || `<div class="jc-empty">No candidates yet</div>`}
+            </div>
           </div>`;
       }
 
@@ -323,6 +347,20 @@ function jobs(root) {
     );
     grid.querySelectorAll("[data-act=screen]").forEach((b) =>
       b.addEventListener("click", (e) => { e.stopPropagation(); screenJob(b.dataset.id); })
+    );
+    grid.querySelectorAll("[data-act=wa-cand]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const phone = b.dataset.phone;
+        window.open(`https://wa.me/${phone}`, "_blank", "noopener");
+        toast("Opening WhatsApp with " + (b.dataset.name || "").split(" ")[0]);
+      })
+    );
+    grid.querySelectorAll("[data-act=stage-cand]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        updateStageForm(b.dataset.appId);
+      })
     );
   }
   draw();
