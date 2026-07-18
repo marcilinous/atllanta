@@ -1256,6 +1256,152 @@ function scoreDetail(appId) {
   };
 }
 
+// ---------- Manage interview slots ----------
+async function manageSlots(jobId) {
+  const job = S.cache.jobs.find((j) => j.id === jobId);
+  if (!job) return;
+
+  const f = el("div", "slots-modal");
+  f.innerHTML = `<div class="slots-loading">Loading slots…</div>`;
+  openModal("Interview slots — " + (job.title || ""), f, { scrollList: true });
+
+  const { data: slots } = await sb
+    .from("interview_slots")
+    .select("*")
+    .eq("job_id", jobId)
+    .order("slot_start");
+
+  function renderSlotList() {
+    const future = (slots || []).filter((s) => new Date(s.slot_start) > new Date());
+    const past = (slots || []).filter((s) => new Date(s.slot_start) <= new Date());
+
+    f.innerHTML = `
+      <div class="slot-add-form">
+        <div class="slot-add-row">
+          <label class="slot-field">
+            <span>Date</span>
+            <input type="date" id="sl-date" class="input" min="${new Date().toISOString().slice(0,10)}">
+          </label>
+          <label class="slot-field">
+            <span>Start</span>
+            <input type="time" id="sl-start" class="input" value="10:00">
+          </label>
+          <label class="slot-field">
+            <span>End</span>
+            <input type="time" id="sl-end" class="input" value="10:30">
+          </label>
+          <button class="btn btn-amber btn-sm" id="sl-add">Add slot</button>
+        </div>
+        <div class="slot-quick-row">
+          <span class="slot-quick-label">Quick add:</span>
+          <button class="btn btn-outline btn-sm" data-quick="30">+30 min slots</button>
+          <button class="btn btn-outline btn-sm" data-quick="60">+1 hr slots</button>
+        </div>
+      </div>
+      <div class="slot-list">
+        ${!future.length ? `<div class="empty" style="padding:16px 0">No upcoming slots. Add time slots above.</div>` : ""}
+        ${future.map((s) => {
+          const st = new Date(s.slot_start);
+          const en = new Date(s.slot_end);
+          const booked = !!s.booked_by;
+          const app = booked ? S.cache.applications.find((a) => a.id === s.booked_by) : null;
+          const cand = app ? S.cache.candidates.find((c) => c.id === app.candidate_id) : null;
+          return `<div class="slot-row${booked ? " slot-booked" : ""}">
+            <div class="slot-date">${st.toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</div>
+            <div class="slot-time">${st.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} – ${en.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
+            <div class="slot-status">${booked ? `<span class="pill pill-interview_scheduled"><span class="dot"></span>${esc(cand?.name || "Booked")}</span>` : `<span class="pill pill-new"><span class="dot"></span>open</span>`}</div>
+            ${!booked ? `<button class="btn-icon slot-del" data-slot="${s.id}" title="Remove">✕</button>` : ""}
+          </div>`;
+        }).join("")}
+      </div>
+      ${past.length ? `<details class="slot-past-toggle"><summary>${past.length} past slot${past.length>1?"s":""}</summary>
+        <div class="slot-list slot-past">${past.map((s) => {
+          const st = new Date(s.slot_start);
+          const en = new Date(s.slot_end);
+          return `<div class="slot-row slot-dim"><div class="slot-date">${st.toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</div><div class="slot-time">${st.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} – ${en.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div><div class="slot-status">${s.booked_by ? "booked" : "expired"}</div></div>`;
+        }).join("")}</div></details>` : ""}`;
+
+    f.querySelector("#sl-add").onclick = addSlot;
+
+    f.querySelectorAll("[data-quick]").forEach((btn) => {
+      btn.onclick = () => quickAdd(+btn.dataset.quick);
+    });
+
+    f.querySelectorAll(".slot-del").forEach((btn) => {
+      btn.onclick = async () => {
+        const { error } = await sb.from("interview_slots").delete().eq("id", btn.dataset.slot);
+        if (error) return toast(error.message);
+        const idx = slots.findIndex((s) => s.id === btn.dataset.slot);
+        if (idx !== -1) slots.splice(idx, 1);
+        renderSlotList();
+        toast("Slot removed");
+      };
+    });
+  }
+
+  async function addSlot() {
+    const date = f.querySelector("#sl-date").value;
+    const start = f.querySelector("#sl-start").value;
+    const end = f.querySelector("#sl-end").value;
+    if (!date || !start || !end) return toast("Fill in date, start and end time");
+    if (start >= end) return toast("End time must be after start time");
+
+    const slot_start = new Date(`${date}T${start}:00`).toISOString();
+    const slot_end = new Date(`${date}T${end}:00`).toISOString();
+
+    const { data, error } = await sb.from("interview_slots").insert({
+      organization_id: S.org.id,
+      job_id: jobId,
+      slot_start,
+      slot_end,
+      created_by: S.session.user.id,
+    }).select().single();
+    if (error) return toast(error.message);
+    slots.push(data);
+    slots.sort((a, b) => a.slot_start.localeCompare(b.slot_start));
+    renderSlotList();
+    toast("Slot added");
+  }
+
+  async function quickAdd(mins) {
+    const date = f.querySelector("#sl-date").value;
+    if (!date) return toast("Pick a date first");
+    const startH = 9, endH = 18;
+    const newSlots = [];
+    for (let h = startH; h < endH; ) {
+      const m = h * 60;
+      const mEnd = m + mins;
+      if (mEnd / 60 > endH) break;
+      const sh = String(Math.floor(m/60)).padStart(2,"0");
+      const sm = String(m%60).padStart(2,"0");
+      const eh = String(Math.floor(mEnd/60)).padStart(2,"0");
+      const em = String(mEnd%60).padStart(2,"0");
+      const slot_start = new Date(`${date}T${sh}:${sm}:00`).toISOString();
+      const slot_end = new Date(`${date}T${eh}:${em}:00`).toISOString();
+      const exists = slots.some((s) => s.slot_start === slot_start && s.slot_end === slot_end);
+      if (!exists) {
+        newSlots.push({ organization_id: S.org.id, job_id: jobId, slot_start, slot_end, created_by: S.session.user.id });
+      }
+      h = mEnd / 60;
+    }
+    if (!newSlots.length) return toast("All slots for that day already exist");
+    const { data, error } = await sb.from("interview_slots").insert(newSlots).select();
+    if (error) return toast(error.message);
+    slots.push(...data);
+    slots.sort((a, b) => a.slot_start.localeCompare(b.slot_start));
+    renderSlotList();
+    toast(`${data.length} slots added`);
+  }
+
+  renderSlotList();
+}
+
+function scheduleLink(appId) {
+  const app = S.cache.applications.find((a) => a.id === appId);
+  if (!app?.schedule_token) { toast("No schedule token — re-save the candidate"); return ""; }
+  return `${window.location.origin}/schedule?token=${app.schedule_token}`;
+}
+
 // ---------- Interviews ----------
 function interviews(root) {
   const rows = S.cache.applications
@@ -1267,14 +1413,28 @@ function interviews(root) {
     }))
     .filter((r) => r.cand && r.job);
 
+  // Slot management per job
+  const jobsWithApps = [...new Set(S.cache.applications.map((a) => a.job_id))];
+  const slotBar = el("div", "int-slot-bar");
+  slotBar.innerHTML = `<div class="int-slot-label">Manage interview slots:</div>
+    <div class="int-slot-btns">${jobsWithApps.map((jid) => {
+      const j = S.cache.jobs.find((x) => x.id === jid);
+      return j ? `<button class="btn btn-outline btn-sm" data-act="manage-slots" data-job="${jid}">${esc(j.title)}</button>` : "";
+    }).join("")}</div>`;
+  root.appendChild(slotBar);
+
+  slotBar.querySelectorAll("[data-act=manage-slots]").forEach((b) =>
+    b.addEventListener("click", () => manageSlots(b.dataset.job))
+  );
+
   if (!rows.length) {
-    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Move a candidate's stage to "interview scheduled" and they'll appear here.</div>`));
+    root.appendChild(el("div", "card", `<div class="empty"><strong>No interviews scheduled</strong>Add time slots above, then send a scheduling link via Chat → Interview invite.</div>`));
     return;
   }
 
   const list = el("div", "interview-list");
   rows.forEach((r) => {
-    const d = new Date(r.app.updated_at);
+    const d = r.app.interview_at ? new Date(r.app.interview_at) : new Date(r.app.updated_at);
     const card = el("div", "interview-card");
     card.innerHTML = `
       <div class="date-block">
@@ -1284,7 +1444,7 @@ function interviews(root) {
       <div class="int-info">
         <div class="int-name">${esc(r.cand.name)}</div>
         <div class="int-meta">${esc(r.job.title)} · ${r.app.stage.replaceAll("_", " ")}</div>
-        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+        <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${r.app.interview_at ? "" : " (not scheduled via link)"}</div>
       </div>
       <div class="int-actions">
         <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="stage">Update stage</button>
@@ -1349,8 +1509,11 @@ function chat(root) {
     const jobTitle = candJob ? candJob.title : "[Position]";
     const orgName = S.org?.name || "[Company]";
 
+    const app = candApps.length ? candApps[0] : null;
+    const link = app ? scheduleLink(app.id) : "";
+
     const templates = [
-      { label: "Interview invite", text: `Hi ${firstName}, this is ${orgName}. We reviewed your profile for the ${jobTitle} role and would like to invite you for an interview. Please let us know your available dates and preferred time slots this week. Looking forward to connecting with you!` },
+      { label: "Interview invite", text: `Hi ${firstName}, this is ${orgName}. We reviewed your profile for the ${jobTitle} role and would like to invite you for an interview.\n\nPick a time that works for you:\n${link}\n\nLooking forward to meeting you!` },
       { label: "Job offer", text: `Hi ${firstName}, congratulations! We're pleased to offer you the ${jobTitle} position at ${orgName}. We were impressed with your profile and believe you'd be a great fit for our team. We'll be sharing the offer details shortly. Please confirm your interest so we can proceed. Welcome aboard!` },
       { label: "Schedule call", text: `Hi ${firstName}, thank you for your interest in the ${jobTitle} role at ${orgName}. We'd like to schedule a brief call to discuss the opportunity and next steps. Could you share your availability for a 15-20 minute call this week?` },
       { label: "Follow-up", text: `Hi ${firstName}, just following up regarding the ${jobTitle} position at ${orgName}. We wanted to check if you're still interested and available. Please let us know at your earliest convenience.` },
