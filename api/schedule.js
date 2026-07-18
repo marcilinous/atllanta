@@ -112,18 +112,11 @@ export default async function handler(req, res) {
 
     let meetLink = null;
     try {
-      const { data: client } = await db
-        .from("clients").select("organization_id").eq("id", job?.client_id).single();
-
-      // Find the manager (slot creator) email for calendar invite
+      // Get manager email for the calendar invite
       let managerEmail = null;
       if (slot.created_by) {
-        const { data: creator } = await db.rpc("get_user_email", { uid: slot.created_by }).single();
-        managerEmail = creator?.email || null;
-        if (!managerEmail) {
-          const { data: mUser } = await db.auth.admin.getUserById(slot.created_by);
-          managerEmail = mUser?.user?.email || null;
-        }
+        const { data: mUser } = await db.auth.admin.getUserById(slot.created_by);
+        managerEmail = mUser?.user?.email || null;
       }
 
       const meetResult = await createMeetEvent({
@@ -132,7 +125,7 @@ export default async function handler(req, res) {
         startTime: slot.slot_start,
         endTime: slot.slot_end,
         attendees: [managerEmail, cand?.email],
-        impersonateEmail: managerEmail,
+        creatorUserId: slot.created_by,
       });
       meetLink = meetResult?.meetLink || null;
     } catch (_) {

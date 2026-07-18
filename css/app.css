@@ -787,6 +787,75 @@ body.modal-open { overflow: hidden; }
 .table tr:last-child td { border-bottom: none; }
 .table tr:hover td { background: #FAFAF8; }
 
+/* ── Settings ─────────────────────────────── */
+.set-card { margin-bottom: 16px; }
+.set-card .card-title { margin-bottom: 8px; }
+.set-desc { color: var(--grey); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+.set-loading { color: var(--grey); font-size: 13px; }
+.set-warn { color: var(--red); font-size: 13px; }
+
+.set-gcal-connected {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.set-check {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--green); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+}
+
+.set-org-info { display: flex; flex-direction: column; gap: 6px; }
+.set-field { display: flex; gap: 12px; font-size: 13px; }
+.set-label { color: var(--grey); min-width: 80px; }
+.set-val { font-weight: 500; }
+
+.set-team-grid {
+  display: grid; grid-template-columns: 1fr 120px 120px;
+  gap: 0; font-size: 13px; overflow-x: auto;
+}
+.set-team-grid-2 { grid-template-columns: 1fr 120px 100px; }
+.set-team-hd {
+  font-weight: 600; padding: 6px 8px;
+  border-bottom: 1px solid var(--line); color: var(--grey);
+}
+.set-team-cell {
+  padding: 8px; border-bottom: 1px solid var(--line2);
+  display: flex; align-items: center;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.set-invite-form {
+  display: flex; flex-direction: column; gap: 10px; max-width: 400px;
+}
+.set-inv-lbl {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 13px; font-weight: 500; color: var(--ink2);
+}
+.set-input {
+  padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 8px; font-size: 14px; background: var(--white);
+  outline: none; transition: border-color .15s;
+}
+.set-input:focus { border-color: var(--amber); }
+
+.set-inv-result {
+  font-size: 13px; padding: 8px 12px; border-radius: 8px;
+  line-height: 1.5;
+}
+.set-inv-ok { background: var(--green2); color: #1a5c3a; }
+.set-inv-err { background: var(--red2); color: var(--red); }
+.set-inv-result code {
+  background: rgba(0,0,0,.06); padding: 2px 6px; border-radius: 4px;
+  font-family: monospace; font-size: 13px; user-select: all;
+}
+
+.btn-sm { padding: 4px 12px; font-size: 12px; }
+.btn-outline {
+  background: transparent; border: 1px solid var(--line);
+  border-radius: 8px; color: var(--ink2); font-weight: 500;
+}
+.btn-outline:hover { border-color: var(--red); color: var(--red); }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
