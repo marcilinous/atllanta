@@ -9,7 +9,7 @@ import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
-// ── Algorithmic (Python-style) matching ─────────────────────────────
+// ── Algorithmic matching engine ─────────────────────────────────────
 
 const STOP_WORDS = new Set([
   "a","an","the","and","or","but","in","on","at","to","for","of","with",
@@ -21,84 +21,176 @@ const STOP_WORDS = new Set([
   "after","before","between","under","above","such","each","which","what","who",
   "how","when","where","while","all","any","both","few","more","most","other",
   "some","only","own","same","also","new","one","two","per","etc","via",
+  "using","used","work","working","worked","based","including","like","well",
+  "able","need","needs","required","preferred","must","strong","good","great",
+  "ensure","responsible","role","team","company","looking","candidate","position",
+  "experience","years","year","knowledge","understanding","ability","skills",
+  "please","apply","join","offer","provide","support","develop","manage",
 ]);
+
+const SKILL_TERMS = new Set([
+  "javascript","typescript","python","java","c++","c#","ruby","go","golang","rust",
+  "swift","kotlin","scala","php","perl","r","matlab","sql","nosql","graphql",
+  "react","angular","vue","svelte","next.js","nuxt","remix","gatsby",
+  "node.js","express","fastify","django","flask","spring","rails","laravel",
+  "aws","azure","gcp","docker","kubernetes","terraform","jenkins","ci/cd",
+  "mongodb","postgresql","mysql","redis","elasticsearch","cassandra","dynamodb",
+  "git","linux","nginx","apache","rest","api","microservices","serverless",
+  "html","css","sass","tailwind","bootstrap","figma","sketch",
+  "machine learning","deep learning","nlp","computer vision","tensorflow",
+  "pytorch","pandas","numpy","scikit-learn","data science","data engineering",
+  "agile","scrum","kanban","devops","sre","tdd","bdd",
+  "react native","flutter","ios","android","mobile",
+  "blockchain","web3","solidity","smart contracts",
+  "cybersecurity","penetration testing","encryption",
+  "tableau","power bi","looker","analytics","etl","airflow","spark","hadoop",
+  "salesforce","sap","erp","crm","jira","confluence",
+  "communication","leadership","problem-solving","teamwork","mentoring",
+]);
+
+function stem(word) {
+  if (word.length < 4) return word;
+  return word
+    .replace(/ies$/, "y")
+    .replace(/ies$/, "y")
+    .replace(/(ed|ing|tion|ment|ness|able|ible|ful|less|ous|ive|ize|ise|ity|al|er|or|ist|ent|ant)$/, "")
+    .replace(/s$/, "");
+}
 
 function tokenize(text) {
   return (text || "")
     .toLowerCase()
-    .replace(/[^a-z0-9+#.\-]/g, " ")
+    .replace(/[^a-z0-9+#.\-\/]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 1 && !STOP_WORDS.has(w));
 }
 
-function termFrequency(tokens) {
-  const tf = {};
-  for (const t of tokens) tf[t] = (tf[t] || 0) + 1;
-  const len = tokens.length || 1;
-  for (const k in tf) tf[k] /= len;
-  return tf;
+function extractBigrams(text) {
+  const lower = (text || "").toLowerCase();
+  const found = [];
+  for (const skill of SKILL_TERMS) {
+    if (skill.includes(" ") && lower.includes(skill)) {
+      found.push(skill);
+    }
+  }
+  return found;
 }
 
-function cosineSimilarity(tfA, tfB, idf) {
-  const allTerms = new Set([...Object.keys(tfA), ...Object.keys(tfB)]);
-  let dot = 0, magA = 0, magB = 0;
-  for (const t of allTerms) {
-    const w = idf[t] || 1;
-    const a = (tfA[t] || 0) * w;
-    const b = (tfB[t] || 0) * w;
-    dot += a * b;
-    magA += a * a;
-    magB += b * b;
+function extractSkills(tokens, bigrams) {
+  const skills = new Set(bigrams);
+  for (const t of tokens) {
+    if (SKILL_TERMS.has(t)) skills.add(t);
   }
-  if (magA === 0 || magB === 0) return 0;
-  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+  return skills;
 }
 
-function keywordScore(jdTokens, resumeTokens) {
-  const jdSet = new Set(jdTokens);
-  const resumeSet = new Set(resumeTokens);
-  if (jdSet.size === 0) return 0;
-  let matched = 0;
-  for (const t of jdSet) {
-    if (resumeSet.has(t)) matched++;
+function extractYearsRequired(text) {
+  const matches = (text || "").match(/(\d+)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)/gi) || [];
+  let maxYears = 0;
+  for (const m of matches) {
+    const n = parseInt(m);
+    if (n > maxYears) maxYears = n;
   }
-  return matched / jdSet.size;
+  return maxYears;
+}
+
+function extractYearsFromResume(text) {
+  const dates = [];
+  const yearPattern = /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{4})|(\d{4})\s*[-–]\s*(?:(\d{4})|present|current)/gi;
+  let m;
+  while ((m = yearPattern.exec(text || "")) !== null) {
+    const y = parseInt(m[1] || m[2] || m[3]);
+    if (y >= 1990 && y <= 2030) dates.push(y);
+  }
+  if (dates.length < 2) return 0;
+  return Math.max(...dates) - Math.min(...dates);
 }
 
 function algorithmicMatch(jdText, resumeText) {
   const jdTokens = tokenize(jdText);
   const resumeTokens = tokenize(resumeText);
 
-  if (!jdTokens.length || !resumeTokens.length) return { score: 0, summary: "Insufficient text for matching" };
-
-  const docCount = 2;
-  const allTokens = new Set([...jdTokens, ...resumeTokens]);
-  const idf = {};
-  for (const t of allTokens) {
-    const df = (jdTokens.includes(t) ? 1 : 0) + (resumeTokens.includes(t) ? 1 : 0);
-    idf[t] = Math.log((docCount + 1) / (df + 1)) + 1;
+  if (!jdTokens.length || !resumeTokens.length) {
+    return { score: 0, summary: "Insufficient text for matching" };
   }
 
-  const tfJd = termFrequency(jdTokens);
-  const tfResume = termFrequency(resumeTokens);
+  const jdBigrams = extractBigrams(jdText);
+  const resumeBigrams = extractBigrams(resumeText);
 
-  const tfidfScore = cosineSimilarity(tfJd, tfResume, idf);
-  const kwScore = keywordScore(jdTokens, resumeTokens);
+  const jdSkills = extractSkills(jdTokens, jdBigrams);
+  const resumeSkills = extractSkills(resumeTokens, resumeBigrams);
 
-  const combined = Math.round(Math.max(0, Math.min(100, (kwScore * 40 + tfidfScore * 60) * 100)));
+  // 1. Skill match (45% weight) — most important signal
+  let skillScore = 0;
+  const matchedSkills = [];
+  const missingSkills = [];
+  if (jdSkills.size > 0) {
+    for (const s of jdSkills) {
+      if (resumeSkills.has(s)) {
+        matchedSkills.push(s);
+      } else {
+        const stemmed = stem(s);
+        const found = [...resumeSkills].some((rs) => stem(rs) === stemmed);
+        if (found) matchedSkills.push(s);
+        else missingSkills.push(s);
+      }
+    }
+    skillScore = matchedSkills.length / jdSkills.size;
+  }
 
-  const jdSet = new Set(jdTokens);
-  const resumeSet = new Set(resumeTokens);
-  const matched = [...jdSet].filter((t) => resumeSet.has(t));
-  const missing = [...jdSet].filter((t) => !resumeSet.has(t));
+  // 2. Keyword overlap with stemming (25% weight)
+  const jdStems = new Set(jdTokens.map(stem));
+  const resumeStems = new Set(resumeTokens.map(stem));
+  const matchedStems = [...jdStems].filter((s) => resumeStems.has(s));
+  const keywordScore = jdStems.size > 0 ? matchedStems.length / jdStems.size : 0;
 
-  const summary = `Keyword overlap: ${Math.round(kwScore * 100)}% (${matched.length}/${jdSet.size} terms). TF-IDF similarity: ${Math.round(tfidfScore * 100)}%.`;
+  // 3. Experience match (15% weight)
+  const requiredYears = extractYearsRequired(jdText);
+  const candidateYears = extractYearsFromResume(resumeText);
+  let expScore = 1;
+  if (requiredYears > 0) {
+    if (candidateYears >= requiredYears) expScore = 1;
+    else if (candidateYears >= requiredYears * 0.7) expScore = 0.7;
+    else if (candidateYears > 0) expScore = 0.4;
+    else expScore = 0.2;
+  }
+
+  // 4. Education/certification signals (15% weight)
+  const lower = resumeText.toLowerCase();
+  const eduPatterns = [
+    /\b(b\.?tech|b\.?e\.?|bachelor|b\.?sc|bca|mca)\b/,
+    /\b(m\.?tech|m\.?e\.?|master|m\.?sc|mba|m\.?s\.?)\b/,
+    /\b(ph\.?d|doctorate)\b/,
+    /\b(certified|certification|certificate)\b/,
+    /\b(aws certified|pmp|scrum master|cissp|cka|ckad)\b/i,
+  ];
+  const jdLower = jdText.toLowerCase();
+  let eduScore = 0.5;
+  const jdWantsEdu = eduPatterns.some((p) => p.test(jdLower));
+  if (jdWantsEdu) {
+    const resumeHasEdu = eduPatterns.some((p) => p.test(lower));
+    eduScore = resumeHasEdu ? 1 : 0.2;
+  } else {
+    const resumeHasEdu = eduPatterns.some((p) => p.test(lower));
+    eduScore = resumeHasEdu ? 0.7 : 0.5;
+  }
+
+  // Weighted combination
+  const raw = (skillScore * 45 + keywordScore * 25 + expScore * 15 + eduScore * 15);
+  const score = Math.round(Math.max(0, Math.min(100, raw)));
+
+  // Build summary
+  const parts = [];
+  if (jdSkills.size > 0) parts.push(`Skills: ${matchedSkills.length}/${jdSkills.size} matched`);
+  if (requiredYears > 0) parts.push(`Experience: ${candidateYears || "?"}yr (${requiredYears}yr required)`);
+  parts.push(`Keyword overlap: ${Math.round(keywordScore * 100)}%`);
+  const summary = parts.join(". ") + ".";
 
   return {
-    score: combined,
+    score,
     summary,
-    strengths: matched.slice(0, 8),
-    gaps: missing.slice(0, 8),
+    strengths: matchedSkills.slice(0, 10),
+    gaps: missingSkills.slice(0, 10),
   };
 }
 
