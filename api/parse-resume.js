@@ -53,12 +53,16 @@ export default async function handler(req, res) {
 
   try {
     if (ext === "pdf") {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: buffer });
-      await parser.load();
-      const result = await parser.getText();
-      text = result.text || "";
-      await parser.destroy();
+      const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+      const pages = [];
+      for (let i = 1; i <= doc.numPages; i++) {
+        const page = await doc.getPage(i);
+        const tc = await page.getTextContent();
+        pages.push(tc.items.map((it) => it.str).join(" "));
+      }
+      text = pages.join("\n");
+      await doc.destroy();
     } else {
       const mammoth = await import("mammoth");
       const result = await mammoth.extractRawText({ buffer });
@@ -71,7 +75,6 @@ export default async function handler(req, res) {
   }
 
   text = text
-    .replace(/\n*--\s*\d+\s+of\s+\d+\s*--\n*/g, "\n")
     .replace(/\r\n/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
