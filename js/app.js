@@ -1870,8 +1870,9 @@ async function settings(root) {
         <div class="set-team-hd">User</div><div class="set-team-hd">Role</div><div class="set-team-hd">Client</div>`;
       members.forEach((m) => {
         const client = S.clients.find((c) => c.id === m.client_id);
+        const roleLabel = { super_admin: "Super Admin", agency_admin: "Agency Admin", client_admin: "HR Admin", client_member: "Recruiter" }[m.role] || m.role;
         html += `<div class="set-team-cell">${esc(m.email)}</div>
-          <div class="set-team-cell"><span class="pill pill-${m.role}">${(m.role || "member").replaceAll("_", " ")}</span></div>
+          <div class="set-team-cell"><span class="pill pill-${m.role}">${roleLabel}</span></div>
           <div class="set-team-cell">${client ? esc(client.name) : "All"}</div>`;
       });
       teamEl.innerHTML = html + `</div>`;
@@ -1889,9 +1890,8 @@ async function settings(root) {
         </label>
         <label class="set-inv-lbl">Role
           <select id="inv-role" class="set-input">
-            <option value="client_member">Member</option>
-            <option value="client_admin">Client Admin</option>
-            ${isSuperAdmin || isAgencyAdmin ? `<option value="agency_admin">Agency Admin</option>` : ""}
+            <option value="client_member">Recruiter</option>
+            <option value="client_admin">HR Admin</option>
           </select>
         </label>
         ${S.clients.length > 1 ? `<label class="set-inv-lbl">Assign to client
