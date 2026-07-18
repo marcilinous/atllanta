@@ -23,6 +23,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST" });
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel → Settings → Environment Variables (enable for Preview)." });
+  }
+
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) return res.status(401).json({ error: "Missing auth token" });
 
