@@ -1471,6 +1471,60 @@ function analytics(root) {
   grid.appendChild(dist);
   root.appendChild(grid);
 
+  // ── Daily activity (last 7 days) ──
+  const activity = el("div", "card", `<div class="card-title">Daily activity (last 7 days)</div>`);
+  const now = new Date();
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString("en", { weekday: "short", day: "numeric", month: "short" });
+    const isToday = i === 0;
+
+    const dayApps = apps.filter((a) => (a.updated_at || a.created_at || "").slice(0, 10) === key);
+    const dayCands = S.cache.candidates.filter((c) => (c.created_at || "").slice(0, 10) === key);
+    const dayScored = dayApps.filter((a) => a.match_score != null);
+    const dayStageChanges = dayApps.filter((a) => a.stage !== "new");
+    const dayShortlisted = dayApps.filter((a) => ["shortlisted", "interview_scheduled", "interviewed", "offered", "hired"].includes(a.stage));
+
+    days.push({ key, label, isToday, uploaded: dayCands.length, scored: dayScored.length, stageChanges: dayStageChanges.length, shortlisted: dayShortlisted.length });
+  }
+
+  const maxActivity = Math.max(1, ...days.map((d) => d.uploaded + d.scored));
+  activity.innerHTML += `<div class="da-grid">
+    ${days.map((d) => {
+      const total = d.uploaded + d.scored;
+      const barH = Math.max(4, (total / maxActivity) * 100);
+      return `<div class="da-col${d.isToday ? " da-today" : ""}">
+        <div class="da-bar-wrap">
+          <div class="da-bar" style="height:${barH}%">
+            ${d.scored ? `<div class="da-bar-seg da-scored" style="flex:${d.scored}"></div>` : ""}
+            ${d.uploaded ? `<div class="da-bar-seg da-uploaded" style="flex:${d.uploaded}"></div>` : ""}
+          </div>
+        </div>
+        <div class="da-num">${total || ""}</div>
+        <div class="da-label">${d.label}</div>
+      </div>`;
+    }).join("")}
+  </div>
+  <div class="da-legend">
+    <span class="da-leg"><span class="da-dot da-scored"></span> Scored</span>
+    <span class="da-leg"><span class="da-dot da-uploaded"></span> Uploaded</span>
+  </div>`;
+
+  const todayData = days[days.length - 1];
+  activity.innerHTML += `<div class="da-today-summary">
+    <div class="da-today-title">Today</div>
+    <div class="da-today-stats">
+      <span>${todayData.uploaded} uploaded</span>
+      <span>${todayData.scored} scored</span>
+      <span>${todayData.shortlisted} shortlisted</span>
+      <span>${todayData.stageChanges} stage updates</span>
+    </div>
+  </div>`;
+  root.appendChild(activity);
+
   const perJob = el("div", "card", `<div class="card-title">Per-job breakdown</div>`);
   if (!S.cache.jobs.length) {
     perJob.innerHTML += `<div class="empty">No jobs yet.</div>`;

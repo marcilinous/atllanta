@@ -546,6 +546,28 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
 
+/* ── Daily activity chart ─────────────────── */
+.da-grid { display: flex; gap: 8px; align-items: flex-end; margin: 16px 0 10px; }
+.da-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.da-col.da-today .da-label { color: var(--amber); font-weight: 700; }
+.da-col.da-today .da-bar-wrap { border-bottom: 2px solid var(--amber); }
+.da-bar-wrap { width: 100%; height: 100px; display: flex; align-items: flex-end; justify-content: center; }
+.da-bar { width: 70%; max-width: 36px; border-radius: 4px 4px 0 0; overflow: hidden; display: flex; flex-direction: column; min-height: 4px; }
+.da-bar-seg { min-height: 2px; }
+.da-bar-seg.da-scored { background: var(--green); }
+.da-bar-seg.da-uploaded { background: var(--amber); }
+.da-num { font-size: 11px; font-weight: 700; font-family: var(--font-display); color: var(--ink); min-height: 14px; }
+.da-label { font-size: 10.5px; color: var(--grey); white-space: nowrap; }
+.da-legend { display: flex; gap: 16px; justify-content: center; margin-bottom: 16px; }
+.da-leg { font-size: 11px; color: var(--grey); display: flex; align-items: center; gap: 5px; }
+.da-dot { width: 8px; height: 8px; border-radius: 2px; }
+.da-dot.da-scored { background: var(--green); }
+.da-dot.da-uploaded { background: var(--amber); }
+.da-today-summary { border-top: 1px solid var(--line2); padding-top: 14px; }
+.da-today-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink); margin-bottom: 8px; }
+.da-today-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.da-today-stats span { font-size: 12.5px; color: var(--ink2); background: var(--line2); padding: 4px 12px; border-radius: 8px; font-weight: 600; }
+
 /* ── Forms ─────────────────────────────────── */
 .form-grid { display: grid; gap: 14px; }
 .form-grid label { font-weight: 600; font-size: 12.5px; }
