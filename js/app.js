@@ -1343,27 +1343,59 @@ function chat(root) {
     const idx = candsWithPhone.indexOf(c);
     if (items[idx]) items[idx].classList.add("active-chat");
 
+    const firstName = c.name.split(" ")[0];
+    const candApps = S.cache.applications.filter((a) => a.candidate_id === c.id);
+    const candJob = candApps.length ? S.cache.jobs.find((j) => j.id === candApps[0].job_id) : null;
+    const jobTitle = candJob ? candJob.title : "[Position]";
+    const orgName = S.org?.name || "[Company]";
+
+    const templates = [
+      { label: "Interview invite", text: `Hi ${firstName}, this is ${orgName}. We reviewed your profile for the ${jobTitle} role and would like to invite you for an interview. Please let us know your available dates and preferred time slots this week. Looking forward to connecting with you!` },
+      { label: "Job offer", text: `Hi ${firstName}, congratulations! We're pleased to offer you the ${jobTitle} position at ${orgName}. We were impressed with your profile and believe you'd be a great fit for our team. We'll be sharing the offer details shortly. Please confirm your interest so we can proceed. Welcome aboard!` },
+      { label: "Schedule call", text: `Hi ${firstName}, thank you for your interest in the ${jobTitle} role at ${orgName}. We'd like to schedule a brief call to discuss the opportunity and next steps. Could you share your availability for a 15-20 minute call this week?` },
+      { label: "Follow-up", text: `Hi ${firstName}, just following up regarding the ${jobTitle} position at ${orgName}. We wanted to check if you're still interested and available. Please let us know at your earliest convenience.` },
+      { label: "Document request", text: `Hi ${firstName}, thank you for your interest in the ${jobTitle} role at ${orgName}. To move forward with your application, could you please share the following documents:\n\n1. Updated resume\n2. ID proof\n3. Relevant certifications\n\nPlease share at your earliest convenience.` },
+      { label: "Custom", text: `Hi ${firstName},\n\n` },
+    ];
+
     windowCol.innerHTML = `
       <div class="chat-head">
         <div>
           <div class="ch-name">${esc(c.name)}</div>
-          <div class="ch-sub">${esc(c.phone)}</div>
+          <div class="ch-sub">${esc(c.phone)}${candJob ? ` · ${esc(jobTitle)}` : ""}</div>
         </div>
         <a class="wa-link" href="https://wa.me/${c.phone.replace(/[^\d]/g, "")}" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
           Open in WhatsApp
         </a>
       </div>
+      <div class="tpl-picker">
+        ${templates.map((t, i) => `<button class="tpl-chip${i === 0 ? " active" : ""}" data-tpl="${i}">${t.label}</button>`).join("")}
+      </div>
       <div class="chat-messages">
         <div class="msg us">
-          Hi ${esc(c.name.split(" ")[0])}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?
-          <div class="msg-time">Template</div>
+          ${esc(templates[0].text).replace(/\n/g, "<br>")}
+          <div class="msg-time">Preview</div>
         </div>
       </div>
       <div class="chat-input-row">
-        <textarea id="wa-msg" placeholder="Type a message…">Hi ${esc(c.name.split(" ")[0])}, thanks for applying! We'd like to move forward with your application. Could you confirm your availability this week for a quick call?</textarea>
+        <textarea id="wa-msg" placeholder="Edit message or pick a template above…">${templates[0].text}</textarea>
         <button class="btn btn-dark btn-sm" id="wa-send">Send via WA</button>
       </div>`;
+
+    windowCol.querySelectorAll(".tpl-chip").forEach((chip) => {
+      chip.onclick = () => {
+        windowCol.querySelectorAll(".tpl-chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        const tpl = templates[+chip.dataset.tpl];
+        windowCol.querySelector("#wa-msg").value = tpl.text;
+        windowCol.querySelector(".msg.us").innerHTML = `${esc(tpl.text).replace(/\n/g, "<br>")}<div class="msg-time">Preview</div>`;
+      };
+    });
+
+    windowCol.querySelector("#wa-msg").addEventListener("input", (e) => {
+      windowCol.querySelector(".msg.us").innerHTML = `${esc(e.target.value).replace(/\n/g, "<br>")}<div class="msg-time">Preview</div>`;
+    });
 
     windowCol.querySelector("#wa-send").onclick = () => {
       const phone = c.phone.replace(/[^\d]/g, "");

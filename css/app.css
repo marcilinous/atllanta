@@ -508,7 +508,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 .chat-input-row textarea {
   flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px;
-  font-size: 13px; resize: none; height: 42px; background: var(--white);
+  font-size: 13px; resize: vertical; min-height: 60px; height: 80px; background: var(--white);
 }
 .chat-input-row textarea:focus { outline: none; border-color: var(--ink); }
 .wa-link {
@@ -518,6 +518,12 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   border: 1px solid var(--green2); background: var(--green2);
 }
 .wa-link svg { width: 14px; height: 14px; }
+
+/* ── Template picker ── */
+.tpl-picker { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.tpl-chip { font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--line2); background: var(--white); color: var(--ink2); cursor: pointer; transition: all .15s; }
+.tpl-chip:hover { border-color: var(--ink); color: var(--ink); }
+.tpl-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
 /* ── Analytics ────────────────────────────── */
 .metric-row {
