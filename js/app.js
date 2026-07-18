@@ -1476,6 +1476,7 @@ function interviews(root) {
         <div class="int-name">${esc(r.cand.name)}</div>
         <div class="int-meta">${esc(r.job.title)} · ${r.app.stage.replaceAll("_", " ")}</div>
         <div class="int-time">${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${r.app.interview_at ? "" : " (manual)"}</div>
+        ${r.app.meet_link ? `<a href="${esc(r.app.meet_link)}" target="_blank" rel="noopener" class="int-meet-link">Google Meet</a>` : ""}
       </div>
       <div class="int-actions">
         <button class="btn btn-outline btn-sm" data-app="${r.app.id}" data-act="slots">Manage slots</button>

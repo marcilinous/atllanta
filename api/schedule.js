@@ -3,6 +3,7 @@
 // Each candidate gets a unique link with 24hr auto-expiry.
 
 import { supabaseAdmin } from "../lib/supabaseServer.js";
+import { createMeetEvent } from "../lib/googleMeet.js";
 
 export default async function handler(req, res) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
 
     const { data: app } = await db
       .from("applications")
-      .select("id, job_id, candidate_id, stage, interview_at, schedule_expires_at")
+      .select("id, job_id, candidate_id, stage, interview_at, schedule_expires_at, meet_link")
       .eq("schedule_token", token)
       .single();
     if (!app) return res.status(404).json({ error: "Invalid or expired link" });
@@ -43,6 +44,7 @@ export default async function handler(req, res) {
       return res.json({
         booked: true,
         interview_at: app.interview_at,
+        meet_link: app.meet_link || null,
         job_title: job.title,
         org_name: org?.name || client?.name || "",
         candidate_name: cand?.name || "",
@@ -102,13 +104,51 @@ export default async function handler(req, res) {
       .is("booked_by", null);
     if (slotErr) return res.status(500).json({ error: "Booking failed" });
 
+    // Fetch candidate, job, org info for the calendar event
+    const [{ data: job }, { data: cand }] = await Promise.all([
+      db.from("jobs").select("title, client_id").eq("id", app.job_id).single(),
+      db.from("candidates").select("name, email").eq("id", app.candidate_id).single(),
+    ]);
+
+    let meetLink = null;
+    try {
+      const { data: client } = await db
+        .from("clients").select("organization_id").eq("id", job?.client_id).single();
+
+      // Find the manager (slot creator) email for calendar invite
+      let managerEmail = null;
+      if (slot.created_by) {
+        const { data: creator } = await db.rpc("get_user_email", { uid: slot.created_by }).single();
+        managerEmail = creator?.email || null;
+        if (!managerEmail) {
+          const { data: mUser } = await db.auth.admin.getUserById(slot.created_by);
+          managerEmail = mUser?.user?.email || null;
+        }
+      }
+
+      const meetResult = await createMeetEvent({
+        title: `Interview: ${cand?.name || "Candidate"} — ${job?.title || "Position"}`,
+        description: `Interview for ${job?.title || "Position"}\nCandidate: ${cand?.name || ""}`,
+        startTime: slot.slot_start,
+        endTime: slot.slot_end,
+        attendees: [managerEmail, cand?.email],
+        impersonateEmail: managerEmail,
+      });
+      meetLink = meetResult?.meetLink || null;
+    } catch (_) {
+      // Meet creation is best-effort — booking still succeeds without it
+    }
+
+    const updateData = { stage: "interview_scheduled", interview_at: slot.slot_start };
+    if (meetLink) updateData.meet_link = meetLink;
+
     const { error: appErr } = await db
       .from("applications")
-      .update({ stage: "interview_scheduled", interview_at: slot.slot_start })
+      .update(updateData)
       .eq("id", app.id);
     if (appErr) return res.status(500).json({ error: "Update failed" });
 
-    return res.json({ success: true, interview_at: slot.slot_start });
+    return res.json({ success: true, interview_at: slot.slot_start, meet_link: meetLink });
   }
 
   return res.status(405).json({ error: "Use GET or POST" });
