@@ -1835,10 +1835,236 @@ function analytics(root) {
 
 // ---------- Settings ----------
 async function settings(root) {
-  const isAdmin = S.membership && ["super_admin", "agency_admin", "client_admin"].includes(S.membership.role);
+  const role = S.membership?.role || "";
+  const isSuperAdmin = role === "super_admin";
+  const isAgencyAdmin = role === "agency_admin";
+  const isAdmin = ["super_admin", "agency_admin", "client_admin"].includes(role);
   const token = S.session?.access_token;
 
-  // -- Google Calendar section --
+  // -- Organization info --
+  const orgCard = el("div", "card set-card");
+  orgCard.innerHTML = `<div class="card-title">Organization</div>
+    <div class="set-org-info">
+      <div class="set-field"><span class="set-label">Name</span><span class="set-val">${esc(S.org?.name || "—")}</span></div>
+      <div class="set-field"><span class="set-label">Type</span><span class="set-val">${esc(S.org?.org_type || "—")}</span></div>
+      <div class="set-field"><span class="set-label">Plan</span><span class="set-val">${esc(S.org?.plan_tier || "—")}</span></div>
+      <div class="set-field"><span class="set-label">Credits</span><span class="set-val">${S.org?.credits_balance ?? "—"}</span></div>
+      <div class="set-field"><span class="set-label">Your role</span><span class="set-val">${esc(role.replaceAll("_", " "))}</span></div>
+    </div>`;
+  root.appendChild(orgCard);
+
+  // -- Team members --
+  const teamCard = el("div", "card set-card");
+  teamCard.innerHTML = `<div class="card-title">Team members</div>
+    <div id="team-list" class="set-team"><span class="set-loading">Loading…</span></div>`;
+  root.appendChild(teamCard);
+
+  (async () => {
+    const teamEl = teamCard.querySelector("#team-list");
+    try {
+      const r = await fetch("/api/team", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      const members = d.members || [];
+      if (!members.length) { teamEl.innerHTML = `<div class="empty">No members found.</div>`; return; }
+      let html = `<div class="set-team-grid">
+        <div class="set-team-hd">User</div><div class="set-team-hd">Role</div><div class="set-team-hd">Client</div>`;
+      members.forEach((m) => {
+        const client = S.clients.find((c) => c.id === m.client_id);
+        html += `<div class="set-team-cell">${esc(m.email)}</div>
+          <div class="set-team-cell"><span class="pill pill-${m.role}">${(m.role || "member").replaceAll("_", " ")}</span></div>
+          <div class="set-team-cell">${client ? esc(client.name) : "All"}</div>`;
+      });
+      teamEl.innerHTML = html + `</div>`;
+    } catch { teamEl.innerHTML = `<div class="empty">Could not load members.</div>`; }
+  })();
+
+  // -- Add team member (admin only) --
+  if (isAdmin) {
+    const addCard = el("div", "card set-card");
+    addCard.innerHTML = `<div class="card-title">Add team member</div>
+      <p class="set-desc">Create an account for a team member. They'll receive credentials to log in.</p>
+      <form class="set-invite-form" id="invite-form">
+        <label class="set-inv-lbl">Email
+          <input type="email" id="inv-email" required placeholder="colleague@company.com" class="set-input" />
+        </label>
+        <label class="set-inv-lbl">Role
+          <select id="inv-role" class="set-input">
+            <option value="client_member">Member</option>
+            <option value="client_admin">Client Admin</option>
+            ${isSuperAdmin || isAgencyAdmin ? `<option value="agency_admin">Agency Admin</option>` : ""}
+          </select>
+        </label>
+        ${S.clients.length > 1 ? `<label class="set-inv-lbl">Assign to client
+          <select id="inv-client" class="set-input">
+            <option value="">All clients</option>
+            ${S.clients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+          </select>
+        </label>` : ""}
+        <button type="submit" class="btn btn-amber" id="inv-btn">Create account</button>
+        <div id="inv-result" class="set-inv-result hidden"></div>
+      </form>`;
+    root.appendChild(addCard);
+
+    addCard.querySelector("#invite-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = addCard.querySelector("#inv-btn");
+      const resEl = addCard.querySelector("#inv-result");
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      resEl.classList.add("hidden");
+      try {
+        const r = await fetch("/api/invite", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: addCard.querySelector("#inv-email").value.trim(),
+            role: addCard.querySelector("#inv-role").value,
+            client_id: addCard.querySelector("#inv-client")?.value || undefined,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          resEl.textContent = d.error || "Failed";
+          resEl.className = "set-inv-result set-inv-err";
+        } else if (d.new_account) {
+          resEl.innerHTML = `Account created for <strong>${esc(d.email)}</strong><br>
+            Temp password: <code>${esc(d.temp_password)}</code><br>
+            Share these credentials — they should change their password after first login.`;
+          resEl.className = "set-inv-result set-inv-ok";
+          addCard.querySelector("#inv-email").value = "";
+        } else {
+          resEl.textContent = `${d.email} already has an account — added to your organization.`;
+          resEl.className = "set-inv-result set-inv-ok";
+          addCard.querySelector("#inv-email").value = "";
+        }
+      } catch {
+        resEl.textContent = "Network error — try again.";
+        resEl.className = "set-inv-result set-inv-err";
+      }
+      btn.disabled = false;
+      btn.textContent = "Create account";
+    });
+  }
+
+  // -- Create agency (super_admin only) --
+  if (isSuperAdmin) {
+    const agencyCard = el("div", "card set-card");
+    agencyCard.innerHTML = `<div class="card-title">Create agency</div>
+      <p class="set-desc">Set up a new staffing agency. An admin account will be created for the agency head.</p>
+      <form class="set-invite-form" id="agency-form">
+        <label class="set-inv-lbl">Agency name
+          <input type="text" id="ag-name" required placeholder="BlueHire Consultants" class="set-input" />
+        </label>
+        <label class="set-inv-lbl">Agency admin email
+          <input type="email" id="ag-email" required placeholder="admin@agency.com" class="set-input" />
+        </label>
+        <button type="submit" class="btn btn-amber" id="ag-btn">Create agency</button>
+        <div id="ag-result" class="set-inv-result hidden"></div>
+      </form>`;
+    root.appendChild(agencyCard);
+
+    agencyCard.querySelector("#agency-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = agencyCard.querySelector("#ag-btn");
+      const resEl = agencyCard.querySelector("#ag-result");
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      resEl.classList.add("hidden");
+      try {
+        const r = await fetch("/api/create-org", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "agency",
+            name: agencyCard.querySelector("#ag-name").value.trim(),
+            admin_email: agencyCard.querySelector("#ag-email").value.trim(),
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          resEl.textContent = d.error || "Failed";
+          resEl.className = "set-inv-result set-inv-err";
+        } else {
+          let msg = `Agency "${esc(d.org_name)}" created with ${esc(d.admin_email)} as admin.`;
+          if (d.new_account && d.temp_password) {
+            msg += `<br>Temp password: <code>${esc(d.temp_password)}</code><br>Share these credentials with the agency admin.`;
+          }
+          resEl.innerHTML = msg;
+          resEl.className = "set-inv-result set-inv-ok";
+          agencyCard.querySelector("#ag-name").value = "";
+          agencyCard.querySelector("#ag-email").value = "";
+          toast("Agency created");
+        }
+      } catch {
+        resEl.textContent = "Network error — try again.";
+        resEl.className = "set-inv-result set-inv-err";
+      }
+      btn.disabled = false;
+      btn.textContent = "Create agency";
+    });
+  }
+
+  // -- Onboard client organization (agency_admin only) --
+  if (isAgencyAdmin) {
+    const clientCard = el("div", "card set-card");
+    clientCard.innerHTML = `<div class="card-title">Onboard client organization</div>
+      <p class="set-desc">Add a client company to your agency. An admin account will be created for their team lead.</p>
+      <form class="set-invite-form" id="client-form">
+        <label class="set-inv-lbl">Company name
+          <input type="text" id="cl-name" required placeholder="Meridian Retail Ltd" class="set-input" />
+        </label>
+        <label class="set-inv-lbl">Client admin email
+          <input type="email" id="cl-email" required placeholder="hr@company.com" class="set-input" />
+        </label>
+        <button type="submit" class="btn btn-amber" id="cl-btn">Onboard client</button>
+        <div id="cl-result" class="set-inv-result hidden"></div>
+      </form>`;
+    root.appendChild(clientCard);
+
+    clientCard.querySelector("#client-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = clientCard.querySelector("#cl-btn");
+      const resEl = clientCard.querySelector("#cl-result");
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      resEl.classList.add("hidden");
+      try {
+        const r = await fetch("/api/create-org", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "client",
+            name: clientCard.querySelector("#cl-name").value.trim(),
+            admin_email: clientCard.querySelector("#cl-email").value.trim(),
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok) {
+          resEl.textContent = d.error || "Failed";
+          resEl.className = "set-inv-result set-inv-err";
+        } else {
+          let msg = `Client "${esc(d.client_name)}" onboarded with ${esc(d.admin_email)} as admin.`;
+          if (d.new_account && d.temp_password) {
+            msg += `<br>Temp password: <code>${esc(d.temp_password)}</code><br>Share these credentials with the client admin.`;
+          } else {
+            msg += `<br>Existing account — added as client admin.`;
+          }
+          resEl.innerHTML = msg;
+          resEl.className = "set-inv-result set-inv-ok";
+          clientCard.querySelector("#cl-name").value = "";
+          clientCard.querySelector("#cl-email").value = "";
+          toast("Client onboarded");
+        }
+      } catch {
+        resEl.textContent = "Network error — try again.";
+        resEl.className = "set-inv-result set-inv-err";
+      }
+      btn.disabled = false;
+      btn.textContent = "Onboard client";
+    });
+  }
+
+  // -- Google Calendar --
   const gcalCard = el("div", "card set-card");
   gcalCard.innerHTML = `<div class="card-title">Google Calendar</div>
     <p class="set-desc">Connect your Google account to auto-create Meet links when candidates book interviews.</p>
@@ -1848,13 +2074,8 @@ async function settings(root) {
   (async () => {
     const statusEl = gcalCard.querySelector("#gcal-status");
     try {
-      const r = await fetch(`/api/google-auth?action=status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (r.status === 501) {
-        statusEl.innerHTML = `<span class="set-warn">Google OAuth not configured on this deployment.</span>`;
-        return;
-      }
+      const r = await fetch(`/api/google-auth?action=status`, { headers: { Authorization: `Bearer ${token}` } });
+      if (r.status === 501) { statusEl.innerHTML = `<span class="set-warn">Google OAuth not configured on this deployment.</span>`; return; }
       const d = await r.json();
       if (d.connected) {
         statusEl.innerHTML = `<div class="set-gcal-connected">
@@ -1875,234 +2096,14 @@ async function settings(root) {
       } else {
         statusEl.innerHTML = `<button class="btn btn-amber" id="gcal-connect">Connect Google Calendar</button>`;
         statusEl.querySelector("#gcal-connect").onclick = async () => {
-          const r2 = await fetch(`/api/google-auth?action=url`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const r2 = await fetch(`/api/google-auth?action=url`, { headers: { Authorization: `Bearer ${token}` } });
           const d2 = await r2.json();
           if (d2.url) window.location.href = d2.url;
           else toast("Could not start Google auth");
         };
       }
-    } catch {
-      statusEl.innerHTML = `<span class="set-warn">Could not check Google status.</span>`;
-    }
+    } catch { statusEl.innerHTML = `<span class="set-warn">Could not check Google status.</span>`; }
   })();
-
-  // -- Organization info --
-  const orgCard = el("div", "card set-card");
-  orgCard.innerHTML = `<div class="card-title">Organization</div>
-    <div class="set-org-info">
-      <div class="set-field"><span class="set-label">Name</span><span class="set-val">${esc(S.org?.name || "—")}</span></div>
-      <div class="set-field"><span class="set-label">Type</span><span class="set-val">${esc(S.org?.org_type || "—")}</span></div>
-      <div class="set-field"><span class="set-label">Plan</span><span class="set-val">${esc(S.org?.plan_tier || "—")}</span></div>
-      <div class="set-field"><span class="set-label">Credits</span><span class="set-val">${S.org?.credits_balance ?? "—"}</span></div>
-      <div class="set-field"><span class="set-label">Your role</span><span class="set-val">${esc((S.membership?.role || "member").replaceAll("_", " "))}</span></div>
-    </div>`;
-  root.appendChild(orgCard);
-
-  // -- Team members --
-  const teamCard = el("div", "card set-card");
-  teamCard.innerHTML = `<div class="card-title">Team members</div>
-    <div id="team-list" class="set-team"><span class="set-loading">Loading…</span></div>`;
-  root.appendChild(teamCard);
-
-  (async () => {
-    const teamEl = teamCard.querySelector("#team-list");
-    try {
-      const r = await fetch("/api/team", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const d = await r.json();
-      const members = d.members || [];
-
-      if (!members.length) {
-        teamEl.innerHTML = `<div class="empty">No members found.</div>`;
-        return;
-      }
-
-      let html = `<div class="set-team-grid">
-        <div class="set-team-hd">User</div>
-        <div class="set-team-hd">Role</div>
-        <div class="set-team-hd">Client</div>`;
-      members.forEach((m) => {
-        const client = S.clients.find((c) => c.id === m.client_id);
-        const roleLbl = (m.role || "member").replaceAll("_", " ");
-        html += `<div class="set-team-cell">${esc(m.email)}</div>
-          <div class="set-team-cell"><span class="pill pill-${m.role}">${roleLbl}</span></div>
-          <div class="set-team-cell">${client ? esc(client.name) : "All"}</div>`;
-      });
-      html += `</div>`;
-
-      teamEl.innerHTML = html;
-    } catch {
-      teamEl.innerHTML = `<div class="empty">Could not load members.</div>`;
-    }
-  })();
-
-  // -- Invite user (admin only) --
-  if (isAdmin) {
-    const invCard = el("div", "card set-card");
-    invCard.innerHTML = `<div class="card-title">Invite user</div>
-      <form class="set-invite-form" id="invite-form">
-        <label class="set-inv-lbl">Email
-          <input type="email" id="inv-email" required placeholder="colleague@company.com" class="set-input" />
-        </label>
-        <label class="set-inv-lbl">Role
-          <select id="inv-role" class="set-input">
-            <option value="client_member">Member</option>
-            <option value="client_admin">Client Admin</option>
-            <option value="agency_admin">Agency Admin</option>
-          </select>
-        </label>
-        <label class="set-inv-lbl">Client (optional)
-          <select id="inv-client" class="set-input">
-            <option value="">All clients</option>
-            ${S.clients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
-          </select>
-        </label>
-        <button type="submit" class="btn btn-amber" id="inv-btn">Send invite</button>
-        <div id="inv-result" class="set-inv-result hidden"></div>
-      </form>`;
-    root.appendChild(invCard);
-
-    invCard.querySelector("#invite-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = invCard.querySelector("#inv-btn");
-      const resEl = invCard.querySelector("#inv-result");
-      btn.disabled = true;
-      btn.textContent = "Sending…";
-      resEl.classList.add("hidden");
-
-      try {
-        const r = await fetch("/api/invite", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: invCard.querySelector("#inv-email").value.trim(),
-            role: invCard.querySelector("#inv-role").value,
-            client_id: invCard.querySelector("#inv-client").value || undefined,
-          }),
-        });
-        const d = await r.json();
-        if (!r.ok) {
-          resEl.textContent = d.error || "Invite failed";
-          resEl.className = "set-inv-result set-inv-err";
-        } else if (d.new_account) {
-          resEl.innerHTML = `Invited! New account created.<br>Temp password: <code>${esc(d.temp_password)}</code><br>Share these credentials — they should change their password after first login.`;
-          resEl.className = "set-inv-result set-inv-ok";
-          invCard.querySelector("#inv-email").value = "";
-        } else if (d.auto_accepted) {
-          resEl.textContent = "User already has an account — added to your organization.";
-          resEl.className = "set-inv-result set-inv-ok";
-          invCard.querySelector("#inv-email").value = "";
-        } else {
-          resEl.textContent = "Invitation sent!";
-          resEl.className = "set-inv-result set-inv-ok";
-          invCard.querySelector("#inv-email").value = "";
-        }
-      } catch {
-        resEl.textContent = "Network error — try again.";
-        resEl.className = "set-inv-result set-inv-err";
-      }
-      btn.disabled = false;
-      btn.textContent = "Send invite";
-    });
-
-    // -- Pending invitations --
-    const pendCard = el("div", "card set-card");
-    pendCard.innerHTML = `<div class="card-title">Pending invitations</div>
-      <div id="pend-list" class="set-team"><span class="set-loading">Loading…</span></div>`;
-    root.appendChild(pendCard);
-
-    (async () => {
-      const pendEl = pendCard.querySelector("#pend-list");
-      try {
-        const { data: invites } = await sb
-          .from("invitations")
-          .select("*")
-          .eq("organization_id", S.membership.organization_id)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false });
-
-        if (!invites?.length) {
-          pendEl.innerHTML = `<div class="empty">No pending invitations.</div>`;
-          return;
-        }
-
-        let html = `<div class="set-team-grid set-team-grid-2">
-          <div class="set-team-hd">Email</div>
-          <div class="set-team-hd">Role</div>
-          <div class="set-team-hd">Expires</div>`;
-        invites.forEach((inv) => {
-          const exp = inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : "—";
-          html += `<div class="set-team-cell">${esc(inv.email)}</div>
-            <div class="set-team-cell">${esc(inv.role.replaceAll("_", " "))}</div>
-            <div class="set-team-cell">${exp}</div>`;
-        });
-        html += `</div>`;
-        pendEl.innerHTML = html;
-      } catch {
-        pendEl.innerHTML = `<div class="empty">Could not load invitations.</div>`;
-      }
-    })();
-
-    // -- Create organization --
-    const newOrgCard = el("div", "card set-card");
-    newOrgCard.innerHTML = `<div class="card-title">Create new organization</div>
-      <p class="set-desc">Create an additional organization. You'll be its super admin.</p>
-      <form class="set-invite-form" id="new-org-form">
-        <label class="set-inv-lbl">Organization name
-          <input type="text" id="new-org-name" required placeholder="Acme Corp" class="set-input" />
-        </label>
-        <label class="set-inv-lbl">Type
-          <select id="new-org-type" class="set-input">
-            <option value="direct">Direct (hiring for yourself)</option>
-            <option value="agency">Agency (hiring for clients)</option>
-          </select>
-        </label>
-        <button type="submit" class="btn btn-amber" id="new-org-btn">Create organization</button>
-        <div id="new-org-result" class="set-inv-result hidden"></div>
-      </form>`;
-    root.appendChild(newOrgCard);
-
-    newOrgCard.querySelector("#new-org-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = newOrgCard.querySelector("#new-org-btn");
-      const resEl = newOrgCard.querySelector("#new-org-result");
-      btn.disabled = true;
-      btn.textContent = "Creating…";
-      resEl.classList.add("hidden");
-
-      const orgName = newOrgCard.querySelector("#new-org-name").value.trim();
-      const orgType = newOrgCard.querySelector("#new-org-type").value;
-
-      try {
-        const { data: newOrg, error: orgErr } = await sb
-          .from("organizations")
-          .insert({ name: orgName, org_type: orgType })
-          .select()
-          .single();
-
-        if (orgErr) throw orgErr;
-
-        await sb.from("memberships").insert({
-          user_id: S.session.user.id,
-          organization_id: newOrg.id,
-          role: "super_admin",
-        });
-
-        resEl.textContent = `"${orgName}" created! Switch to it by reloading.`;
-        resEl.className = "set-inv-result set-inv-ok";
-        newOrgCard.querySelector("#new-org-name").value = "";
-        toast("Organization created");
-      } catch (err) {
-        resEl.textContent = err.message || "Failed to create organization";
-        resEl.className = "set-inv-result set-inv-err";
-      }
-      btn.disabled = false;
-      btn.textContent = "Create organization";
-    });
-  }
 }
 
 // go

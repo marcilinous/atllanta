@@ -38,7 +38,7 @@ css/app.css        Styles
 js/config.js       Public Supabase URL + anon key
 js/app.js          All views: Jobs, Candidates, Interviews, Chat, Re-score, Analytics
 supabase/migrations/   Schema (already applied to the live project)
-supabase/seed.sql      Demo orgs (TechNova, BlueHire)
+supabase/seed.sql      Demo orgs (Atllanta, BlueHire)
 ```
 
 ## Environment variables (Vercel → Settings → Environment Variables)
@@ -72,7 +72,7 @@ Create a user in Supabase Dashboard → Authentication → Users, then link them
 insert into memberships (user_id, organization_id, client_id, role)
 select '<auth-user-uuid>', o.id, c.id, 'client_admin'
 from organizations o join clients c on c.organization_id = o.id
-where o.name = 'TechNova Pvt Ltd';
+where o.name = 'Atllanta Pvt Ltd';
 ```
 
 ## Roadmap
