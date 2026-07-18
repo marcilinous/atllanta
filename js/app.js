@@ -1471,59 +1471,94 @@ function analytics(root) {
   grid.appendChild(dist);
   root.appendChild(grid);
 
-  // ── Daily activity (last 7 days) ──
-  const activity = el("div", "card", `<div class="card-title">Daily activity (last 7 days)</div>`);
-  const now = new Date();
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    const label = d.toLocaleDateString("en", { weekday: "short", day: "numeric", month: "short" });
-    const isToday = i === 0;
+  // ── Daily activity (date range) ──
+  const activity = el("div", "card", "");
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 6);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
-    const dayApps = apps.filter((a) => (a.updated_at || a.created_at || "").slice(0, 10) === key);
-    const dayCands = S.cache.candidates.filter((c) => (c.created_at || "").slice(0, 10) === key);
-    const dayScored = dayApps.filter((a) => a.match_score != null);
-    const dayStageChanges = dayApps.filter((a) => a.stage !== "new");
-    const dayShortlisted = dayApps.filter((a) => ["shortlisted", "interview_scheduled", "interviewed", "offered", "hired"].includes(a.stage));
+  activity.innerHTML = `<div class="da-header">
+    <div class="card-title">Daily activity</div>
+    <div class="da-dates">
+      <input type="date" class="da-date-input" id="da-from" value="${weekAgoStr}" max="${todayStr}">
+      <span class="da-date-sep">to</span>
+      <input type="date" class="da-date-input" id="da-to" value="${todayStr}" max="${todayStr}">
+    </div>
+  </div>
+  <div id="da-chart-area"></div>`;
+  root.appendChild(activity);
 
-    days.push({ key, label, isToday, uploaded: dayCands.length, scored: dayScored.length, stageChanges: dayStageChanges.length, shortlisted: dayShortlisted.length });
+  function renderActivityChart() {
+    const fromVal = activity.querySelector("#da-from").value;
+    const toVal = activity.querySelector("#da-to").value;
+    if (!fromVal || !toVal || fromVal > toVal) return;
+
+    const from = new Date(fromVal + "T00:00:00");
+    const to = new Date(toVal + "T00:00:00");
+    const diffDays = Math.round((to - from) / 86400000) + 1;
+    if (diffDays > 90) { activity.querySelector("#da-chart-area").innerHTML = `<div class="empty">Max 90 days range</div>`; return; }
+
+    const days = [];
+    for (let i = 0; i < diffDays; i++) {
+      const d = new Date(from);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const isToday = key === todayStr;
+      const compact = diffDays > 14;
+      const label = compact
+        ? d.toLocaleDateString("en", { day: "numeric", month: "short" })
+        : d.toLocaleDateString("en", { weekday: "short", day: "numeric", month: "short" });
+
+      const dayApps = apps.filter((a) => (a.updated_at || a.created_at || "").slice(0, 10) === key);
+      const dayCands = S.cache.candidates.filter((c) => (c.created_at || "").slice(0, 10) === key);
+      const dayScored = dayApps.filter((a) => a.match_score != null);
+      const dayStageChanges = dayApps.filter((a) => a.stage !== "new");
+      const dayShortlisted = dayApps.filter((a) => ["shortlisted", "interview_scheduled", "interviewed", "offered", "hired"].includes(a.stage));
+
+      days.push({ key, label, isToday, uploaded: dayCands.length, scored: dayScored.length, stageChanges: dayStageChanges.length, shortlisted: dayShortlisted.length });
+    }
+
+    const maxAct = Math.max(1, ...days.map((d) => d.uploaded + d.scored));
+    const scrollable = diffDays > 14;
+    const colW = scrollable ? "48px" : "";
+
+    const totals = days.reduce((t, d) => ({ uploaded: t.uploaded + d.uploaded, scored: t.scored + d.scored, shortlisted: t.shortlisted + d.shortlisted, stageChanges: t.stageChanges + d.stageChanges }), { uploaded: 0, scored: 0, shortlisted: 0, stageChanges: 0 });
+
+    activity.querySelector("#da-chart-area").innerHTML = `
+    <div class="da-grid${scrollable ? " da-scrollable" : ""}">
+      ${days.map((d) => {
+        const total = d.uploaded + d.scored;
+        const barH = Math.max(4, (total / maxAct) * 100);
+        return `<div class="da-col${d.isToday ? " da-today" : ""}" ${colW ? `style="min-width:${colW}"` : ""}>
+          <div class="da-bar-wrap">
+            <div class="da-bar" style="height:${barH}%">
+              ${d.scored ? `<div class="da-bar-seg da-scored" style="flex:${d.scored}"></div>` : ""}
+              ${d.uploaded ? `<div class="da-bar-seg da-uploaded" style="flex:${d.uploaded}"></div>` : ""}
+            </div>
+          </div>
+          <div class="da-num">${total || ""}</div>
+          <div class="da-label">${d.label}</div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="da-legend">
+      <span class="da-leg"><span class="da-dot da-scored"></span> Scored</span>
+      <span class="da-leg"><span class="da-dot da-uploaded"></span> Uploaded</span>
+    </div>
+    <div class="da-today-summary">
+      <div class="da-today-title">Period summary</div>
+      <div class="da-today-stats">
+        <span>${totals.uploaded} uploaded</span>
+        <span>${totals.scored} scored</span>
+        <span>${totals.shortlisted} shortlisted</span>
+        <span>${totals.stageChanges} stage updates</span>
+      </div>
+    </div>`;
   }
 
-  const maxActivity = Math.max(1, ...days.map((d) => d.uploaded + d.scored));
-  activity.innerHTML += `<div class="da-grid">
-    ${days.map((d) => {
-      const total = d.uploaded + d.scored;
-      const barH = Math.max(4, (total / maxActivity) * 100);
-      return `<div class="da-col${d.isToday ? " da-today" : ""}">
-        <div class="da-bar-wrap">
-          <div class="da-bar" style="height:${barH}%">
-            ${d.scored ? `<div class="da-bar-seg da-scored" style="flex:${d.scored}"></div>` : ""}
-            ${d.uploaded ? `<div class="da-bar-seg da-uploaded" style="flex:${d.uploaded}"></div>` : ""}
-          </div>
-        </div>
-        <div class="da-num">${total || ""}</div>
-        <div class="da-label">${d.label}</div>
-      </div>`;
-    }).join("")}
-  </div>
-  <div class="da-legend">
-    <span class="da-leg"><span class="da-dot da-scored"></span> Scored</span>
-    <span class="da-leg"><span class="da-dot da-uploaded"></span> Uploaded</span>
-  </div>`;
-
-  const todayData = days[days.length - 1];
-  activity.innerHTML += `<div class="da-today-summary">
-    <div class="da-today-title">Today</div>
-    <div class="da-today-stats">
-      <span>${todayData.uploaded} uploaded</span>
-      <span>${todayData.scored} scored</span>
-      <span>${todayData.shortlisted} shortlisted</span>
-      <span>${todayData.stageChanges} stage updates</span>
-    </div>
-  </div>`;
-  root.appendChild(activity);
+  renderActivityChart();
+  activity.querySelector("#da-from").addEventListener("change", renderActivityChart);
+  activity.querySelector("#da-to").addEventListener("change", renderActivityChart);
 
   const perJob = el("div", "card", `<div class="card-title">Per-job breakdown</div>`);
   if (!S.cache.jobs.length) {
