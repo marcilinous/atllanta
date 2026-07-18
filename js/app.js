@@ -268,7 +268,7 @@ function jobs(root) {
           const summary = a.match_summary ? `<div class="jc-summary">${esc(a.match_summary)}</div>` : "";
           return `<div class="jc-row">
             <div class="av" style="background:${avColor(c?.name)}">${initials(c?.name)}</div>
-            <div class="jc-info">
+            <div class="jc-info jc-info-link" data-act="match-detail" data-app-id="${a.id}">
               <div class="jc-name">${esc(c?.name || "Unknown")}</div>
               <div class="jc-contact">${esc(contact)}</div>
               ${summary}
@@ -360,6 +360,12 @@ function jobs(root) {
       b.addEventListener("click", (e) => {
         e.stopPropagation();
         updateStageForm(b.dataset.appId);
+      })
+    );
+    grid.querySelectorAll("[data-act=match-detail]").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        scoreDetail(b.dataset.appId);
       })
     );
   }
@@ -1201,23 +1207,40 @@ function scoreDetail(appId) {
   const app = S.cache.applications.find((a) => a.id === appId);
   const cand = S.cache.candidates.find((c) => c.id === app.candidate_id);
   const job = S.cache.jobs.find((j) => j.id === app.job_id);
-  const f = el("div");
+  const f = el("div", "sd-modal");
   const raw = app.match_raw_response || {};
   const score = app.match_score;
 
+  const scoreRing = score != null
+    ? `<div class="sd-ring" style="--score:${score}"><span class="sd-ring-num">${Math.round(score)}</span></div>`
+    : "";
+
   f.innerHTML = `
-    <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
-      <div class="av" style="background:${avColor(cand?.name)};width:44px;height:44px;font-size:16px;border-radius:12px">${initials(cand?.name)}</div>
-      <div><strong style="font-size:15px">${esc(cand?.name)}</strong><br>
-      <span style="color:var(--grey);font-size:12.5px">${esc(job?.title)}</span></div>
-      ${score != null ? `<div style="margin-left:auto">${scoreBar(score)}</div>` : ""}
+    <div class="sd-header">
+      <div class="av" style="background:${avColor(cand?.name)};width:48px;height:48px;font-size:17px;border-radius:13px">${initials(cand?.name)}</div>
+      <div class="sd-header-info">
+        <div class="sd-cand-name">${esc(cand?.name)}</div>
+        <div class="sd-job-title">${esc(job?.title)}</div>
+        ${cand?.email ? `<div class="sd-contact">${esc(cand.email)}${cand.phone ? " · " + esc(cand.phone) : ""}</div>` : ""}
+      </div>
+      ${scoreRing}
     </div>
-    ${app.match_summary ? `<p style="margin-bottom:12px;font-size:13px;color:var(--ink2)">${esc(app.match_summary)}</p>` : ""}
-    ${raw.strengths?.length ? `<p style="font-weight:700;font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Strengths</p><ul style="margin:0 0 12px 18px;font-size:13px">${raw.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-    ${raw.gaps?.length ? `<p style="font-weight:700;font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Gaps</p><ul style="margin:0 0 12px 18px;font-size:13px">${raw.gaps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
-    <button class="btn btn-amber" id="sd-run">${score == null ? "Run AI match (1 credit)" : "Re-run match (1 credit)"}</button>
+    ${app.match_summary ? `<div class="sd-section"><div class="sd-section-title">Summary</div><p class="sd-summary">${esc(app.match_summary)}</p></div>` : ""}
+    ${raw.strengths?.length ? `<div class="sd-section"><div class="sd-section-title sd-green">Strengths</div><ul class="sd-list sd-list-green">${raw.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+    ${raw.gaps?.length ? `<div class="sd-section"><div class="sd-section-title sd-red">Gaps</div><ul class="sd-list sd-list-red">${raw.gaps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+    ${score == null ? '<div class="sd-section"><p class="sd-no-score">Not scored yet — run a match to see the full analysis.</p></div>' : ""}
+    <div class="sd-actions">
+      <button class="btn btn-amber" id="sd-run">${score == null ? "Run AI match (1 credit)" : "Re-run match (1 credit)"}</button>
+      ${cand?.phone ? `<button class="btn btn-outline" id="sd-wa">WhatsApp</button>` : ""}
+    </div>
     <p id="sd-status" style="margin-top:8px;color:var(--grey);font-size:12.5px"></p>`;
   openModal("Match detail", f);
+  if (cand?.phone) {
+    f.querySelector("#sd-wa").onclick = () => {
+      window.open(`https://wa.me/${cand.phone.replace(/[^\d]/g, "")}`, "_blank", "noopener");
+      toast("Opening WhatsApp with " + cand.name.split(" ")[0]);
+    };
+  }
   f.querySelector("#sd-run").onclick = async (e) => {
     e.target.disabled = true;
     f.querySelector("#sd-status").textContent = "Scoring resume against JD…";
