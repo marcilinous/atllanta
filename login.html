@@ -232,6 +232,10 @@
   </div>
 </div>
 
+<script>
+  const t = localStorage.getItem('atllanta-theme');
+  if (t) document.documentElement.setAttribute('data-theme', t);
+</script>
 <script src="/js/config.js"></script>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";

@@ -306,4 +306,13 @@
   .topbar-center { display: none; }
 
   .content { padding: var(--space-4); }
+
+  .page-header { margin-bottom: var(--space-4); }
+  .page-title { font-size: var(--text-xl); }
+}
+
+@media (max-width: 640px) {
+  .stat-grid { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .stat-card { padding: var(--space-3); }
+  .stat-value { font-size: var(--text-2xl); }
 }
