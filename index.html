@@ -62,6 +62,9 @@
       </div>
     </div>
     <div class="topbar-right">
+      <button class="topbar-icon-btn" id="ai-toggle-btn" title="AI Assistant">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
+      </button>
       <button class="topbar-icon-btn" id="notif-btn" title="Notifications">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-dot hidden" id="notif-dot"></span>
@@ -106,7 +109,9 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
-import { onUnreadChange, fetchUnreadCount } from '/js/notifications.js';
+import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead } from '/js/notifications.js';
+import { initGlobalSearch } from '/js/search.js';
+import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 
 import dashboard from '/views/dashboard.js';
 import employeeList from '/views/employees/list.js';
@@ -115,6 +120,7 @@ import leaveApply from '/views/leave/apply.js';
 import recruitmentJobs from '/views/recruitment/jobs.js';
 import interviewsView from '/views/recruitment/interviews.js';
 import settingsOrg from '/views/settings/org.js';
+import auditLog from '/views/audit/log.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -157,6 +163,97 @@ onUnreadChange(count => {
 });
 fetchUnreadCount();
 
+initGlobalSearch();
+initAIPanel();
+document.getElementById('ai-toggle-btn').addEventListener('click', toggleAIPanel);
+
+// Notification panel
+const notifBtn = document.getElementById('notif-btn');
+let notifPanel = null;
+
+notifBtn.addEventListener('click', async () => {
+  if (notifPanel && !notifPanel.classList.contains('hidden')) {
+    notifPanel.classList.add('hidden');
+    return;
+  }
+
+  if (!notifPanel) {
+    notifPanel = document.createElement('div');
+    notifPanel.className = 'notif-panel hidden';
+    notifPanel.innerHTML = `
+      <div class="notif-panel-header">
+        <span>Notifications</span>
+        <button class="btn btn-ghost btn-sm" id="notif-mark-all">Mark all read</button>
+      </div>
+      <div class="notif-list" id="notif-list"></div>
+    `;
+    document.querySelector('.topbar-right').appendChild(notifPanel);
+
+    document.getElementById('notif-mark-all').addEventListener('click', async () => {
+      await markAllRead();
+      loadNotifList();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (notifPanel && !e.target.closest('#notif-btn') && !e.target.closest('.notif-panel')) {
+        notifPanel.classList.add('hidden');
+      }
+    });
+  }
+
+  await loadNotifList();
+  notifPanel.classList.remove('hidden');
+});
+
+async function loadNotifList() {
+  const notifs = await fetchNotifications(15);
+  const listEl = document.getElementById('notif-list');
+  if (!notifs.length) {
+    listEl.innerHTML = `<div class="notif-empty">No notifications yet</div>`;
+    return;
+  }
+
+  const moduleIcons = {
+    leave: '\u{1F333}', attendance: '\u{1F551}', recruitment: '\u{1F4BC}', people: '\u{1F465}',
+  };
+  const moduleColors = {
+    leave: 'var(--color-success-light)', attendance: 'var(--color-info-light)',
+    recruitment: 'var(--color-warning-light)', people: 'var(--color-accent-light)',
+  };
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+    );
+  }
+
+  function ago(d) {
+    const s = Math.floor((Date.now() - new Date(d)) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  }
+
+  listEl.innerHTML = notifs.map(n => `
+    <div class="notif-item ${n.status === 'unread' ? 'unread' : ''}" data-notif-id="${n.id}">
+      <div class="notif-icon" style="background:${moduleColors[n.module] || 'var(--color-bg-tertiary)'}">${moduleIcons[n.module] || '\u{1F514}'}</div>
+      <div class="notif-content">
+        <div class="notif-title">${esc(n.title)}</div>
+        ${n.body ? `<div class="notif-body">${esc(n.body)}</div>` : ''}
+        <div class="notif-time">${ago(n.sent_at)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('.notif-item.unread').forEach(item => {
+    item.addEventListener('click', async () => {
+      await markRead(item.dataset.notifId);
+      item.classList.remove('unread');
+    });
+  });
+}
+
 registerRoute('dashboard', dashboard);
 registerRoute('employees', employeeList);
 registerRoute('attendance', attendanceDashboard);
@@ -165,6 +262,7 @@ registerRoute('recruitment', recruitmentJobs);
 registerRoute('recruitment/jobs', recruitmentJobs);
 registerRoute('recruitment/interviews', interviewsView);
 registerRoute('settings', settingsOrg);
+registerRoute('audit', auditLog);
 
 initRouter(document.getElementById('main-content'));
 </script>
