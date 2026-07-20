@@ -113,6 +113,7 @@ import employeeList from '/views/employees/list.js';
 import attendanceDashboard from '/views/attendance/dashboard.js';
 import leaveApply from '/views/leave/apply.js';
 import recruitmentJobs from '/views/recruitment/jobs.js';
+import interviewsView from '/views/recruitment/interviews.js';
 import settingsOrg from '/views/settings/org.js';
 
 const session = await checkSession();
@@ -162,6 +163,7 @@ registerRoute('attendance', attendanceDashboard);
 registerRoute('leave', leaveApply);
 registerRoute('recruitment', recruitmentJobs);
 registerRoute('recruitment/jobs', recruitmentJobs);
+registerRoute('recruitment/interviews', interviewsView);
 registerRoute('settings', settingsOrg);
 
 initRouter(document.getElementById('main-content'));

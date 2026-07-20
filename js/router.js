@@ -44,8 +44,9 @@ async function handleRoute() {
 }
 
 function updateActiveNav(path) {
+  const base = path.split('/')[0];
   document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === path);
+    btn.classList.toggle('active', btn.dataset.view === path || btn.dataset.view === base);
   });
 }
 
