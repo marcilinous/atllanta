@@ -1,12 +1,15 @@
 import sb from '../../js/supabase.js';
 import { esc, toast, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor, formatDate } from '../../js/ui.js';
+import { getOrg } from '../../js/auth.js';
 
 export default async function interviewsView(container) {
-  const cid = await clientId();
+  const org = getOrg();
+  const cid = org?.id || await clientId();
   if (!cid) {
     container.innerHTML = '<div class="empty-state"><div class="empty-state-title">No organization found</div></div>';
     return;
   }
+  const orgCol = org ? 'org_id' : 'client_id';
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
@@ -24,8 +27,8 @@ export default async function interviewsView(container) {
   });
 
   const [{ data: jobs }, { data: candidates }, { data: apps }] = await Promise.all([
-    sb.from('jobs').select('*').eq('client_id', cid),
-    sb.from('candidates').select('*').eq('client_id', cid),
+    sb.from('jobs').select('*').eq(orgCol, cid),
+    sb.from('candidates').select('*').eq(orgCol, cid),
     sb.from('applications').select('*').in('stage', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
   ]);
 

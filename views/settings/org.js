@@ -5,7 +5,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 export default async function settingsOrg(container) {
   const org = getOrg();
   const membership = getMembership();
-  const isAdmin = membership && ['owner', 'admin', 'super_admin', 'agency_admin', 'client_admin'].includes(membership.role);
+  const isAdmin = membership && ['owner', 'admin'].includes(membership.role);
 
   container.innerHTML = `
     <div class="page-header">

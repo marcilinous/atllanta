@@ -1,9 +1,12 @@
 import sb from '../../js/supabase.js';
 import { esc, toast, scoreBar, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor } from '../../js/ui.js';
+import { getOrg } from '../../js/auth.js';
 import { navigate } from '../../js/router.js';
+import { publishEvent } from '../../js/events.js';
 
 export default async function recruitmentJobs(container) {
-  const cid = await clientId();
+  const org = getOrg();
+  const cid = org?.id || await clientId();
   if (!cid) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div><div class="empty-state-desc">Ask your admin to add you to an organization.</div></div>`;
     return;
@@ -35,10 +38,12 @@ export default async function recruitmentJobs(container) {
   let candidates = [];
   let applications = [];
 
+  const orgCol = org ? 'org_id' : 'client_id';
+
   async function loadData() {
     const [{ data: j }, { data: c }] = await Promise.all([
-      sb.from('jobs').select('*').eq('client_id', cid).order('created_at', { ascending: false }),
-      sb.from('candidates').select('*').eq('client_id', cid).order('created_at', { ascending: false }),
+      sb.from('jobs').select('*').eq(orgCol, cid).order('created_at', { ascending: false }),
+      sb.from('candidates').select('*').eq(orgCol, cid).order('created_at', { ascending: false }),
     ]);
     jobs = j || [];
     candidates = c || [];
@@ -218,7 +223,7 @@ export default async function recruitmentJobs(container) {
       btn.disabled = true;
       btn.textContent = 'Creating...';
       const { error } = await sb.from('jobs').insert({
-        client_id: cid,
+        [orgCol]: cid,
         title,
         description: f.querySelector('#jf-desc').value.trim(),
         jd_raw_text: f.querySelector('#jf-jd').value.trim(),
@@ -333,7 +338,7 @@ export default async function recruitmentJobs(container) {
 
           let candId;
           if (email || phone) {
-            let q = sb.from('candidates').select('id').eq('client_id', cid);
+            let q = sb.from('candidates').select('id').eq(orgCol, cid);
             if (email) q = q.eq('email', email);
             else q = q.eq('phone', phone);
             const { data: existing } = await q.maybeSingle();
@@ -345,7 +350,7 @@ export default async function recruitmentJobs(container) {
 
           if (!candId) {
             const { data: newCand, error: candErr } = await sb.from('candidates').insert({
-              client_id: cid,
+              [orgCol]: cid,
               name,
               email,
               phone,

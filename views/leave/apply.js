@@ -7,7 +7,7 @@ export default async function leaveModule(container) {
   const user = getUser();
   const org = getOrg();
   const membership = getMembership();
-  const isManager = membership && ['owner', 'admin', 'manager', 'super_admin', 'agency_admin', 'client_admin'].includes(membership.role);
+  const isManager = membership && ['owner', 'admin', 'manager'].includes(membership.role);
 
   container.innerHTML = `
     <div class="page-header">
