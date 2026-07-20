@@ -1,15 +1,13 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/((?!api|css|js|views|lib|public|favicon).*)", "destination": "/index.html" }
+    { "source": "/login", "destination": "/login.html" }
   ],
   "functions": {
     "api/parse-resume.js": { "maxDuration": 30 },
     "api/extract-candidate.js": { "maxDuration": 15 },
     "api/screen-job.js": { "maxDuration": 60 },
-    "api/match.js": { "maxDuration": 30 },
-    "api/ai-query.js": { "maxDuration": 15 }
+    "api/match.js": { "maxDuration": 30 }
   },
   "headers": [
     {
