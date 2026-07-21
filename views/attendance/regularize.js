@@ -65,7 +65,7 @@ export default async function regularizeView(container) {
     const statusColors = { pending: 'warning', approved: 'success', rejected: 'error' };
 
     el.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+      <div class="grid-2col">
         <div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
             <span class="card-title">Recent Attendance</span>

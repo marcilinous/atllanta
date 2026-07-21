@@ -211,7 +211,7 @@ export default async function employeeList(container) {
             <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(emp.designation || emp.role || '—')}</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+        <div class="grid-2col" style="gap:var(--space-3)">
           <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Email</div><div style="font-size:var(--text-sm)">${esc(emp.email || '—')}</div></div>
           <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Phone</div><div style="font-size:var(--text-sm)">${esc(emp.phone || '—')}</div></div>
           <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Department</div><div style="font-size:var(--text-sm)">${esc(emp.department?.name || '—')}</div></div>

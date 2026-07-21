@@ -19,7 +19,7 @@ export default async function employeeImport(container) {
       <h1 class="page-title">Import Employees</h1>
       <p class="page-subtitle">Bulk import employees from a CSV file</p>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+    <div class="grid-2col">
       <div class="card">
         <div class="card-header"><span class="card-title">Upload CSV</span></div>
         <div class="card-body">

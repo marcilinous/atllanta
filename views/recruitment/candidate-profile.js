@@ -59,7 +59,7 @@ export default async function candidateProfile(container) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);margin-bottom:var(--space-6)">
+    <div class="grid-2col" style="margin-bottom:var(--space-6)">
       <div class="card">
         <div class="card-header"><span class="card-title">Skills</span></div>
         <div class="card-body">

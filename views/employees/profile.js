@@ -56,7 +56,7 @@ export default async function employeeProfile(container) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-6)">
+    <div class="grid-2col" style="margin-bottom:var(--space-6)">
       <div class="card">
         <div class="card-header"><span class="card-title">Personal Information</span></div>
         <div class="card-body">
