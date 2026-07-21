@@ -18,7 +18,9 @@ export default async function recruitmentJobs(container) {
         <h1 class="page-title">Recruitment</h1>
         <p class="page-subtitle">Manage job listings, screen candidates, and schedule interviews</p>
       </div>
-      <div style="display:flex;gap:var(--space-2)">
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <a href="#/recruitment/upload" class="btn btn-secondary">Upload Resumes</a>
+        <a href="#/recruitment/matcher" class="btn btn-secondary">CV-JD Matcher</a>
         <button class="btn btn-secondary" id="view-interviews-btn">Interviews</button>
         <button class="btn btn-primary" id="create-job-btn">+ New Job</button>
       </div>

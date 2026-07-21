@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { navigate } from '../../js/router.js';
 
 export default async function settingsOrg(container) {
   const org = getOrg();
@@ -14,10 +15,12 @@ export default async function settingsOrg(container) {
     </div>
     <div class="tabs" id="settings-tabs">
       <button class="tab active" data-tab="org">Organization</button>
+      <button class="tab" data-tab="users">Users</button>
       <button class="tab" data-tab="departments">Departments</button>
       <button class="tab" data-tab="leave-types">Leave Types</button>
       <button class="tab" data-tab="holidays">Holidays</button>
       <button class="tab" data-tab="schedules">Work Schedules</button>
+      <button class="tab" data-tab="integrations">Integrations</button>
     </div>
     <div id="settings-content" style="margin-top:var(--space-4)"></div>
   `;
@@ -42,10 +45,12 @@ export default async function settingsOrg(container) {
 
   async function renderTab() {
     if (currentTab === 'org') renderOrgSettings();
+    else if (currentTab === 'users') { navigate('settings/users'); return; }
     else if (currentTab === 'departments') await renderDepartments();
     else if (currentTab === 'leave-types') await renderLeaveTypes();
     else if (currentTab === 'holidays') await renderHolidays();
     else if (currentTab === 'schedules') await renderSchedules();
+    else if (currentTab === 'integrations') { navigate('settings/integrations'); return; }
   }
 
   function renderOrgSettings() {

@@ -12,7 +12,10 @@ export default async function employeeList(container) {
         <h1 class="page-title">Employees</h1>
         <p class="page-subtitle">Manage your team directory</p>
       </div>
-      <button class="btn btn-primary" id="add-employee-btn">+ Add Employee</button>
+      <div style="display:flex;gap:var(--space-2)">
+        <a href="#/employees/import" class="btn btn-secondary">Import CSV</a>
+        <button class="btn btn-primary" id="add-employee-btn">+ Add Employee</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">

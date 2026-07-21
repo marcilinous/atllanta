@@ -24,9 +24,9 @@ export default async function dashboard(container) {
         <div class="card-header"><span class="card-title">Quick Actions</span></div>
         <div class="card-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
-            <a href="#/recruitment/jobs" class="btn btn-primary" style="justify-content:center">Post a Job</a>
+            <a href="#/recruitment" class="btn btn-primary" style="justify-content:center">Post a Job</a>
             <a href="#/employees" class="btn btn-secondary" style="justify-content:center">Employees</a>
-            <a href="#/attendance" class="btn btn-secondary" style="justify-content:center">Attendance</a>
+            <a href="#/attendance/checkin" class="btn btn-secondary" style="justify-content:center">Check In</a>
             <a href="#/leave" class="btn btn-secondary" style="justify-content:center">Apply Leave</a>
           </div>
         </div>

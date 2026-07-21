@@ -9,9 +9,16 @@ export default async function attendanceDashboard(container) {
   const today = new Date().toISOString().split('T')[0];
 
   container.innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">Attendance</h1>
-      <p class="page-subtitle">Track daily attendance</p>
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
+      <div>
+        <h1 class="page-title">Attendance</h1>
+        <p class="page-subtitle">Track daily attendance</p>
+      </div>
+      <div style="display:flex;gap:var(--space-2)">
+        <a href="#/attendance/checkin" class="btn btn-secondary btn-sm">Check In/Out</a>
+        <a href="#/attendance/report" class="btn btn-secondary btn-sm">Reports</a>
+        <a href="#/attendance/regularize" class="btn btn-secondary btn-sm">Regularize</a>
+      </div>
     </div>
     <div class="card" style="margin-bottom:var(--space-6)">
       <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">

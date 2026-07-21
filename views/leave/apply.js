@@ -19,6 +19,7 @@ export default async function leaveModule(container) {
       <button class="tab" data-tab="requests">My Requests</button>
       ${isManager ? '<button class="tab" data-tab="approvals">Pending Approvals</button>' : ''}
       <button class="tab" data-tab="calendar">Team Calendar</button>
+      ${isManager ? '<a href="#/leave/settings" class="tab" style="text-decoration:none">Settings</a>' : ''}
     </div>
     <div id="leave-content" style="margin-top:var(--space-4)"></div>
   `;
