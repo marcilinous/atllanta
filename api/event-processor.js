@@ -204,6 +204,46 @@ async function createNotification(sb, data) {
     channel: data.channel || "in_app",
     status: "unread",
   });
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const { data: userRecord } = await sb
+        .from("users")
+        .select("email, full_name")
+        .eq("id", data.user_id)
+        .maybeSingle();
+
+      if (userRecord?.email) {
+        await sendEmail(
+          userRecord.email,
+          data.title,
+          `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <h2 style="color:#1A1D23">${data.title}</h2>
+            <p style="color:#6B7080">${data.body || ''}</p>
+            <hr style="border:none;border-top:1px solid #E2E4E9;margin:24px 0">
+            <p style="font-size:12px;color:#9CA0AB">Atllanta Business OS</p>
+          </div>`
+        );
+      }
+    } catch {}
+  }
+}
+
+async function sendEmail(to, subject, html) {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM || "Atllanta <notifications@atllanta.app>",
+      to,
+      subject: `[Atllanta] ${subject}`,
+      html,
+    }),
+  });
+  return res.json();
 }
 
 export default async function handler(req, res) {
