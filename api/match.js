@@ -46,14 +46,14 @@ export default async function handler(req, res) {
   let app;
   if (application_id) {
     const { data } = await db
-      .from("applications")
+      .from("job_applications")
       .select("id, job_id, candidate_id")
       .eq("id", application_id)
       .single();
     app = data;
   } else if (job_id && candidate_id) {
     const { data } = await db
-      .from("applications")
+      .from("job_applications")
       .upsert(
         { job_id, candidate_id },
         { onConflict: "job_id,candidate_id" }
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     .single();
   const { data: candidate } = await db
     .from("candidates")
-    .select("id, name, resume_raw_text")
+    .select("id, full_name, name, resume_text, resume_raw_text")
     .eq("id", app.candidate_id)
     .single();
 
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
   if (!allowed) return res.status(403).json({ error: "No access to this client" });
 
   const jd = job.jd_raw_text || job.description || "";
-  const resume = candidate.resume_raw_text || "";
+  const resume = candidate.resume_text || candidate.resume_raw_text || "";
   if (!jd.trim() || !resume.trim()) {
     return res.status(400).json({
       error: "Both the job's JD text and the candidate's resume text are required before matching.",
@@ -160,12 +160,12 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
 
   // Persist result
   const { error: updateErr } = await db
-    .from("applications")
+    .from("job_applications")
     .update({
       match_score: score,
       match_summary: parsed.summary || "",
       match_raw_response: parsed,
-      stage: "screened",
+      status: "screened",
       updated_at: new Date().toISOString(),
     })
     .eq("id", app.id);
