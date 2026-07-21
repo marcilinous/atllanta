@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
-import { esc, showToast } from '../../js/ui.js';
+import { esc, toast } from '../../js/ui.js';
 
 export default async function leaveApprovals(container) {
   const org = getOrg();
@@ -68,8 +68,8 @@ export default async function leaveApprovals(container) {
           .from('leave_requests')
           .update({ status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString() })
           .eq('id', id);
-        if (error) { showToast(error.message, 'error'); btn.disabled = false; return; }
-        showToast('Leave approved', 'success');
+        if (error) { toast(error.message, 'error'); btn.disabled = false; return; }
+        toast('Leave approved', 'success');
         loadApprovals();
       });
     });
@@ -88,8 +88,8 @@ export default async function leaveApprovals(container) {
             review_comment: comment || null,
           })
           .eq('id', id);
-        if (error) { showToast(error.message, 'error'); btn.disabled = false; return; }
-        showToast('Leave rejected', 'success');
+        if (error) { toast(error.message, 'error'); btn.disabled = false; return; }
+        toast('Leave rejected', 'success');
         loadApprovals();
       });
     });

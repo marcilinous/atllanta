@@ -1,7 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
 import { routeParams } from '../../js/router.js';
-import { esc, showToast } from '../../js/ui.js';
+import { esc, toast } from '../../js/ui.js';
 
 export default async function jobDetail(container) {
   const org = getOrg();
