@@ -1,7 +1,8 @@
 import sb from '../../js/supabase.js';
 import { esc, toast, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor, formatDate } from '../../js/ui.js';
-import { getOrg } from '../../js/auth.js';
+import { getOrg, getUser } from '../../js/auth.js';
 import { logAction } from '../../js/audit.js';
+import { publishEvent } from '../../js/events.js';
 
 export default async function interviewsView(container) {
   const org = getOrg();
@@ -97,9 +98,10 @@ export default async function interviewsView(container) {
           <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${a.interview_at ? '' : ' (manual)'}</div>
           ${a.meet_link ? `<a href="${esc(a.meet_link)}" target="_blank" rel="noopener" style="font-size:var(--text-sm);color:var(--color-accent)">Google Meet</a>` : ''}
         </div>
-        <div style="display:flex;gap:var(--space-2)">
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" data-act="slots" data-app="${a.id}">Manage Slots</button>
-          <button class="btn btn-secondary btn-sm" data-act="stage" data-app="${a.id}">Update Stage</button>
+          <button class="btn btn-primary btn-sm" data-act="feedback" data-app="${a.id}">Feedback</button>
+          <button class="btn btn-secondary btn-sm" data-act="stage" data-app="${a.id}">Stage</button>
           ${c?.phone ? `<a class="btn btn-secondary btn-sm" href="https://wa.me/${(c.phone || '').replace(/[^\d]/g, '')}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
         </div>
       </div>`;
@@ -128,6 +130,82 @@ export default async function interviewsView(container) {
         await logAction('recruitment', 'job_application', btn.dataset.app, 'stage_updated', { status: app?.status }, { status: newStatus });
         closeModal();
         toast('Stage updated');
+        interviewsView(container);
+      });
+    });
+  });
+
+  content.querySelectorAll('[data-act=feedback]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const app = allApps.find(a => a.id === btn.dataset.app);
+      const cand = allCands.find(c => c.id === app?.candidate_id);
+      const job = allJobs.find(j => j.id === app?.job_id);
+      const user = getUser();
+      const f = document.createElement('div');
+      f.innerHTML = `
+        <div style="display:grid;gap:var(--space-3)">
+          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.full_name || '—')} for ${esc(job?.title || '—')}</div>
+          <div class="form-group">
+            <label class="form-label">Rating</label>
+            <div style="display:flex;gap:var(--space-2)" id="fb-stars">
+              ${[1,2,3,4,5].map(n => `<button type="button" class="btn btn-ghost btn-sm" data-star="${n}" style="font-size:var(--text-lg);padding:var(--space-1)">${n <= 0 ? '☆' : '☆'}</button>`).join('')}
+            </div>
+            <input type="hidden" id="fb-rating" value="">
+          </div>
+          <div class="form-group"><label class="form-label">Decision</label>
+            <select class="form-input" id="fb-decision">
+              <option value="">Select...</option>
+              <option value="advance">Advance to next round</option>
+              <option value="hire">Hire</option>
+              <option value="hold">Hold</option>
+              <option value="reject">Reject</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Feedback</label><textarea class="form-input" id="fb-text" rows="4" placeholder="Interview notes, strengths, areas of concern..."></textarea></div>
+          <button class="btn btn-primary" id="fb-save">Submit Feedback</button>
+        </div>`;
+      openModal('Interview Feedback', f);
+
+      let selectedRating = 0;
+      f.querySelectorAll('[data-star]').forEach(star => {
+        star.addEventListener('click', () => {
+          selectedRating = parseInt(star.dataset.star);
+          f.querySelector('#fb-rating').value = selectedRating;
+          f.querySelectorAll('[data-star]').forEach(s => {
+            s.textContent = parseInt(s.dataset.star) <= selectedRating ? '★' : '☆';
+            s.style.color = parseInt(s.dataset.star) <= selectedRating ? 'var(--color-warning)' : '';
+          });
+        });
+      });
+
+      f.querySelector('#fb-save').addEventListener('click', async () => {
+        const rating = selectedRating;
+        const decision = f.querySelector('#fb-decision').value;
+        const feedback = f.querySelector('#fb-text').value.trim();
+        if (!rating) return toast('Please select a rating');
+        if (!decision) return toast('Please select a decision');
+
+        const interviewData = {
+          org_id: org?.id || cid,
+          job_application_id: app.id,
+          round_number: 1,
+          interviewer_id: user?.id,
+          scheduled_at: app.interview_at || app.updated_at,
+          status: 'completed',
+          rating,
+          feedback: feedback || null,
+          decision,
+        };
+        const { error: intErr } = await sb.from('interviews').insert(interviewData);
+        if (intErr) return toast('Failed: ' + intErr.message);
+
+        const newAppStatus = decision === 'hire' ? 'offered' : decision === 'reject' ? 'rejected' : 'interviewed';
+        const { error: appErr } = await sb.from('job_applications').update({ status: newAppStatus, updated_at: new Date().toISOString() }).eq('id', app.id);
+        if (appErr) toast('Failed to update stage: ' + appErr.message);
+
+        await logAction('recruitment', 'interview', app.id, 'feedback_submitted', { status: app.status }, { status: newAppStatus, rating, decision });
+        closeModal();
+        toast('Feedback submitted');
         interviewsView(container);
       });
     });

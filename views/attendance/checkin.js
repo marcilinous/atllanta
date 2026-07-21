@@ -106,7 +106,7 @@ export default async function checkinView(container) {
       });
       if (error) { toast('Check-in failed: ' + error.message); actionBtn.disabled = false; return; }
       await logAction('attendance', 'attendance', null, 'check_in', null, { date: today, check_in: now });
-      await publishEvent('attendance.checkin.completed', { user_id: user.id, time: now });
+      await publishEvent('attendance.checkin.completed', { user_id: user.id, org_id: org.id, check_in_time: now });
       toast('Checked in successfully!');
       checkinView(container);
     };
