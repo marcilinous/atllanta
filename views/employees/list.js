@@ -14,7 +14,8 @@ export default async function employeeList(container) {
         <h1 class="page-title">Employees</h1>
         <p class="page-subtitle">Manage your team directory</p>
       </div>
-      <div style="display:flex;gap:var(--space-2)">
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <button class="btn btn-secondary" id="export-employees">Export CSV</button>
         <a href="#/employees/orgchart" class="btn btn-secondary">Org Chart</a>
         <a href="#/employees/import" class="btn btn-secondary">Import CSV</a>
         <button class="btn btn-primary" id="add-employee-btn">+ Add Employee</button>
@@ -104,11 +105,21 @@ export default async function employeeList(container) {
       return;
     }
 
-    wrap.innerHTML = `<div class="table-wrap"><table class="table">
-      <thead><tr><th>Employee</th><th>Department</th><th>Role</th><th>Status</th><th>Joined</th></tr></thead>
+    const isAdmin = membership && ['owner', 'admin'].includes(membership.role);
+    wrap.innerHTML = `
+      ${isAdmin ? `<div id="bulk-bar" style="display:none;padding:var(--space-2) var(--space-4);background:var(--color-accent-light);border-bottom:1px solid var(--color-border);display:none;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+        <span style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)" id="bulk-count">0 selected</span>
+        <button class="btn btn-secondary btn-sm" id="bulk-activate">Set Active</button>
+        <button class="btn btn-secondary btn-sm" id="bulk-deactivate">Set Exited</button>
+        <button class="btn btn-secondary btn-sm" id="bulk-dept">Change Dept</button>
+        <button class="btn btn-ghost btn-sm" id="bulk-clear">Clear</button>
+      </div>` : ''}
+      <div class="table-wrap"><table class="table">
+      <thead><tr>${isAdmin ? '<th style="width:36px"><input type="checkbox" id="select-all"></th>' : ''}<th>Employee</th><th>Department</th><th>Role</th><th>Status</th><th>Joined</th></tr></thead>
       <tbody>${filtered.map(e => {
         const statusColors = { active: 'success', on_notice: 'warning', exited: 'error' };
         return `<tr style="cursor:pointer" data-emp-id="${e.id}">
+          ${isAdmin ? `<td><input type="checkbox" class="emp-check" data-id="${e.id}" onclick="event.stopPropagation()"></td>` : ''}
           <td>
             <div style="display:flex;align-items:center;gap:var(--space-3)">
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(e.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(e.full_name)}</div>
@@ -127,8 +138,89 @@ export default async function employeeList(container) {
     </table></div>`;
 
     wrap.querySelectorAll('tr[data-emp-id]').forEach(row => {
-      row.addEventListener('click', () => showEmployeeProfile(row.dataset.empId));
+      row.addEventListener('click', () => {
+        window.location.hash = `#/employees/profile?id=${row.dataset.empId}`;
+      });
     });
+
+    if (isAdmin) {
+      const bulkBar = document.getElementById('bulk-bar');
+      const selectAll = document.getElementById('select-all');
+      const checks = wrap.querySelectorAll('.emp-check');
+
+      function getSelected() {
+        return [...wrap.querySelectorAll('.emp-check:checked')].map(c => c.dataset.id);
+      }
+      function updateBulkBar() {
+        const sel = getSelected();
+        if (bulkBar) bulkBar.style.display = sel.length ? 'flex' : 'none';
+        const countEl = document.getElementById('bulk-count');
+        if (countEl) countEl.textContent = `${sel.length} selected`;
+      }
+
+      checks.forEach(c => c.addEventListener('change', updateBulkBar));
+      if (selectAll) selectAll.addEventListener('change', () => {
+        checks.forEach(c => { c.checked = selectAll.checked; });
+        updateBulkBar();
+      });
+
+      document.getElementById('bulk-activate')?.addEventListener('click', async () => {
+        const ids = getSelected();
+        if (!ids.length) return;
+        for (const id of ids) {
+          await sb.from('users').update({ status: 'active' }).eq('id', id);
+        }
+        toast(`${ids.length} employee${ids.length > 1 ? 's' : ''} set to active`);
+        const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        allEmployees = refreshed || [];
+        renderTable();
+      });
+
+      document.getElementById('bulk-deactivate')?.addEventListener('click', async () => {
+        const ids = getSelected();
+        if (!ids.length) return;
+        for (const id of ids) {
+          await sb.from('users').update({ status: 'exited' }).eq('id', id);
+        }
+        toast(`${ids.length} employee${ids.length > 1 ? 's' : ''} set to exited`);
+        const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        allEmployees = refreshed || [];
+        renderTable();
+      });
+
+      document.getElementById('bulk-dept')?.addEventListener('click', () => {
+        const ids = getSelected();
+        if (!ids.length) return;
+        const f = document.createElement('div');
+        f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+          <div class="form-group"><label class="form-label">Department</label>
+            <select class="form-input" id="bulk-dept-select">
+              <option value="">None</option>
+              ${departments.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" id="bulk-dept-save">Update ${ids.length} employee${ids.length > 1 ? 's' : ''}</button>
+        </div>`;
+        openModal('Change Department', f);
+        f.querySelector('#bulk-dept-save').addEventListener('click', async () => {
+          const deptId = f.querySelector('#bulk-dept-select').value || null;
+          for (const id of ids) {
+            await sb.from('users').update({ department_id: deptId }).eq('id', id);
+          }
+          closeModal();
+          toast(`Department updated for ${ids.length} employee${ids.length > 1 ? 's' : ''}`);
+          const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+          allEmployees = refreshed || [];
+          renderTable();
+        });
+      });
+
+      document.getElementById('bulk-clear')?.addEventListener('click', () => {
+        checks.forEach(c => { c.checked = false; });
+        if (selectAll) selectAll.checked = false;
+        updateBulkBar();
+      });
+    }
   }
 
   renderTable();
@@ -136,6 +228,20 @@ export default async function employeeList(container) {
   document.getElementById('emp-search').addEventListener('input', renderTable);
   document.getElementById('emp-dept-filter').addEventListener('change', renderTable);
   document.getElementById('emp-status-filter').addEventListener('change', renderTable);
+
+  document.getElementById('export-employees').addEventListener('click', () => {
+    if (!allEmployees.length) return toast('No employees to export');
+    const headers = 'Name,Email,Phone,Department,Designation,Role,Status,Date of Joining\n';
+    const rows = allEmployees.map(e =>
+      `"${e.full_name || ''}","${e.email || ''}","${e.phone || ''}","${e.department?.name || ''}","${e.designation || ''}","${e.role || 'member'}","${e.status || 'active'}","${e.date_of_joining || ''}"`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'employees.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 
   document.getElementById('add-employee-btn').addEventListener('click', () => {
     const f = document.createElement('div');
@@ -202,29 +308,4 @@ export default async function employeeList(container) {
     });
   });
 
-  function showEmployeeProfile(empId) {
-    const emp = allEmployees.find(e => e.id === empId);
-    if (!emp) return;
-
-    const f = document.createElement('div');
-    f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
-        <div style="display:flex;align-items:center;gap:var(--space-4)">
-          <div style="width:56px;height:56px;border-radius:var(--radius-full);background:${avColor(emp.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-xl)">${initials(emp.full_name)}</div>
-          <div>
-            <div style="font-size:var(--text-lg);font-weight:var(--font-weight-semibold)">${esc(emp.full_name || '—')}</div>
-            <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(emp.designation || emp.role || '—')}</div>
-          </div>
-        </div>
-        <div class="grid-2col" style="gap:var(--space-3)">
-          <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Email</div><div style="font-size:var(--text-sm)">${esc(emp.email || '—')}</div></div>
-          <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Phone</div><div style="font-size:var(--text-sm)">${esc(emp.phone || '—')}</div></div>
-          <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Department</div><div style="font-size:var(--text-sm)">${esc(emp.department?.name || '—')}</div></div>
-          <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Status</div><div style="font-size:var(--text-sm)">${esc(emp.status || 'active')}</div></div>
-          <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Role</div><div style="font-size:var(--text-sm)">${esc((emp.role || 'member').replaceAll('_', ' '))}</div></div>
-          <div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Joined</div><div style="font-size:var(--text-sm)">${emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div></div>
-        </div>
-      </div>`;
-    openModal('Employee Profile', f);
-  }
 }
