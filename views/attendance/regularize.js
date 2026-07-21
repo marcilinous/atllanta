@@ -19,7 +19,7 @@ export default async function regularizeView(container) {
       <button class="tab active" data-tab="my-requests">My Requests</button>
       ${isManager ? '<button class="tab" data-tab="pending">Pending Approvals</button>' : ''}
     </div>
-    <div id="reg-content" style="margin-top:var(--space-4)"></div>
+    <div id="reg-content" style="margin-top:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div>
   `;
 
   if (!org || !user) return;
@@ -44,18 +44,20 @@ export default async function regularizeView(container) {
   async function renderMyRequests(el) {
     el.innerHTML = `<div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading...</div>`;
 
-    const { data: attendance } = await sb
+    const { data: attendance, error: attErr } = await sb
       .from('attendance')
       .select('*')
       .eq('user_id', user.id)
       .order('date', { ascending: false })
       .limit(30);
+    if (attErr) toast('Failed to load attendance: ' + attErr.message);
 
-    const { data: regs } = await sb
+    const { data: regs, error: regsErr } = await sb
       .from('attendance_regularizations')
       .select('*, attendance:attendance_id(date)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
+    if (regsErr) toast('Failed to load regularizations: ' + regsErr.message);
 
     const myRegs = regs || [];
     const myAttendance = (attendance || []).filter(a =>
@@ -171,11 +173,12 @@ export default async function regularizeView(container) {
   async function renderPending(el) {
     el.innerHTML = `<div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading...</div>`;
 
-    const { data: pending } = await sb
+    const { data: pending, error: pendErr } = await sb
       .from('attendance_regularizations')
       .select('*, attendance:attendance_id(date, check_in, check_out, status), requester:user_id(full_name, email)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
+    if (pendErr) { toast('Failed to load pending requests: ' + pendErr.message); return; }
 
     const items = pending || [];
 

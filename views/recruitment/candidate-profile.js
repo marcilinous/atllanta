@@ -13,7 +13,7 @@ export default async function candidateProfile(container) {
     return;
   }
 
-  container.innerHTML = `<div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading candidate...</div>`;
+  container.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div><div class="skeleton skeleton-text" style="width:40%"></div></div>`;
 
   const { data: candidate, error } = await sb
     .from('candidates')
@@ -26,7 +26,7 @@ export default async function candidateProfile(container) {
     return;
   }
 
-  const [{ data: applications }, { data: interviews }] = await Promise.all([
+  const [{ data: applications, error: appsErr }, { data: interviews, error: intErr }] = await Promise.all([
     sb.from('job_applications')
       .select('*, job:job_id(title, status)')
       .eq('candidate_id', candidateId)
@@ -36,6 +36,8 @@ export default async function candidateProfile(container) {
       .eq('job_application_id', candidateId)
       .order('scheduled_at', { ascending: false }),
   ]);
+  if (appsErr) toast('Failed to load applications: ' + appsErr.message);
+  if (intErr) toast('Failed to load interviews: ' + intErr.message);
 
   const apps = applications || [];
   const intvs = interviews || [];

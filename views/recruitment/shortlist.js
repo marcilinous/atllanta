@@ -15,15 +15,17 @@ export default async function shortlistView(container) {
     return;
   }
 
-  container.innerHTML = `<div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading...</div>`;
+  container.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div>`;
 
-  const [{ data: job }, { data: applications }] = await Promise.all([
+  const [{ data: job, error: jobErr }, { data: applications, error: appsErr }] = await Promise.all([
     sb.from('jobs').select('*').eq('id', jobId).maybeSingle(),
     sb.from('job_applications')
       .select('*, candidate:candidate_id(full_name, email, phone)')
       .eq('job_id', jobId)
       .order('match_score', { ascending: false }),
   ]);
+  if (jobErr) toast('Failed to load job: ' + jobErr.message);
+  if (appsErr) toast('Failed to load applications: ' + appsErr.message);
 
   if (!job) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Job not found</div></div>`;

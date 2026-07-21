@@ -18,7 +18,7 @@ export default async function employeeProfile(container) {
     return;
   }
 
-  container.innerHTML = `<div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading profile...</div>`;
+  container.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div><div class="skeleton skeleton-text" style="width:40%"></div></div>`;
 
   const { data: emp, error } = await sb
     .from('users')

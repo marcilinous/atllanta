@@ -141,8 +141,9 @@ export default async function checkinView(container) {
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const weekStartStr = weekStart.toISOString().split('T')[0];
-  const { data: weekData } = await sb.from('attendance')
+  const { data: weekData, error: weekErr } = await sb.from('attendance')
     .select('*').eq('user_id', user.id).gte('date', weekStartStr).order('date');
+  if (weekErr) toast('Failed to load week summary: ' + weekErr.message);
 
   const weekEl = document.getElementById('week-summary');
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
