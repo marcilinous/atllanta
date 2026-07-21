@@ -32,7 +32,11 @@ export default async function recruitmentJobs(container) {
       <button class="tab" data-filter="paused">Paused</button>
       <button class="tab" data-filter="closed">Closed</button>
     </div>
-    <div id="jobs-grid" style="display:grid;gap:var(--space-4);margin-top:var(--space-4)"></div>
+    <div id="jobs-grid" style="display:grid;gap:var(--space-4);margin-top:var(--space-4)">
+      <div class="skeleton skeleton-text" style="height:80px;border-radius:var(--radius-lg)"></div>
+      <div class="skeleton skeleton-text" style="height:80px;border-radius:var(--radius-lg)"></div>
+      <div class="skeleton skeleton-text" style="height:80px;border-radius:var(--radius-lg)"></div>
+    </div>
   `;
 
   let filter = 'all';

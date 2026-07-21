@@ -29,7 +29,9 @@ export default async function settingsUsers(container) {
           <option value="member">Member</option>
         </select>
       </div>
-      <div id="members-table-wrap"></div>
+      <div id="members-table-wrap">
+        <div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>
+      </div>
     </div>
   `;
 

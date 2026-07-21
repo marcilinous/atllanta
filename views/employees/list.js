@@ -33,7 +33,9 @@ export default async function employeeList(container) {
           <option value="exited">Exited</option>
         </select>
       </div>
-      <div id="emp-table-wrap"></div>
+      <div id="emp-table-wrap">
+        <div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>
+      </div>
     </div>
   `;
 

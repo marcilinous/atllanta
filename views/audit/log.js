@@ -39,7 +39,7 @@ export default async function auditLog(container) {
         <input type="date" class="form-input" id="audit-to" style="max-width:160px;height:34px">
         <button class="btn btn-secondary btn-sm" id="audit-filter">Filter</button>
       </div>
-      <div id="audit-list"></div>
+      <div id="audit-list"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>
     </div>
     <div style="display:flex;justify-content:center;gap:var(--space-3);margin-top:var(--space-4)" id="audit-pagination"></div>
   `;

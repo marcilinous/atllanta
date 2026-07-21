@@ -24,7 +24,7 @@ export default async function leaveModule(container) {
       ${isManager ? '<a href="#/leave/approvals" class="tab" style="text-decoration:none">Approvals</a>' : ''}
       ${isManager ? '<a href="#/leave/settings" class="tab" style="text-decoration:none">Settings</a>' : ''}
     </div>
-    <div id="leave-content" style="margin-top:var(--space-4)"></div>
+    <div id="leave-content" style="margin-top:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div>
   `;
 
   if (!org || !user) return;

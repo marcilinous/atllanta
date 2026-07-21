@@ -20,7 +20,7 @@ export default async function interviewsView(container) {
       </div>
       <button class="btn btn-secondary" id="back-to-jobs">Back to Jobs</button>
     </div>
-    <div id="interviews-content"></div>
+    <div id="interviews-content"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>
   `;
 
   document.getElementById('back-to-jobs').addEventListener('click', () => {
