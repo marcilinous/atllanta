@@ -19,7 +19,7 @@ export default async function dashboard(container) {
       <div class="stat-card"><div class="skeleton skeleton-text" style="width:60%"></div><div class="skeleton skeleton-heading"></div></div>
       <div class="stat-card"><div class="skeleton skeleton-text" style="width:60%"></div><div class="skeleton skeleton-heading"></div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);margin-top:var(--space-6)">
+    <div class="dash-grid">
       <div class="card">
         <div class="card-header"><span class="card-title">Quick Actions</span></div>
         <div class="card-body">
@@ -39,7 +39,7 @@ export default async function dashboard(container) {
         </div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);margin-top:var(--space-6)">
+    <div class="dash-grid">
       <div class="card">
         <div class="card-header"><span class="card-title">Recent Activity</span></div>
         <div class="card-body" id="dash-activity" style="max-height:280px;overflow-y:auto">

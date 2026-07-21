@@ -1,13 +1,16 @@
-const CACHE_NAME = "atllanta-v1";
+const CACHE_NAME = "atllanta-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/login.html",
+  "/schedule.html",
   "/css/tokens.css",
   "/css/base.css",
   "/css/layout.css",
   "/css/components.css",
   "/manifest.json",
+  "/icon-192.svg",
+  "/icon-512.svg",
 ];
 
 self.addEventListener("install", (event) => {

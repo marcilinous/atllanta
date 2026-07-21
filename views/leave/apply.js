@@ -59,7 +59,7 @@ export default async function leaveModule(container) {
 
   function renderApply(el) {
     el.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+      <div class="dash-grid" style="margin-top:0">
         <div class="card">
           <div class="card-header"><span class="card-title">Apply for Leave</span></div>
           <div class="card-body">

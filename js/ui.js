@@ -150,3 +150,24 @@ export async function clientId() {
   cachedClientId = await getClientId();
   return cachedClientId;
 }
+
+export function showError(container, message, retryFn) {
+  container.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-icon" style="background:var(--color-error-light)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <div class="empty-state-title">Something went wrong</div>
+      <div class="empty-state-desc">${esc(message)}</div>
+      ${retryFn ? '<button class="btn btn-secondary" id="retry-btn">Try Again</button>' : ''}
+    </div>`;
+  if (retryFn) {
+    container.querySelector('#retry-btn')?.addEventListener('click', retryFn);
+  }
+}
+
+export function loadingSkeleton(rows = 5) {
+  return `<div style="padding:var(--space-4)">
+    ${Array.from({ length: rows }, () => `<div class="skeleton skeleton-text" style="width:${60 + Math.random() * 30}%;margin-bottom:var(--space-3)"></div>`).join('')}
+  </div>`;
+}

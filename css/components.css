@@ -677,8 +677,42 @@ select.form-input { cursor: pointer; }
 /* ── Org Chart ────────────────────────────── */
 .orgchart-node:hover { background: var(--color-bg-secondary); }
 
+/* ── Progress Bar ────────────────────────── */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+/* ── Responsive ──────────────────────────── */
 @media (max-width: 768px) {
   .ai-panel { width: 100%; }
   .notif-panel { width: calc(100vw - var(--space-8)); right: var(--space-4); }
   .search-results { max-height: 300px; }
+  .modal { max-width: calc(100vw - var(--space-8)); }
+  .modal-header, .modal-body, .modal-footer { padding: var(--space-4); }
+
+  .tabs { overflow-x: auto; gap: 0; -webkit-overflow-scrolling: touch; }
+  .tab { flex-shrink: 0; padding: var(--space-2) var(--space-3); }
+
+  .card-header { padding: var(--space-3) var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+  .card-body { padding: var(--space-3) var(--space-4); }
+
+  .form-input { font-size: 16px; }
+}
+
+@media (max-width: 640px) {
+  .btn { height: 34px; padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+  .btn-lg { height: 38px; padding: var(--space-2) var(--space-4); font-size: var(--text-sm); }
+
+  .table th, .table td { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
 }

@@ -271,6 +271,20 @@
   margin-top: var(--space-1);
 }
 
+/* ── Dashboard / Two-Column Grid ──────────── */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
 /* ── Mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   .app {
@@ -309,10 +323,18 @@
 
   .page-header { margin-bottom: var(--space-4); }
   .page-title { font-size: var(--text-xl); }
+
+  .dash-grid, .grid-2col { grid-template-columns: 1fr; gap: var(--space-4); }
+  .dash-grid { margin-top: var(--space-4); }
 }
 
 @media (max-width: 640px) {
   .stat-grid { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
   .stat-card { padding: var(--space-3); }
   .stat-value { font-size: var(--text-2xl); }
+
+  .topbar { padding: 0 var(--space-3); gap: var(--space-2); }
+  .topbar-org { font-size: var(--text-sm); }
+  .topbar-left { gap: var(--space-2); }
+  .topbar-right { gap: var(--space-1); }
 }

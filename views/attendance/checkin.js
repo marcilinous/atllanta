@@ -13,7 +13,7 @@ export default async function checkinView(container) {
       <h1 class="page-title">Check In / Out</h1>
       <p class="page-subtitle">${new Date().toLocaleDateString('en', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+    <div class="dash-grid" style="margin-top:0">
       <div class="card">
         <div class="card-body" style="text-align:center;padding:var(--space-8)">
           <div id="clock" style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);margin-bottom:var(--space-4)"></div>
