@@ -43,22 +43,21 @@ const recipes = {
     const { leave_request_id, user_id, org_id } = event.payload;
 
     const { data: requester } = await sb
-      .from("memberships")
+      .from("users")
       .select("full_name, email")
-      .eq("user_id", user_id)
-      .limit(1)
-      .single();
+      .eq("id", user_id)
+      .maybeSingle();
 
     const { data: managers } = await sb
-      .from("memberships")
-      .select("user_id")
-      .eq("organization_id", org_id)
+      .from("users")
+      .select("id")
+      .eq("org_id", org_id)
       .in("role", ["owner", "admin", "manager"]);
 
     if (managers?.length) {
       const notifications = managers.map((m) => ({
         org_id,
-        user_id: m.user_id,
+        user_id: m.id,
         title: "New leave request",
         body: `${requester?.full_name || requester?.email || "An employee"} has requested leave.`,
         module: "leave",
@@ -175,15 +174,15 @@ const recipes = {
 
         if (count >= 3) {
           const { data: managers } = await sb
-            .from("memberships")
-            .select("user_id")
-            .eq("organization_id", org_id)
+            .from("users")
+            .select("id")
+            .eq("org_id", org_id)
             .in("role", ["owner", "admin", "manager"]);
 
           if (managers?.length) {
             const notifications = managers.map((m) => ({
               org_id,
-              user_id: m.user_id,
+              user_id: m.id,
               title: "Frequent late check-ins",
               body: `An employee has been late ${count} times this month.`,
               module: "attendance",

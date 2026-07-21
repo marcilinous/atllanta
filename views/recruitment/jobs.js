@@ -51,7 +51,7 @@ export default async function recruitmentJobs(container) {
     candidates = c || [];
     const jobIds = jobs.map(j => j.id);
     if (jobIds.length) {
-      const { data: apps } = await sb.from('applications').select('*').in('job_id', jobIds).order('updated_at', { ascending: false });
+      const { data: apps } = await sb.from('job_applications').select('*').in('job_id', jobIds).order('updated_at', { ascending: false });
       applications = apps || [];
     } else {
       applications = [];
@@ -76,8 +76,8 @@ export default async function recruitmentJobs(container) {
     grid.innerHTML = filtered.map(j => {
       const jobApps = applications.filter(a => a.job_id === j.id);
       const appCount = jobApps.length;
-      const shortlisted = jobApps.filter(a => ['shortlisted', 'interview_scheduled', 'interviewed', 'offered', 'hired'].includes(a.stage)).length;
-      const hired = jobApps.filter(a => a.stage === 'hired').length;
+      const shortlisted = jobApps.filter(a => ['shortlisted', 'interview_scheduled', 'interviewed', 'offered', 'hired'].includes(a.status)).length;
+      const hired = jobApps.filter(a => a.status === 'hired').length;
       const isExpanded = expandedId === j.id;
 
       let detailHTML = '';
@@ -90,14 +90,14 @@ export default async function recruitmentJobs(container) {
           const c = candidates.find(x => x.id === a.candidate_id);
           return `<div class="table-row" style="display:grid;grid-template-columns:1fr 120px 120px 80px;align-items:center;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border-light);cursor:pointer" data-act="candidate-detail" data-cand-id="${a.candidate_id}" data-app-id="${a.id}">
             <div style="display:flex;align-items:center;gap:var(--space-3)">
-              <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(c?.name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(c?.name)}</div>
+              <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(c?.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(c?.full_name)}</div>
               <div>
-                <div style="font-weight:var(--font-weight-medium)">${esc(c?.name || 'Unknown')}</div>
+                <div style="font-weight:var(--font-weight-medium)">${esc(c?.full_name || 'Unknown')}</div>
                 <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(c?.email || c?.phone || '')}</div>
               </div>
             </div>
             <div>${scoreBar(a.match_score)}</div>
-            <div>${stagePill(a.stage)}</div>
+            <div>${stagePill(a.status)}</div>
             <div style="text-align:right">
               <button class="btn btn-ghost btn-sm" data-act="stage-update" data-app-id="${a.id}" title="Update stage">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -346,27 +346,27 @@ export default async function recruitmentJobs(container) {
             const { data: existing } = await q.maybeSingle();
             if (existing) {
               candId = existing.id;
-              await sb.from('candidates').update({ resume_raw_text: parseData.text, name }).eq('id', candId);
+              await sb.from('candidates').update({ resume_text: parseData.text, full_name: name }).eq('id', candId);
             }
           }
 
           if (!candId) {
             const { data: newCand, error: candErr } = await sb.from('candidates').insert({
               [orgCol]: cid,
-              name,
+              full_name: name,
               email,
               phone,
-              resume_raw_text: parseData.text,
+              resume_text: parseData.text,
             }).select('id').single();
             if (candErr) throw candErr;
             candId = newCand.id;
           }
 
           if (jobId) {
-            const { data: existingApp } = await sb.from('applications')
+            const { data: existingApp } = await sb.from('job_applications')
               .select('id').eq('job_id', jobId).eq('candidate_id', candId).maybeSingle();
             if (!existingApp) {
-              await sb.from('applications').insert({ job_id: jobId, candidate_id: candId });
+              await sb.from('job_applications').insert({ job_id: jobId, candidate_id: candId });
             }
           }
 
@@ -486,9 +486,9 @@ export default async function recruitmentJobs(container) {
     f.innerHTML = `
       <div style="display:grid;gap:var(--space-3)">
         <div class="form-group">
-          <label class="form-label">Current: ${stagePill(app.stage)}</label>
+          <label class="form-label">Current: ${stagePill(app.status)}</label>
           <select class="form-input" id="stage-select">
-            ${stages.map(s => `<option value="${s}" ${s === app.stage ? 'selected' : ''}>${s.replaceAll('_', ' ')}</option>`).join('')}
+            ${stages.map(s => `<option value="${s}" ${s === app.status ? 'selected' : ''}>${s.replaceAll('_', ' ')}</option>`).join('')}
           </select>
         </div>
         <button class="btn btn-primary" id="stage-save">Update Stage</button>
@@ -497,8 +497,8 @@ export default async function recruitmentJobs(container) {
 
     f.querySelector('#stage-save').addEventListener('click', async () => {
       const newStage = f.querySelector('#stage-select').value;
-      const { error } = await sb.from('applications').update({
-        stage: newStage,
+      const { error } = await sb.from('job_applications').update({
+        status: newStage,
         updated_at: new Date().toISOString(),
       }).eq('id', appId);
       if (error) return toast(error.message);
@@ -521,9 +521,9 @@ export default async function recruitmentJobs(container) {
     f.innerHTML = `
       <div style="display:grid;gap:var(--space-4)">
         <div style="display:flex;align-items:center;gap:var(--space-4)">
-          <div style="width:48px;height:48px;border-radius:var(--radius-full);background:${avColor(cand?.name)};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">${initials(cand?.name)}</div>
+          <div style="width:48px;height:48px;border-radius:var(--radius-full);background:${avColor(cand?.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">${initials(cand?.full_name)}</div>
           <div>
-            <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">${esc(cand?.name || 'Unknown')}</div>
+            <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">${esc(cand?.full_name || 'Unknown')}</div>
             <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.email || '')} ${cand?.phone ? '· ' + esc(cand.phone) : ''}</div>
           </div>
         </div>
@@ -533,20 +533,20 @@ export default async function recruitmentJobs(container) {
             <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Match Score</div>
           </div>
           <div class="card" style="flex:1;padding:var(--space-3);text-align:center">
-            ${stagePill(app.stage)}
+            ${stagePill(app.status)}
             <div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:var(--space-1)">Stage</div>
           </div>
         </div>
         ${app.match_summary ? `<div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">AI Assessment</div><div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(app.match_summary)}</div></div>` : ''}
         ${matchData.strengths?.length ? `<div><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">Strengths</div><div style="display:flex;flex-wrap:wrap;gap:var(--space-1)">${matchData.strengths.map(s => `<span class="badge badge-success">${esc(s)}</span>`).join('')}</div></div>` : ''}
         ${matchData.gaps?.length ? `<div><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">Gaps</div><div style="display:flex;flex-wrap:wrap;gap:var(--space-1)">${matchData.gaps.map(g => `<span class="badge badge-error">${esc(g)}</span>`).join('')}</div></div>` : ''}
-        ${cand?.resume_raw_text ? `<details><summary style="cursor:pointer;font-size:var(--text-sm);font-weight:var(--font-weight-medium)">Resume Text</summary><pre style="white-space:pre-wrap;font-size:var(--text-xs);color:var(--color-text-secondary);max-height:300px;overflow:auto;margin-top:var(--space-2);padding:var(--space-3);background:var(--color-bg-secondary);border-radius:var(--radius-md)">${esc(cand.resume_raw_text)}</pre></details>` : ''}
+        ${cand?.resume_text ? `<details><summary style="cursor:pointer;font-size:var(--text-sm);font-weight:var(--font-weight-medium)">Resume Text</summary><pre style="white-space:pre-wrap;font-size:var(--text-xs);color:var(--color-text-secondary);max-height:300px;overflow:auto;margin-top:var(--space-2);padding:var(--space-3);background:var(--color-bg-secondary);border-radius:var(--radius-md)">${esc(cand.resume_text)}</pre></details>` : ''}
         <div style="display:flex;gap:var(--space-2);justify-content:flex-end">
           ${cand?.phone ? `<a class="btn btn-secondary btn-sm" href="https://wa.me/${(cand.phone || '').replace(/[^\d]/g, '')}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
           <button class="btn btn-primary btn-sm" id="cd-stage">Update Stage</button>
         </div>
       </div>`;
-    openModal(`${esc(cand?.name)} — ${esc(job?.title || '')}`, f);
+    openModal(`${esc(cand?.full_name)} — ${esc(job?.title || '')}`, f);
 
     f.querySelector('#cd-stage').addEventListener('click', () => {
       closeModal();

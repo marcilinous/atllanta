@@ -25,6 +25,10 @@ export async function loadUserProfile() {
     .limit(1)
     .single();
 
+  if (membership) {
+    const roleMap = { super_admin: 'owner', agency_admin: 'admin', client_admin: 'admin', client_member: 'member' };
+    membership.role = roleMap[membership.role] || membership.role;
+  }
   currentMembership = membership;
 
   if (membership) {

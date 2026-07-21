@@ -29,15 +29,15 @@ export default async function interviewsView(container) {
   const [{ data: jobs }, { data: candidates }, { data: apps }] = await Promise.all([
     sb.from('jobs').select('*').eq(orgCol, cid),
     sb.from('candidates').select('*').eq(orgCol, cid),
-    sb.from('applications').select('*').in('stage', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
+    sb.from('job_applications').select('*').in('status', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
   ]);
 
   const allJobs = jobs || [];
   const allCands = candidates || [];
   const allApps = (apps || []).filter(a => allJobs.some(j => j.id === a.job_id));
 
-  const interviewApps = allApps.filter(a => ['interview_scheduled', 'interviewed'].includes(a.stage));
-  const schedulable = allApps.filter(a => !['rejected', 'hired', 'interviewed'].includes(a.stage) && !a.interview_at);
+  const interviewApps = allApps.filter(a => ['interview_scheduled', 'interviewed'].includes(a.status));
+  const schedulable = allApps.filter(a => !['rejected', 'hired', 'interviewed'].includes(a.status) && !a.interview_at);
 
   const content = document.getElementById('interviews-content');
 
@@ -51,7 +51,7 @@ export default async function interviewsView(container) {
         ${schedulable.map(a => {
           const c = allCands.find(x => x.id === a.candidate_id);
           const j = allJobs.find(x => x.id === a.job_id);
-          return `<button class="btn btn-secondary btn-sm" data-act="manage-slots" data-app="${a.id}">${esc(c?.name || 'Unknown')} · ${esc(j?.title || '')}</button>`;
+          return `<button class="btn btn-secondary btn-sm" data-act="manage-slots" data-app="${a.id}">${esc(c?.full_name || 'Unknown')} · ${esc(j?.title || '')}</button>`;
         }).join('')}
       </div>`;
     content.appendChild(section);
@@ -88,8 +88,8 @@ export default async function interviewsView(container) {
           <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${d.toLocaleString('en', { month: 'short' })}</div>
         </div>
         <div style="flex:1">
-          <div style="font-weight:var(--font-weight-semibold)">${esc(c?.name || 'Unknown')}</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(j?.title || '')} · ${a.stage.replaceAll('_', ' ')}</div>
+          <div style="font-weight:var(--font-weight-semibold)">${esc(c?.full_name || 'Unknown')}</div>
+          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(j?.title || '')} · ${a.status.replaceAll('_', ' ')}</div>
           <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${a.interview_at ? '' : ' (manual)'}</div>
           ${a.meet_link ? `<a href="${esc(a.meet_link)}" target="_blank" rel="noopener" style="font-size:var(--text-sm);color:var(--color-accent)">Google Meet</a>` : ''}
         </div>
@@ -113,12 +113,12 @@ export default async function interviewsView(container) {
       const f = document.createElement('div');
       f.innerHTML = `
         <div style="display:grid;gap:var(--space-3)">
-          <select class="form-input" id="int-stage">${stages.map(s => `<option value="${s}" ${s === app?.stage ? 'selected' : ''}>${s.replaceAll('_', ' ')}</option>`).join('')}</select>
+          <select class="form-input" id="int-stage">${stages.map(s => `<option value="${s}" ${s === app?.status ? 'selected' : ''}>${s.replaceAll('_', ' ')}</option>`).join('')}</select>
           <button class="btn btn-primary" id="int-stage-save">Update</button>
         </div>`;
       openModal('Update Stage', f);
       f.querySelector('#int-stage-save').addEventListener('click', async () => {
-        await sb.from('applications').update({ stage: f.querySelector('#int-stage').value, updated_at: new Date().toISOString() }).eq('id', btn.dataset.app);
+        await sb.from('job_applications').update({ status: f.querySelector('#int-stage').value, updated_at: new Date().toISOString() }).eq('id', btn.dataset.app);
         closeModal();
         toast('Stage updated');
         interviewsView(container);
@@ -143,7 +143,7 @@ export default async function interviewsView(container) {
     const f = document.createElement('div');
     f.innerHTML = `
       <div style="display:grid;gap:var(--space-4)">
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.name)} for ${esc(job?.title)}</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.full_name)} for ${esc(job?.title)}</div>
         <div style="display:flex;gap:var(--space-2);align-items:flex-end">
           <div class="form-group" style="flex:1"><label class="form-label">Date</label><input type="date" class="form-input" id="sl-date" min="${new Date().toISOString().slice(0, 10)}"></div>
           <div class="form-group"><label class="form-label">Start</label><input type="time" class="form-input" id="sl-start" value="10:00"></div>

@@ -44,12 +44,14 @@ export default async function handler(req, res) {
       .lte("date", end_date)
       .order("date", { ascending: false });
 
-    if (membership.role === "member") query = query.eq("user_id", user.id);
+    const isMember = ["member", "client_member"].includes(membership.role);
+    if (isMember) query = query.eq("user_id", user.id);
     else if (user_id) query = query.eq("user_id", user_id);
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
 
+    const withHours = data.filter((r) => r.total_hours);
     const summary = {
       total_records: data.length,
       present: data.filter((r) => r.status === "present").length,
@@ -57,8 +59,8 @@ export default async function handler(req, res) {
       late: data.filter((r) => r.status === "late").length,
       half_day: data.filter((r) => r.status === "half_day").length,
       on_leave: data.filter((r) => r.status === "on_leave").length,
-      avg_hours: data.length > 0
-        ? (data.reduce((s, r) => s + (parseFloat(r.total_hours) || 0), 0) / data.filter((r) => r.total_hours).length).toFixed(1)
+      avg_hours: withHours.length > 0
+        ? (data.reduce((s, r) => s + (parseFloat(r.total_hours) || 0), 0) / withHours.length).toFixed(1)
         : "0",
     };
     return res.status(200).json({ records: data, summary });
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
       .lte("end_date", end_date)
       .order("created_at", { ascending: false });
 
-    if (membership.role === "member") query = query.eq("user_id", user.id);
+    if (["member", "client_member"].includes(membership.role)) query = query.eq("user_id", user.id);
     if (leave_type_id) query = query.eq("leave_type_id", leave_type_id);
     if (status) query = query.eq("status", status);
 
