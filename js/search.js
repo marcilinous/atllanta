@@ -24,11 +24,34 @@ export function initGlobalSearch() {
   });
 
   searchEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { resultsEl.classList.add('hidden'); searchEl.blur(); }
+    if (e.key === 'Escape') { resultsEl.classList.add('hidden'); searchEl.blur(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const items = resultsEl.querySelectorAll('.search-item');
+      if (!items.length) return;
+      const active = resultsEl.querySelector('.search-item.active');
+      let idx = active ? Array.from(items).indexOf(active) : -1;
+      if (active) active.classList.remove('active');
+      idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+      items[idx].classList.add('active');
+      items[idx].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'Enter') {
+      const active = resultsEl.querySelector('.search-item.active');
+      if (active) { e.preventDefault(); active.click(); }
+    }
   });
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.search-box')) resultsEl.classList.add('hidden');
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      searchEl.focus();
+    }
   });
 }
 
