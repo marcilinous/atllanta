@@ -716,3 +716,136 @@ select.form-input { cursor: pointer; }
 
   .table th, .table td { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
 }
+
+/* ── Attendance Heatmap & Layout ─────────── */
+.att-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.att-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.att-mini-stat { text-align: center; }
+
+.att-mini-stat-value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+}
+
+.att-mini-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.att-legend {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+}
+
+.att-legend-item { display: flex; align-items: center; gap: 4px; }
+.att-legend-dot { width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0; }
+
+.heatmap { user-select: none; }
+
+.heatmap-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.heatmap-day-name {
+  text-align: center;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  padding: var(--space-1) 0;
+}
+
+.heatmap-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.heatmap-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  background: var(--color-bg-secondary);
+}
+
+.heatmap-cell.empty { background: transparent; }
+
+.heatmap-cell.present { background: var(--color-success-light); border: 1px solid var(--color-success); }
+.heatmap-cell.late { background: var(--color-warning-light); border: 1px solid var(--color-warning); }
+.heatmap-cell.absent { background: var(--color-error-light); border: 1px solid var(--color-error); }
+.heatmap-cell.leave { background: var(--color-info-light); border: 1px solid var(--color-info); }
+.heatmap-cell.off { background: var(--color-bg-tertiary); border: 1px solid var(--color-border-light); }
+.heatmap-cell.future { opacity: 0.35; }
+
+.heatmap-cell.today {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.heatmap-cell.clickable { cursor: pointer; }
+.heatmap-cell.clickable:hover {
+  transform: scale(1.08);
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+}
+
+.heatmap-day {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.heatmap-hours {
+  font-size: 9px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.heatmap-reg-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+}
+
+[data-theme="dark"] .heatmap-cell.present { background: rgba(22, 163, 74, 0.15); border-color: rgba(22, 163, 74, 0.4); }
+[data-theme="dark"] .heatmap-cell.late { background: rgba(217, 119, 6, 0.15); border-color: rgba(217, 119, 6, 0.4); }
+[data-theme="dark"] .heatmap-cell.absent { background: rgba(220, 38, 38, 0.15); border-color: rgba(220, 38, 38, 0.4); }
+[data-theme="dark"] .heatmap-cell.leave { background: rgba(37, 99, 235, 0.15); border-color: rgba(37, 99, 235, 0.4); }
+
+@media (max-width: 768px) {
+  .att-top-row { grid-template-columns: 1fr; }
+  .heatmap-cell { min-height: 36px; }
+  .heatmap-day { font-size: var(--text-xs); }
+  .heatmap-hours { display: none; }
+  .att-legend { gap: var(--space-2); }
+}

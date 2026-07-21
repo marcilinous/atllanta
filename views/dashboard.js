@@ -25,7 +25,7 @@ export default async function dashboard(container) {
         <div class="card-body">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-3)">
             ${isManager ? '<a href="#/recruitment" class="btn btn-primary" style="justify-content:center">Post a Job</a>' : ''}
-            <a href="#/attendance/checkin" class="btn btn-primary" style="justify-content:center">Check In</a>
+            <a href="#/attendance" class="btn btn-primary" style="justify-content:center">Check In</a>
             <a href="#/leave" class="btn btn-secondary" style="justify-content:center">Apply Leave</a>
             <a href="#/employees" class="btn btn-secondary" style="justify-content:center">Employees</a>
             ${isManager ? '<a href="#/approvals" class="btn btn-secondary" style="justify-content:center">Approvals</a>' : ''}
@@ -224,7 +224,7 @@ export default async function dashboard(container) {
           <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${i.label}</div>
         </div>`
       ).join('')}</div>
-      <div style="margin-top:var(--space-3)"><a href="#/attendance/report" style="font-size:var(--text-xs);color:var(--color-accent)">View full report</a></div>`;
+      <div style="margin-top:var(--space-3)"><a href="#/attendance" style="font-size:var(--text-xs);color:var(--color-accent)">View full report</a></div>`;
     }
   }
 }
