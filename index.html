@@ -44,6 +44,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         <span class="nav-tooltip">Recruitment</span>
       </button>
+      <button class="nav-btn" data-view="approvals">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span class="nav-tooltip">Approvals</span>
+      </button>
 
       <div class="sidebar-nav-bottom">
         <button class="nav-btn" data-view="settings">
@@ -151,6 +155,9 @@ import leaveCalendar from '/views/leave/calendar.js';
 import leaveBalances from '/views/leave/balances.js';
 import leaveApprovals from '/views/leave/approvals.js';
 import jobDetail from '/views/recruitment/job-detail.js';
+import orgChart from '/views/employees/orgchart.js';
+import approvalsInbox from '/views/approvals.js';
+import onboarding from '/views/onboarding.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -327,6 +334,9 @@ registerRoute('leave/approvals', leaveApprovals);
 registerRoute('recruitment/job', jobDetail);
 registerRoute('ai', aiAssistant);
 registerRoute('audit', auditLog);
+registerRoute('employees/orgchart', orgChart);
+registerRoute('approvals', approvalsInbox);
+registerRoute('onboarding', onboarding);
 
 initRouter(document.getElementById('main-content'));
 

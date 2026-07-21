@@ -674,6 +674,9 @@ select.form-input { cursor: pointer; }
 
 .ai-input:focus { border-color: var(--color-accent); }
 
+/* ── Org Chart ────────────────────────────── */
+.orgchart-node:hover { background: var(--color-bg-secondary); }
+
 @media (max-width: 768px) {
   .ai-panel { width: 100%; }
   .notif-panel { width: calc(100vw - var(--space-8)); right: var(--space-4); }

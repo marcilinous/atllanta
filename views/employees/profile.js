@@ -217,12 +217,86 @@ export default async function employeeProfile(container) {
     </table></div></div>`;
   }
 
-  function renderDocuments() {
-    tabContent.innerHTML = `<div class="card"><div class="empty-state" style="padding:var(--space-8)">
-      <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-      <div class="empty-state-title">Coming soon</div>
-      <div class="empty-state-desc">Document management will be available in a future update.</div>
-    </div></div>`;
+  async function renderDocuments() {
+    tabContent.innerHTML = `<div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading documents...</div>`;
+
+    const { data: files, error: filesErr } = await sb
+      .from('files')
+      .select('*')
+      .eq('entity_type', 'employee')
+      .eq('entity_id', empId)
+      .order('created_at', { ascending: false });
+
+    const docs = files || [];
+
+    tabContent.innerHTML = `
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span class="card-title">Documents</span>
+          <button class="btn btn-primary btn-sm" id="doc-upload-btn">Upload Document</button>
+        </div>
+        <div class="card-body" id="docs-list"></div>
+      </div>
+      <input type="file" id="doc-file-input" style="display:none" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+    `;
+
+    const listEl = document.getElementById('docs-list');
+
+    if (!docs.length) {
+      listEl.innerHTML = `<div class="empty-state" style="padding:var(--space-6)">
+        <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="empty-state-title">No documents</div>
+        <div class="empty-state-desc">Upload documents like offer letters, ID proofs, or certificates.</div>
+      </div>`;
+    } else {
+      const mimeIcons = { 'application/pdf': '📄', 'image/': '🖼️', 'application/msword': '📝' };
+      listEl.innerHTML = `<div class="table-wrap"><table class="table">
+        <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+        <tbody>${docs.map(f => {
+          const icon = Object.entries(mimeIcons).find(([k]) => (f.mime_type || '').startsWith(k))?.[1] || '📎';
+          const size = f.file_size ? (f.file_size < 1024 ? f.file_size + ' B' : f.file_size < 1048576 ? (f.file_size / 1024).toFixed(1) + ' KB' : (f.file_size / 1048576).toFixed(1) + ' MB') : '—';
+          return `<tr>
+            <td style="font-size:var(--text-sm)">${icon} ${esc(f.file_name)}</td>
+            <td style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(f.mime_type || '—')}</td>
+            <td style="font-size:var(--text-xs)">${size}</td>
+            <td style="font-size:var(--text-xs);color:var(--color-text-secondary)">${formatDate(f.created_at)}</td>
+            <td><button class="btn btn-ghost btn-sm" data-del-doc="${f.id}" data-path="${esc(f.file_path)}">Delete</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+
+      listEl.querySelectorAll('[data-del-doc]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await sb.storage.from('documents').remove([btn.dataset.path]);
+          await sb.from('files').delete().eq('id', btn.dataset.delDoc);
+          toast('Document deleted');
+          renderDocuments();
+        });
+      });
+    }
+
+    const fileInput = document.getElementById('doc-file-input');
+    document.getElementById('doc-upload-btn').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const path = `employees/${empId}/${Date.now()}_${file.name}`;
+      const { error: uploadErr } = await sb.storage.from('documents').upload(path, file);
+      if (uploadErr) return toast('Upload failed: ' + uploadErr.message);
+      await sb.from('files').insert({
+        org_id: org?.id,
+        uploaded_by: getUser().id,
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        mime_type: file.type,
+        entity_type: 'employee',
+        entity_id: empId,
+      });
+      toast('Document uploaded');
+      fileInput.value = '';
+      renderDocuments();
+    });
   }
 
   renderTab();

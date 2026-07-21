@@ -73,12 +73,13 @@ async function sendMessage() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-async function processQuery(query) {
+export async function processQuery(query) {
   const org = getOrg();
   const user = getUser();
   const q = query.toLowerCase();
   const today = new Date().toISOString().split('T')[0];
 
+  // Fast local queries for common patterns
   if (q.includes('absent') && q.includes('today')) {
     const { data } = await sb.from('attendance').select('*, user:user_id(full_name, email)').eq('date', today).eq('status', 'absent');
     if (!data?.length) return 'No one is marked absent today.';
@@ -108,19 +109,6 @@ async function processQuery(query) {
     return `There are <strong>${count || 0}</strong> active employees.`;
   }
 
-  if (q.includes('employee') && q.includes('department') || (q.includes('list') && q.includes('in '))) {
-    const deptMatch = query.match(/in\s+(\w[\w\s]*?)(?:\s+department)?$/i);
-    if (deptMatch) {
-      const deptName = deptMatch[1].trim();
-      const { data: depts } = await sb.from('departments').select('id, name').ilike('name', `%${deptName}%`).limit(1);
-      if (depts?.length) {
-        const { data: emps } = await sb.from('users').select('full_name, email, designation').eq('department_id', depts[0].id).eq('status', 'active');
-        if (!emps?.length) return `No employees found in ${esc(depts[0].name)}.`;
-        return `<strong>${emps.length} employee${emps.length !== 1 ? 's' : ''} in ${esc(depts[0].name)}:</strong><ul>${emps.map(e => `<li>${esc(e.full_name)} — ${esc(e.designation || e.email)}</li>`).join('')}</ul>`;
-      }
-    }
-  }
-
   if (q.includes('late') && q.includes('today')) {
     const { data } = await sb.from('attendance').select('*, user:user_id(full_name)').eq('date', today).eq('status', 'late');
     if (!data?.length) return 'No one was late today.';
@@ -139,6 +127,48 @@ async function processQuery(query) {
     return `<strong>${data.length} interview${data.length !== 1 ? 's' : ''} today:</strong><ul>${data.map(i => `<li>${esc(i.application?.candidate?.full_name || '—')} for ${esc(i.application?.job?.title || '—')} at ${new Date(i.scheduled_at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}</li>`).join('')}</ul>`;
   }
 
+  if (q.includes('employee') && q.includes('department') || (q.includes('list') && q.includes('in '))) {
+    const deptMatch = query.match(/in\s+(\w[\w\s]*?)(?:\s+department)?$/i);
+    if (deptMatch) {
+      const deptName = deptMatch[1].trim();
+      const { data: depts } = await sb.from('departments').select('id, name').ilike('name', `%${deptName}%`).limit(1);
+      if (depts?.length) {
+        const { data: emps } = await sb.from('users').select('full_name, email, designation').eq('department_id', depts[0].id).eq('status', 'active');
+        if (!emps?.length) return `No employees found in ${esc(depts[0].name)}.`;
+        return `<strong>${emps.length} employee${emps.length !== 1 ? 's' : ''} in ${esc(depts[0].name)}:</strong><ul>${emps.map(e => `<li>${esc(e.full_name)} — ${esc(e.designation || e.email)}</li>`).join('')}</ul>`;
+      }
+    }
+  }
+
+  // Fall back to Groq LLM for complex queries
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.access_token) {
+      const resp = await fetch('/api/ai-query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ query }),
+      });
+      if (resp.ok) {
+        const result = await resp.json();
+        let html = '';
+        if (result.response) html += `<div>${esc(result.response)}</div>`;
+        if (result.data?.length) {
+          const keys = Object.keys(result.data[0]).filter(k => !['id', 'org_id', 'fts'].includes(k)).slice(0, 6);
+          html += `<div style="overflow-x:auto;margin-top:var(--space-2)"><table style="width:100%;font-size:var(--text-xs);border-collapse:collapse">
+            <thead><tr>${keys.map(k => `<th style="text-align:left;padding:var(--space-1) var(--space-2);border-bottom:1px solid var(--color-border)">${esc(k)}</th>`).join('')}</tr></thead>
+            <tbody>${result.data.slice(0, 15).map(row => `<tr>${keys.map(k => `<td style="padding:var(--space-1) var(--space-2);border-bottom:1px solid var(--color-border-light)">${esc(String(row[k] ?? '—'))}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table></div>`;
+          if (result.data.length > 15) html += `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">Showing 15 of ${result.data.length} results</div>`;
+        }
+        if (html) return html;
+      }
+    }
+  } catch {}
+
   return `I can help with these queries:
     <ul style="margin-top:var(--space-2);font-size:var(--text-xs)">
       <li>Who is absent/present/late today?</li>
@@ -149,5 +179,5 @@ async function processQuery(query) {
       <li>List employees in [department]</li>
       <li>Any interviews today?</li>
     </ul>
-    <div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-text-tertiary)">Try rephrasing your question using these patterns.</div>`;
+    <div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-text-tertiary)">For more complex queries, try being specific about what data you need.</div>`;
 }

@@ -94,7 +94,7 @@ export default async function dashboard(container) {
             <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(r.requester?.full_name || r.requester?.email || '—')}</div>
             <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(r.leave_type?.name || '—')} · ${r.days} day${r.days !== 1 ? 's' : ''} · ${r.start_date}</div>
           </div>
-          <a href="#/leave" class="btn btn-ghost btn-sm">Review</a>
+          <a href="#/approvals" class="btn btn-ghost btn-sm">Review</a>
         </div>
       `).join('');
     }
