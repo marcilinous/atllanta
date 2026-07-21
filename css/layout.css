@@ -292,6 +292,60 @@
   height: calc(100vh - 200px);
 }
 
+.mobile-search-btn { display: none; }
+
+/* ── Mobile Search Overlay ──────────────── */
+.mobile-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-search-overlay .search-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mobile-search-overlay .search-header input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: var(--text-md);
+  color: var(--color-text-primary);
+}
+
+.mobile-search-overlay .search-header input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.mobile-search-overlay .mobile-search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.mobile-search-overlay .search-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.mobile-search-overlay .search-item:active {
+  background: var(--color-bg-secondary);
+}
+
 /* ── Mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   .app {
@@ -325,6 +379,8 @@
   .nav-btn .nav-tooltip { display: none !important; }
 
   .topbar-center { display: none; }
+
+  .mobile-search-btn { display: grid; }
 
   .content { padding: var(--space-4); }
 
