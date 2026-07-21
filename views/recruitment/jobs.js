@@ -3,6 +3,7 @@ import { esc, toast, scoreBar, stagePill, openModal, closeModal, getAuthToken, c
 import { getOrg } from '../../js/auth.js';
 import { navigate } from '../../js/router.js';
 import { publishEvent } from '../../js/events.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function recruitmentJobs(container) {
   const org = getOrg();
@@ -233,6 +234,8 @@ export default async function recruitmentJobs(container) {
       if (error) { toast(error.message); btn.disabled = false; btn.textContent = 'Create Job'; return; }
       closeModal();
       toast('Job created');
+      await logAction('recruitment', 'job', null, 'created', null, { title });
+      await publishEvent('recruitment.job.created', { title });
       await loadData();
       renderJobs();
     });

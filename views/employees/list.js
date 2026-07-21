@@ -1,6 +1,8 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getMembership, getUser } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, initials, avColor } from '../../js/ui.js';
+import { logAction } from '../../js/audit.js';
+import { publishEvent } from '../../js/events.js';
 
 export default async function employeeList(container) {
   const org = getOrg();
@@ -187,6 +189,8 @@ export default async function employeeList(container) {
 
       closeModal();
       toast('Employee added');
+      await logAction('people', 'employee', null, 'created', null, { full_name: name, email });
+      await publishEvent('people.employee.created', { name, email });
       const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
       allEmployees = refreshed || [];
       renderTable();

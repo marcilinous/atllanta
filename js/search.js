@@ -54,7 +54,7 @@ async function runSearch(query) {
 
   if (users?.length) {
     sections.push(`<div class="search-section"><div class="search-section-title">Employees</div>
-      ${users.map(u => `<div class="search-item" data-nav="employees" data-id="${u.id}">
+      ${users.map(u => `<div class="search-item" data-nav="employees/profile?id=${u.id}" data-id="${u.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <div><div class="search-item-title">${esc(u.full_name)}</div><div class="search-item-sub">${esc(u.email || '')} ${u.department?.name ? '· ' + esc(u.department.name) : ''}</div></div>
       </div>`).join('')}</div>`);
@@ -62,7 +62,7 @@ async function runSearch(query) {
 
   if (candidates?.length) {
     sections.push(`<div class="search-section"><div class="search-section-title">Candidates</div>
-      ${candidates.map(c => `<div class="search-item" data-nav="recruitment" data-id="${c.id}">
+      ${candidates.map(c => `<div class="search-item" data-nav="recruitment/candidate?id=${c.id}" data-id="${c.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         <div><div class="search-item-title">${esc(c.full_name)}</div><div class="search-item-sub">${esc(c.email || '')} · ${esc(c.source || 'manual')}</div></div>
       </div>`).join('')}</div>`);
@@ -70,7 +70,7 @@ async function runSearch(query) {
 
   if (jobs?.length) {
     sections.push(`<div class="search-section"><div class="search-section-title">Jobs</div>
-      ${jobs.map(j => `<div class="search-item" data-nav="recruitment/jobs" data-id="${j.id}">
+      ${jobs.map(j => `<div class="search-item" data-nav="recruitment/job?id=${j.id}" data-id="${j.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         <div><div class="search-item-title">${esc(j.title)}</div><div class="search-item-sub">${esc(j.status)} ${j.department?.name ? '· ' + esc(j.department.name) : ''}</div></div>
       </div>`).join('')}</div>`);

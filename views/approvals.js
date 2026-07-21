@@ -1,6 +1,8 @@
 import sb from '../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../js/auth.js';
 import { esc, toast, formatDate, initials, avColor, openModal, closeModal } from '../js/ui.js';
+import { logAction } from '../js/audit.js';
+import { publishEvent } from '../js/events.js';
 
 export default async function approvalsInbox(container) {
   const org = getOrg();
@@ -99,6 +101,8 @@ export default async function approvalsInbox(container) {
           reviewed_at: new Date().toISOString()
         }).eq('id', btn.dataset.id);
         if (error) return toast(error.message);
+        await logAction('leave', 'leave_request', btn.dataset.id, 'approved', { status: 'pending' }, { status: 'approved' });
+        await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.id, approved_by: user.id });
         toast('Leave approved');
         renderLeaveApprovals();
       });
@@ -123,6 +127,7 @@ export default async function approvalsInbox(container) {
           }).eq('id', btn.dataset.id);
           closeModal();
           if (error) return toast(error.message);
+          await logAction('leave', 'leave_request', btn.dataset.id, 'rejected', { status: 'pending' }, { status: 'rejected', review_comment: reason || null });
           toast('Leave rejected');
           renderLeaveApprovals();
         });
@@ -190,6 +195,8 @@ export default async function approvalsInbox(container) {
           attUpdate.status = 'present';
           await sb.from('attendance').update(attUpdate).eq('id', btn.dataset.attId);
         }
+        await logAction('attendance', 'regularization', btn.dataset.id, 'approved', { status: 'pending' }, { status: 'approved' });
+        await publishEvent('attendance.regularization.approved', { regularization_id: btn.dataset.id });
         toast('Regularization approved');
         renderRegularizations();
       });
@@ -200,6 +207,7 @@ export default async function approvalsInbox(container) {
         await sb.from('attendance_regularizations').update({
           status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString()
         }).eq('id', btn.dataset.id);
+        await logAction('attendance', 'regularization', btn.dataset.id, 'rejected', { status: 'pending' }, { status: 'rejected' });
         toast('Regularization rejected');
         renderRegularizations();
       });
