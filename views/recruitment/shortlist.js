@@ -121,7 +121,7 @@ export default async function shortlistView(container) {
         }).eq('id', a.id);
         if (error) { toast('Failed: ' + error.message); return; }
         await logAction('recruitment', 'job_application', a.id, 'shortlisted', { status: a.status }, { status: 'shortlisted' });
-        await publishEvent('recruitment.candidate.shortlisted', { job_id: jobId, candidate_id: a.candidate_id, score: a.match_score });
+        await publishEvent('recruitment.candidate.shortlisted', { job_id: jobId, candidate_id: a.candidate_id, application_id: a.id, org_id: org.id, score: a.match_score });
       }
       toast(`${top5.length} candidates shortlisted`);
       shortlistView(container);
@@ -135,7 +135,7 @@ export default async function shortlistView(container) {
         if (error) { toast('Failed: ' + error.message); return; }
         const app = apps.find(a => a.id === btn.dataset.shortlist);
         await logAction('recruitment', 'job_application', btn.dataset.shortlist, 'shortlisted', { status: app?.status }, { status: 'shortlisted' });
-        await publishEvent('recruitment.candidate.shortlisted', { job_id: jobId, candidate_id: app?.candidate_id, score: app?.match_score });
+        await publishEvent('recruitment.candidate.shortlisted', { job_id: jobId, candidate_id: app?.candidate_id, application_id: btn.dataset.shortlist, org_id: org.id, score: app?.match_score });
         toast('Candidate shortlisted');
         shortlistView(container);
       });
