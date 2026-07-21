@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, initials, avColor, formatDate } from '../../js/ui.js';
 import { navigate, routeParams } from '../../js/router.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function employeeProfile(container) {
   const org = getOrg();
@@ -269,6 +270,7 @@ export default async function employeeProfile(container) {
         btn.addEventListener('click', async () => {
           await sb.storage.from('documents').remove([btn.dataset.path]);
           await sb.from('files').delete().eq('id', btn.dataset.delDoc);
+          await logAction('people', 'file', btn.dataset.delDoc, 'deleted', null, null);
           toast('Document deleted');
           renderDocuments();
         });
@@ -293,6 +295,7 @@ export default async function employeeProfile(container) {
         entity_type: 'employee',
         entity_id: empId,
       });
+      await logAction('people', 'file', null, 'uploaded', null, { file_name: file.name, entity_type: 'employee', entity_id: empId });
       toast('Document uploaded');
       fileInput.value = '';
       renderDocuments();

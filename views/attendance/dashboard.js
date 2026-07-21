@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg } from '../../js/auth.js';
 import { esc, toast } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function attendanceDashboard(container) {
   const user = getUser();
@@ -81,6 +82,7 @@ export default async function attendanceDashboard(container) {
         org_id: org.id, user_id: user.id, date: today, check_in: now, status: 'present',
       });
       if (error) { toast('Check-in failed: ' + error.message); btn.disabled = false; return; }
+      await logAction('attendance', 'attendance', null, 'check_in', null, { date: today, check_in: now });
       await publishEvent('attendance.checkin.completed', { user_id: user.id, time: now });
       toast('Checked in!');
       attendanceDashboard(container);
@@ -100,6 +102,7 @@ export default async function attendanceDashboard(container) {
         check_out: now.toISOString(), total_hours: parseFloat(totalHours),
       }).eq('id', myAtt.id);
       if (error) { toast('Check-out failed: ' + error.message); btn.disabled = false; return; }
+      await logAction('attendance', 'attendance', myAtt.id, 'check_out', null, { check_out: now.toISOString(), total_hours: totalHours });
       toast('Checked out!');
       attendanceDashboard(container);
     };
