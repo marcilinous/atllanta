@@ -21,11 +21,26 @@ export default async function interviewsView(container) {
       </div>
       <button class="btn btn-secondary" id="back-to-jobs">Back to Jobs</button>
     </div>
+    <div class="tabs" style="margin-bottom:var(--space-4)">
+      <button class="tab active" data-tab="list">List</button>
+      <button class="tab" data-tab="timeline">Timeline</button>
+    </div>
     <div id="interviews-content"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>
+    <div id="interviews-timeline" style="display:none"></div>
   `;
 
   document.getElementById('back-to-jobs').addEventListener('click', () => {
     window.location.hash = '#/recruitment';
+  });
+
+  container.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const show = tab.dataset.tab;
+      document.getElementById('interviews-content').style.display = show === 'list' ? '' : 'none';
+      document.getElementById('interviews-timeline').style.display = show === 'timeline' ? '' : 'none';
+    });
   });
 
   const [{ data: jobs, error: jobsErr }, { data: candidates, error: candsErr }, { data: apps, error: appsErr }] = await Promise.all([
@@ -353,4 +368,100 @@ export default async function interviewsView(container) {
       });
     });
   }
+
+  // ── Timeline View ──
+  function renderTimeline() {
+    const timelineEl = document.getElementById('interviews-timeline');
+    const scheduled = allApps.filter(a => a.interview_at || ['interview_scheduled', 'interviewed'].includes(a.status));
+
+    let weekOffset = 0;
+    function getWeekDates() {
+      const today = new Date();
+      const start = new Date(today);
+      start.setDate(start.getDate() - start.getDay() + 1 + weekOffset * 7);
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        days.push(d);
+      }
+      return days;
+    }
+
+    function draw() {
+      const days = getWeekDates();
+      const weekLabel = `${days[0].toLocaleDateString('en', { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      const hours = [];
+      for (let h = 9; h <= 18; h++) hours.push(h);
+
+      const dayInterviews = days.map(day => {
+        const ds = day.toISOString().split('T')[0];
+        return scheduled.filter(a => {
+          const at = a.interview_at || a.updated_at;
+          return at && at.startsWith(ds);
+        }).map(a => {
+          const dt = new Date(a.interview_at || a.updated_at);
+          const c = allCands.find(x => x.id === a.candidate_id);
+          const j = allJobs.find(x => x.id === a.job_id);
+          return { dt, name: c?.full_name || 'Unknown', job: j?.title || '', status: a.status, hour: dt.getHours(), minute: dt.getMinutes() };
+        });
+      });
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      timelineEl.innerHTML = `
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <button class="btn btn-secondary btn-sm" id="tl-prev">&larr;</button>
+              <span style="font-weight:var(--font-weight-semibold);min-width:200px;text-align:center">${weekLabel}</span>
+              <button class="btn btn-secondary btn-sm" id="tl-next">&rarr;</button>
+              <button class="btn btn-secondary btn-sm" id="tl-this-week" style="margin-left:var(--space-2)">This Week</button>
+            </div>
+            <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
+              ${scheduled.length} interview${scheduled.length !== 1 ? 's' : ''} total
+            </div>
+          </div>
+          <div class="card-body" style="overflow-x:auto;padding:0">
+            <div style="display:grid;grid-template-columns:60px repeat(7, 1fr);min-width:700px">
+              <div style="border-bottom:2px solid var(--color-border);padding:8px 4px"></div>
+              ${days.map((d, i) => {
+                const isToday = d.toISOString().split('T')[0] === todayStr;
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                return `<div style="border-bottom:2px solid var(--color-border);padding:8px;text-align:center;${isToday ? 'background:var(--color-accent-light);' : ''}${isWeekend ? 'color:var(--color-text-tertiary);' : ''}">
+                  <div style="font-size:var(--text-xs)">${d.toLocaleString('en', { weekday: 'short' })}</div>
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">${d.getDate()}</div>
+                  <div style="font-size:10px;color:var(--color-text-tertiary)">${dayInterviews[i].length > 0 ? dayInterviews[i].length + ' int.' : ''}</div>
+                </div>`;
+              }).join('')}
+              ${hours.map(h => `
+                <div style="padding:4px 8px;font-size:10px;color:var(--color-text-tertiary);text-align:right;border-top:1px solid var(--color-border-light);height:48px;display:flex;align-items:flex-start;justify-content:flex-end">${h > 12 ? h - 12 : h}${h >= 12 ? 'pm' : 'am'}</div>
+                ${days.map((d, di) => {
+                  const isToday = d.toISOString().split('T')[0] === todayStr;
+                  const ints = dayInterviews[di].filter(iv => iv.hour === h);
+                  return `<div style="border-top:1px solid var(--color-border-light);${isToday ? 'background:var(--color-accent-light);' : ''}padding:2px;position:relative;min-height:48px">
+                    ${ints.map(iv => {
+                      const top = (iv.minute / 60) * 100;
+                      const statusColor = iv.status === 'interviewed' ? 'var(--color-success)' : iv.status === 'interview_scheduled' ? 'var(--color-accent)' : 'var(--color-warning)';
+                      return `<div style="position:absolute;top:${top}%;left:2px;right:2px;background:var(--color-surface);border:1px solid ${statusColor};border-left:3px solid ${statusColor};border-radius:var(--radius-sm);padding:2px 4px;font-size:9px;z-index:1;cursor:default" title="${esc(iv.name)} — ${esc(iv.job)}">
+                        <div style="font-weight:var(--font-weight-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(iv.name)}</div>
+                        <div style="color:var(--color-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(iv.job)}</div>
+                      </div>`;
+                    }).join('')}
+                  </div>`;
+                }).join('')}
+              `).join('')}
+            </div>
+          </div>
+        </div>`;
+
+      timelineEl.querySelector('#tl-prev').addEventListener('click', () => { weekOffset--; draw(); });
+      timelineEl.querySelector('#tl-next').addEventListener('click', () => { weekOffset++; draw(); });
+      timelineEl.querySelector('#tl-this-week').addEventListener('click', () => { weekOffset = 0; draw(); });
+    }
+
+    draw();
+  }
+
+  renderTimeline();
 }
