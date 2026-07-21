@@ -81,10 +81,12 @@ export default async function settingsOrg(container) {
   }
 
   async function renderDepartments() {
-    const [{ data: depts }, { data: teams }] = await Promise.all([
+    const [{ data: depts, error: deptsErr }, { data: teams, error: teamsErr }] = await Promise.all([
       sb.from('departments').select('*').order('name'),
       sb.from('teams').select('*').order('name'),
     ]);
+    if (deptsErr) toast('Failed to load departments: ' + deptsErr.message);
+    if (teamsErr) toast('Failed to load teams: ' + teamsErr.message);
 
     contentEl.innerHTML = `
       <div class="card">
@@ -174,7 +176,8 @@ export default async function settingsOrg(container) {
   }
 
   async function renderLeaveTypes() {
-    const { data: types } = await sb.from('leave_types').select('*').order('name');
+    const { data: types, error: ltErr } = await sb.from('leave_types').select('*').order('name');
+    if (ltErr) toast('Failed to load leave types: ' + ltErr.message);
 
     contentEl.innerHTML = `
       <div class="card">
@@ -240,7 +243,8 @@ export default async function settingsOrg(container) {
 
   async function renderHolidays() {
     const year = new Date().getFullYear();
-    const { data: holidays } = await sb.from('holidays').select('*').eq('year', year).order('date');
+    const { data: holidays, error: holErr } = await sb.from('holidays').select('*').eq('year', year).order('date');
+    if (holErr) toast('Failed to load holidays: ' + holErr.message);
 
     contentEl.innerHTML = `
       <div class="card">
@@ -299,7 +303,8 @@ export default async function settingsOrg(container) {
   }
 
   async function renderSchedules() {
-    const { data: schedules } = await sb.from('work_schedules').select('*').order('name');
+    const { data: schedules, error: wsErr } = await sb.from('work_schedules').select('*').order('name');
+    if (wsErr) toast('Failed to load schedules: ' + wsErr.message);
 
     contentEl.innerHTML = `
       <div class="card">

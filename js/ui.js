@@ -96,14 +96,25 @@ function ensureModal() {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
+    if (e.key === 'Tab' && !backdrop.classList.contains('hidden')) {
+      const focusable = backdrop.querySelectorAll('input, select, textarea, button, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
   });
 
   modalEl = backdrop;
   return modalEl;
 }
 
+let previousFocus = null;
+
 export function openModal(title, bodyNode) {
   const backdrop = ensureModal();
+  previousFocus = document.activeElement;
   backdrop.querySelector('#modal-title').textContent = title;
   const body = backdrop.querySelector('#modal-body');
   body.innerHTML = '';
@@ -113,11 +124,14 @@ export function openModal(title, bodyNode) {
     body.appendChild(bodyNode);
   }
   backdrop.classList.remove('hidden');
+  const first = backdrop.querySelector('input, select, textarea, button:not(.modal-close)');
+  if (first) setTimeout(() => first.focus(), 50);
 }
 
 export function closeModal() {
   const backdrop = document.getElementById('modal-backdrop');
   if (backdrop) backdrop.classList.add('hidden');
+  if (previousFocus) { previousFocus.focus(); previousFocus = null; }
 }
 
 export async function getAuthToken() {

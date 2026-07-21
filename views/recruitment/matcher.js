@@ -65,7 +65,8 @@ export default async function matcherView(container) {
 
   if (!cid) return;
 
-  const { data: jobs } = await sb.from('jobs').select('id, title, status').eq(orgCol, cid).order('created_at', { ascending: false });
+  const { data: jobs, error: jobsErr } = await sb.from('jobs').select('id, title, status').eq(orgCol, cid).order('created_at', { ascending: false });
+  if (jobsErr) toast('Failed to load jobs: ' + jobsErr.message);
   const allJobs = jobs || [];
 
   const jobSelect = document.getElementById('match-job');

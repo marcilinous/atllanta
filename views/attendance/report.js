@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getMembership } from '../../js/auth.js';
-import { esc, formatDate, initials, avColor } from '../../js/ui.js';
+import { esc, toast, formatDate, initials, avColor } from '../../js/ui.js';
 
 export default async function attendanceReport(container) {
   const org = getOrg();
@@ -54,11 +54,12 @@ export default async function attendanceReport(container) {
     const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    const { data } = await sb.from('attendance')
+    const { data, error: attErr } = await sb.from('attendance')
       .select('*, user:user_id(full_name, email)')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date');
+    if (attErr) { toast('Failed to load report: ' + attErr.message); return; }
 
     const records = data || [];
 

@@ -40,13 +40,15 @@ export default async function leaveModule(container) {
     renderTab();
   });
 
-  const [{ data: types }, { data: balances }] = await Promise.all([
+  const [{ data: types, error: typesErr }, { data: balances, error: balErr }] = await Promise.all([
     sb.from('leave_types').select('*').eq('is_active', true),
     sb.from('leave_balances')
       .select('*, leave_type:leave_type_id(name, code)')
       .eq('user_id', user.id)
       .eq('year', new Date().getFullYear()),
   ]);
+  if (typesErr) toast('Failed to load leave types: ' + typesErr.message);
+  if (balErr) toast('Failed to load leave balances: ' + balErr.message);
   const leaveTypes = types || [];
   const myBalances = balances || [];
 
@@ -125,11 +127,12 @@ export default async function leaveModule(container) {
   }
 
   async function renderRequests(el) {
-    const { data: requests } = await sb.from('leave_requests')
+    const { data: requests, error: reqErr } = await sb.from('leave_requests')
       .select('*, leave_type:leave_type_id(name)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20);
+    if (reqErr) { toast('Failed to load requests: ' + reqErr.message); return; }
 
     if (!requests?.length) {
       el.innerHTML = '<div class="card" style="padding:var(--space-6);text-align:center;color:var(--color-text-tertiary)">No leave requests yet</div>';
@@ -162,10 +165,11 @@ export default async function leaveModule(container) {
   }
 
   async function renderApprovals(el) {
-    const { data: pending } = await sb.from('leave_requests')
+    const { data: pending, error: pendErr } = await sb.from('leave_requests')
       .select('*, leave_type:leave_type_id(name), requester:user_id(full_name, email)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
+    if (pendErr) { toast('Failed to load approvals: ' + pendErr.message); return; }
 
     if (!pending?.length) {
       el.innerHTML = '<div class="card" style="padding:var(--space-6);text-align:center;color:var(--color-text-tertiary)">No pending approvals</div>';
@@ -233,7 +237,7 @@ export default async function leaveModule(container) {
     const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-    const [{ data: leaves }, { data: holidays }] = await Promise.all([
+    const [{ data: leaves, error: lvErr }, { data: holidays, error: holErr }] = await Promise.all([
       sb.from('leave_requests')
         .select('*, requester:user_id(full_name, email), leave_type:leave_type_id(name)')
         .in('status', ['approved', 'pending'])
@@ -246,6 +250,8 @@ export default async function leaveModule(container) {
         .lte('date', endDate)
         .order('date'),
     ]);
+    if (lvErr) toast('Failed to load leave calendar: ' + lvErr.message);
+    if (holErr) toast('Failed to load holidays: ' + holErr.message);
 
     el.innerHTML = `
       <div class="card">

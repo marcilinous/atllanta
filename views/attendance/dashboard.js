@@ -64,8 +64,9 @@ export default async function attendanceDashboard(container) {
   if (!org || !user) return;
 
   // Check-in/out logic
-  const { data: myAtt } = await sb.from('attendance')
+  const { data: myAtt, error: myAttErr } = await sb.from('attendance')
     .select('*').eq('user_id', user.id).eq('date', today).maybeSingle();
+  if (myAttErr) toast('Failed to load attendance: ' + myAttErr.message);
 
   const statusEl = document.getElementById('checkin-status');
   const btn = document.getElementById('checkin-btn');
@@ -114,7 +115,8 @@ export default async function attendanceDashboard(container) {
   }
 
   // Today's stats
-  const { data: allAtt } = await sb.from('attendance').select('*, user:user_id(full_name, email)').eq('date', today);
+  const { data: allAtt, error: allAttErr } = await sb.from('attendance').select('*, user:user_id(full_name, email)').eq('date', today);
+  if (allAttErr) toast('Failed to load team attendance: ' + allAttErr.message);
   if (allAtt) {
     document.getElementById('att-present').textContent = allAtt.filter(a => a.status === 'present').length;
     document.getElementById('att-absent').textContent = allAtt.filter(a => a.status === 'absent').length;
@@ -149,11 +151,12 @@ export default async function attendanceDashboard(container) {
     const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
 
-    const { data: monthData } = await sb.from('attendance')
+    const { data: monthData, error: monthErr } = await sb.from('attendance')
       .select('*, user:user_id(full_name, email)')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date');
+    if (monthErr) { toast('Failed to load monthly report: ' + monthErr.message); return; }
 
     const reportEl = document.getElementById('monthly-report');
     if (!monthData?.length) {

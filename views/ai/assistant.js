@@ -47,6 +47,7 @@ export default async function aiAssistant(container) {
   }
 
   async function processQuery(query) {
+    try {
     const q = query.toLowerCase().trim();
     const today = new Date().toISOString().split('T')[0];
 
@@ -138,6 +139,9 @@ export default async function aiAssistant(container) {
       <li>Employees (recent joiners, count)</li>
       <li>Recruitment (shortlisted candidates)</li>
     </ul>Try asking one of the suggested questions!`;
+    } catch (err) {
+      return `Sorry, something went wrong: ${esc(err.message || 'Unknown error')}`;
+    }
   }
 
   async function handleSend() {

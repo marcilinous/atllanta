@@ -185,11 +185,12 @@ export default async function uploadResumes(container) {
 
   async function loadRecent() {
     const orgCol = org ? 'org_id' : 'client_id';
-    const { data: recent } = await sb.from('candidates')
+    const { data: recent, error: recErr } = await sb.from('candidates')
       .select('*')
       .eq(orgCol, cid)
       .order('created_at', { ascending: false })
       .limit(10);
+    if (recErr) { toast('Failed to load candidates: ' + recErr.message); return; }
 
     const el = document.getElementById('recent-uploads');
     if (!recent?.length) {

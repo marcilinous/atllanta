@@ -45,7 +45,8 @@ export default async function leaveSettings(container) {
   }
 
   async function renderTypes(el) {
-    const { data: types } = await sb.from('leave_types').select('*').eq('org_id', org.id).order('name');
+    const { data: types, error: typesErr } = await sb.from('leave_types').select('*').eq('org_id', org.id).order('name');
+    if (typesErr) toast('Failed to load leave types: ' + typesErr.message);
     const allTypes = types || [];
 
     el.innerHTML = `
@@ -147,7 +148,8 @@ export default async function leaveSettings(container) {
 
   async function renderHolidays(el) {
     const year = new Date().getFullYear();
-    const { data: holidays } = await sb.from('holidays').select('*').eq('org_id', org.id).eq('year', year).order('date');
+    const { data: holidays, error: holErr } = await sb.from('holidays').select('*').eq('org_id', org.id).eq('year', year).order('date');
+    if (holErr) toast('Failed to load holidays: ' + holErr.message);
     const allHolidays = holidays || [];
 
     el.innerHTML = `

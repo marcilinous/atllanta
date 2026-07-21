@@ -47,10 +47,12 @@ export default async function employeeList(container) {
   let allEmployees = [];
   let departments = [];
 
-  const [{ data: users }, { data: depts }] = await Promise.all([
+  const [{ data: users, error: usersErr }, { data: depts, error: deptsErr }] = await Promise.all([
     sb.from('users').select('*, department:department_id(name)').order('full_name'),
     sb.from('departments').select('*').order('name'),
   ]);
+  if (usersErr) toast('Failed to load employees: ' + usersErr.message);
+  if (deptsErr) toast('Failed to load departments: ' + deptsErr.message);
   allEmployees = users || [];
   departments = depts || [];
 

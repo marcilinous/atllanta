@@ -58,8 +58,9 @@ export default async function checkinView(container) {
     }, () => {});
   }
 
-  const { data: myAtt } = await sb.from('attendance')
+  const { data: myAtt, error: myAttErr } = await sb.from('attendance')
     .select('*').eq('user_id', user.id).eq('date', today).maybeSingle();
+  if (myAttErr) toast('Failed to load attendance: ' + myAttErr.message);
 
   const statusEl = document.getElementById('checkin-status');
   const actionBtn = document.getElementById('action-btn');

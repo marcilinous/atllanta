@@ -48,15 +48,18 @@ export default async function recruitmentJobs(container) {
   const orgCol = org ? 'org_id' : 'client_id';
 
   async function loadData() {
-    const [{ data: j }, { data: c }] = await Promise.all([
+    const [{ data: j, error: jErr }, { data: c, error: cErr }] = await Promise.all([
       sb.from('jobs').select('*').eq(orgCol, cid).order('created_at', { ascending: false }),
       sb.from('candidates').select('*').eq(orgCol, cid).order('created_at', { ascending: false }),
     ]);
+    if (jErr) toast('Failed to load jobs: ' + jErr.message);
+    if (cErr) toast('Failed to load candidates: ' + cErr.message);
     jobs = j || [];
     candidates = c || [];
     const jobIds = jobs.map(j => j.id);
     if (jobIds.length) {
-      const { data: apps } = await sb.from('job_applications').select('*').in('job_id', jobIds).order('updated_at', { ascending: false });
+      const { data: apps, error: appErr } = await sb.from('job_applications').select('*').in('job_id', jobIds).order('updated_at', { ascending: false });
+      if (appErr) toast('Failed to load applications: ' + appErr.message);
       applications = apps || [];
     } else {
       applications = [];

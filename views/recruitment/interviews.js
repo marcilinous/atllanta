@@ -27,11 +27,14 @@ export default async function interviewsView(container) {
     window.location.hash = '#/recruitment';
   });
 
-  const [{ data: jobs }, { data: candidates }, { data: apps }] = await Promise.all([
+  const [{ data: jobs, error: jobsErr }, { data: candidates, error: candsErr }, { data: apps, error: appsErr }] = await Promise.all([
     sb.from('jobs').select('*').eq(orgCol, cid),
     sb.from('candidates').select('*').eq(orgCol, cid),
     sb.from('job_applications').select('*').in('status', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
   ]);
+  if (jobsErr) toast('Failed to load jobs: ' + jobsErr.message);
+  if (candsErr) toast('Failed to load candidates: ' + candsErr.message);
+  if (appsErr) toast('Failed to load applications: ' + appsErr.message);
 
   const allJobs = jobs || [];
   const allCands = candidates || [];
