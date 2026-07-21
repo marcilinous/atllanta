@@ -261,10 +261,26 @@ export default async function employeeProfile(container) {
             <td style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(f.mime_type || '—')}</td>
             <td style="font-size:var(--text-xs)">${size}</td>
             <td style="font-size:var(--text-xs);color:var(--color-text-secondary)">${formatDate(f.created_at)}</td>
-            <td><button class="btn btn-ghost btn-sm" data-del-doc="${f.id}" data-path="${esc(f.file_path)}">Delete</button></td>
+            <td style="display:flex;gap:var(--space-1)">
+              <button class="btn btn-ghost btn-sm" data-dl-doc="${esc(f.file_path)}" data-dl-name="${esc(f.file_name)}">Download</button>
+              <button class="btn btn-ghost btn-sm" data-del-doc="${f.id}" data-path="${esc(f.file_path)}">Delete</button>
+            </td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
+
+      listEl.querySelectorAll('[data-dl-doc]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const { data, error } = await sb.storage.from('documents').download(btn.dataset.dlDoc);
+          if (error) { toast('Download failed: ' + error.message); return; }
+          const url = URL.createObjectURL(data);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = btn.dataset.dlName || 'document';
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      });
 
       listEl.querySelectorAll('[data-del-doc]').forEach(btn => {
         btn.addEventListener('click', async () => {

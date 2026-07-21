@@ -8,7 +8,7 @@ const recipes = {
     const { employee_id, org_id } = event.payload;
     const { data: leaveTypes } = await sb
       .from("leave_types")
-      .select("id")
+      .select("id, annual_quota")
       .eq("org_id", org_id)
       .eq("is_active", true);
 
@@ -19,7 +19,7 @@ const recipes = {
         user_id: employee_id,
         leave_type_id: lt.id,
         year,
-        opening_balance: 0,
+        opening_balance: lt.annual_quota || 0,
         accrued: 0,
         used: 0,
       }));
@@ -28,15 +28,46 @@ const recipes = {
       });
     }
 
-    await createNotification(sb, {
-      org_id,
-      user_id: event.actor_id,
-      title: "New employee added",
-      body: `A new team member has been added to the organization.`,
-      module: "people",
-      entity_type: "employee",
-      entity_id: employee_id,
-    });
+    const { data: emp } = await sb
+      .from("users")
+      .select("full_name, reporting_manager_id")
+      .eq("id", employee_id)
+      .maybeSingle();
+    const empName = emp?.full_name || "A new team member";
+
+    if (emp?.reporting_manager_id) {
+      await createNotification(sb, {
+        org_id,
+        user_id: emp.reporting_manager_id,
+        title: "New team member",
+        body: `${empName} has been added to your team.`,
+        module: "people",
+        entity_type: "employee",
+        entity_id: employee_id,
+      });
+    }
+
+    const { data: hrUsers } = await sb
+      .from("users")
+      .select("id")
+      .eq("org_id", org_id)
+      .in("role", ["owner", "admin"]);
+    if (hrUsers?.length) {
+      const notifications = hrUsers
+        .filter((u) => u.id !== event.actor_id && u.id !== emp?.reporting_manager_id)
+        .map((u) => ({
+          org_id,
+          user_id: u.id,
+          title: "New employee added",
+          body: `${empName} has been added to the organization.`,
+          module: "people",
+          entity_type: "employee",
+          entity_id: employee_id,
+          channel: "in_app",
+          status: "unread",
+        }));
+      if (notifications.length) await sb.from("notifications").insert(notifications);
+    }
   },
 
   "leave.request.created": async (sb, event) => {
@@ -44,22 +75,50 @@ const recipes = {
 
     const { data: requester } = await sb
       .from("users")
-      .select("full_name, email")
+      .select("full_name, email, reporting_manager_id")
       .eq("id", user_id)
       .maybeSingle();
+    const name = requester?.full_name || requester?.email || "An employee";
 
-    const { data: managers } = await sb
-      .from("users")
-      .select("id")
-      .eq("org_id", org_id)
-      .in("role", ["owner", "admin", "manager"]);
+    const { data: leaveReq } = await sb
+      .from("leave_requests")
+      .select("days")
+      .eq("id", leave_request_id)
+      .maybeSingle();
+    const days = parseFloat(leaveReq?.days || 0);
 
-    if (managers?.length) {
-      const notifications = managers.map((m) => ({
+    const notifyIds = new Set();
+
+    if (requester?.reporting_manager_id) {
+      notifyIds.add(requester.reporting_manager_id);
+    }
+
+    if (days > 3) {
+      const { data: hrUsers } = await sb
+        .from("users")
+        .select("id")
+        .eq("org_id", org_id)
+        .in("role", ["owner", "admin"]);
+      (hrUsers || []).forEach((u) => notifyIds.add(u.id));
+    }
+
+    if (!notifyIds.size) {
+      const { data: managers } = await sb
+        .from("users")
+        .select("id")
+        .eq("org_id", org_id)
+        .in("role", ["owner", "admin", "manager"]);
+      (managers || []).forEach((u) => notifyIds.add(u.id));
+    }
+
+    notifyIds.delete(user_id);
+
+    if (notifyIds.size) {
+      const notifications = [...notifyIds].map((uid) => ({
         org_id,
-        user_id: m.id,
+        user_id: uid,
         title: "New leave request",
-        body: `${requester?.full_name || requester?.email || "An employee"} has requested leave.`,
+        body: `${name} has requested ${days} day${days !== 1 ? "s" : ""} of leave.`,
         module: "leave",
         entity_type: "leave_request",
         entity_id: leave_request_id,
@@ -81,13 +140,36 @@ const recipes = {
       .eq("user_id", user_id)
       .eq("leave_type_id", leave_type_id)
       .eq("year", year)
-      .single();
+      .maybeSingle();
 
     if (balance) {
       await sb
         .from("leave_balances")
         .update({ used: (parseFloat(balance.used) || 0) + parseFloat(days) })
         .eq("id", balance.id);
+    }
+
+    const { data: leaveReq } = await sb
+      .from("leave_requests")
+      .select("start_date, end_date")
+      .eq("id", leave_request_id)
+      .maybeSingle();
+
+    if (leaveReq) {
+      const start = new Date(leaveReq.start_date);
+      const end = new Date(leaveReq.end_date);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split("T")[0];
+        await sb.from("attendance").upsert(
+          {
+            org_id,
+            user_id,
+            date: dateStr,
+            status: "on_leave",
+          },
+          { onConflict: "user_id,date" }
+        );
+      }
     }
 
     await createNotification(sb, {

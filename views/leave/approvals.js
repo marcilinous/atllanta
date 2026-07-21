@@ -72,7 +72,7 @@ export default async function leaveApprovals(container) {
           .eq('id', id);
         if (error) { toast(error.message, 'error'); btn.disabled = false; return; }
         await logAction('leave', 'leave_request', id, 'approved', { status: 'pending' }, { status: 'approved' });
-        await publishEvent('leave.request.approved', { leave_request_id: id, approved_by: user.id });
+        await publishEvent('leave.request.approved', { leave_request_id: id, user_id: btn.dataset.uid, org_id: org.id, days: btn.dataset.days, leave_type_id: btn.dataset.ltid, approved_by: user.id });
         toast('Leave approved', 'success');
         loadApprovals();
       });

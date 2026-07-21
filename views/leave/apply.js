@@ -22,6 +22,7 @@ export default async function leaveModule(container) {
       <a href="#/leave/balances" class="tab" style="text-decoration:none">Balances</a>
       <a href="#/leave/calendar" class="tab" style="text-decoration:none">Team Calendar</a>
       ${isManager ? '<a href="#/leave/approvals" class="tab" style="text-decoration:none">Approvals</a>' : ''}
+      ${isManager ? '<a href="#/leave/report" class="tab" style="text-decoration:none">Report</a>' : ''}
       ${isManager ? '<a href="#/leave/settings" class="tab" style="text-decoration:none">Settings</a>' : ''}
     </div>
     <div id="leave-content" style="margin-top:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div>
@@ -120,7 +121,7 @@ export default async function leaveModule(container) {
 
       if (error) { msg.textContent = error.message; msg.style.color = 'var(--color-error)'; msg.classList.remove('hidden'); return; }
       await logAction('leave', 'leave_request', data.id, 'created', null, { start_date: startDate, end_date: endDate, days });
-      await publishEvent('leave.request.created', { leave_request_id: data.id });
+      await publishEvent('leave.request.created', { leave_request_id: data.id, user_id: user.id, org_id: org.id });
       msg.textContent = 'Leave request submitted!'; msg.style.color = 'var(--color-success)'; msg.classList.remove('hidden');
       e.target.reset();
     });
@@ -187,7 +188,7 @@ export default async function leaveModule(container) {
               ${r.reason ? `<div style="font-size:var(--text-sm);color:var(--color-text-tertiary);margin-top:var(--space-1)">${esc(r.reason)}</div>` : ''}
             </div>
             <div style="display:flex;gap:var(--space-2)">
-              <button class="btn btn-primary btn-sm" data-approve="${r.id}">Approve</button>
+              <button class="btn btn-primary btn-sm" data-approve="${r.id}" data-uid="${r.user_id}" data-ltid="${r.leave_type_id}" data-days="${r.days}">Approve</button>
               <button class="btn btn-danger btn-sm" data-reject="${r.id}">Reject</button>
             </div>
           </div>
@@ -202,7 +203,7 @@ export default async function leaveModule(container) {
         }).eq('id', btn.dataset.approve);
         if (error) { toast('Failed: ' + error.message); return; }
         await logAction('leave', 'leave_request', btn.dataset.approve, 'approved', { status: 'pending' }, { status: 'approved' });
-        await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.approve, approved_by: user.id });
+        await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.approve, user_id: btn.dataset.uid, org_id: org.id, days: btn.dataset.days, leave_type_id: btn.dataset.ltid, approved_by: user.id });
         toast('Leave approved');
         renderApprovals(el);
       });

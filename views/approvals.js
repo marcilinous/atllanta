@@ -86,7 +86,7 @@ export default async function approvalsInbox(container) {
         <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.reason || '—')}</td>
         <td>
           <div style="display:flex;gap:var(--space-1)">
-            <button class="btn btn-primary btn-sm" data-action="approve-leave" data-id="${r.id}">Approve</button>
+            <button class="btn btn-primary btn-sm" data-action="approve-leave" data-id="${r.id}" data-uid="${r.user_id}" data-ltid="${r.leave_type_id}" data-days="${r.days}">Approve</button>
             <button class="btn btn-secondary btn-sm" data-action="reject-leave" data-id="${r.id}">Reject</button>
           </div>
         </td>
@@ -102,7 +102,7 @@ export default async function approvalsInbox(container) {
         }).eq('id', btn.dataset.id);
         if (error) return toast(error.message);
         await logAction('leave', 'leave_request', btn.dataset.id, 'approved', { status: 'pending' }, { status: 'approved' });
-        await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.id, approved_by: user.id });
+        await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.id, user_id: btn.dataset.uid, org_id: org.id, days: btn.dataset.days, leave_type_id: btn.dataset.ltid, approved_by: user.id });
         toast('Leave approved');
         renderLeaveApprovals();
       });
