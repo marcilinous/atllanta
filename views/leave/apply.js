@@ -213,6 +213,26 @@ export default async function leaveModule(container) {
       if (halfDayCheck.checked) days = 0.5;
       if (days <= 0) return toast('No working days in selected range');
 
+      const lt = leaveTypes.find(t => t.id === leaveTypeId);
+      if (lt?.max_consecutive_days && days > lt.max_consecutive_days) {
+        return toast(`${lt.name} allows max ${lt.max_consecutive_days} consecutive days`);
+      }
+
+      const bal = myBalances.find(b => b.leave_type_id === leaveTypeId);
+      const available = bal ? parseFloat(bal.balance || 0) : 0;
+      const pendingDays = pendingByType[leaveTypeId] || 0;
+      if (bal && days > available - pendingDays) {
+        return toast(`Insufficient balance. Available: ${available - pendingDays} days`);
+      }
+
+      const startDay = new Date(startDate).getDay();
+      const endDay = new Date(endDate).getDay();
+      const sandwichWarning = (startDay === 1 && endDay === 5) || (startDay === 1 && rawDays > days) || (endDay === 5 && rawDays > days);
+      if (sandwichWarning && rawDays !== days) {
+        const sandwichDays = rawDays - days;
+        if (!confirm(`This leave spans ${sandwichDays} weekend day${sandwichDays > 1 ? 's' : ''}. Some organizations count weekends between leave days (sandwich rule). Continue?`)) return;
+      }
+
       const submitBtn = el.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
