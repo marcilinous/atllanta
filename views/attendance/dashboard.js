@@ -514,12 +514,13 @@ export default async function attendanceDashboard(container) {
     const onLeave = teamData.filter(a => a.status === 'on_leave').length;
 
     el.innerHTML = `<div class="card">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
         <span class="card-title">Team Attendance — Today</span>
-        <div style="display:flex;gap:var(--space-3);font-size:var(--text-sm)">
+        <div style="display:flex;gap:var(--space-3);font-size:var(--text-sm);align-items:center">
           <span style="color:var(--color-success);font-weight:var(--font-weight-semibold)">${present} present</span>
           <span style="color:var(--color-error)">${absent} absent</span>
           <span style="color:var(--color-info)">${onLeave} on leave</span>
+          <button class="btn btn-secondary btn-sm" id="team-export-csv">Export CSV</button>
         </div>
       </div>
       ${teamData.length ? `<div class="table-wrap"><table class="table">
@@ -541,5 +542,19 @@ export default async function attendanceDashboard(container) {
         }).join('')}</tbody>
       </table></div>` : '<div style="padding:var(--space-6);text-align:center;color:var(--color-text-tertiary)">No attendance records for today</div>'}
     </div>`;
+
+    el.querySelector('#team-export-csv')?.addEventListener('click', () => {
+      if (!teamData.length) return toast('No data to export');
+      const headers = 'Employee,Email,Check In,Check Out,Hours,Status\n';
+      const rows = teamData.map(a =>
+        `"${a.user?.full_name || ''}","${a.user?.email || ''}","${a.check_in || ''}","${a.check_out || ''}","${a.total_hours || ''}","${a.status || ''}"`
+      ).join('\n');
+      const blob = new Blob([headers + rows], { type: 'text/csv' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `team_attendance_${todayStr}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
   }
 }

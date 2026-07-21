@@ -1,8 +1,9 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
-import { esc, toast, initials, avColor, formatDate } from '../../js/ui.js';
+import { esc, toast, initials, avColor, formatDate, openModal, closeModal } from '../../js/ui.js';
 import { navigate, routeParams } from '../../js/router.js';
 import { logAction } from '../../js/audit.js';
+import { publishEvent } from '../../js/events.js';
 
 export default async function employeeProfile(container) {
   const org = getOrg();
@@ -35,6 +36,8 @@ export default async function employeeProfile(container) {
     return;
   }
 
+  const membership = getMembership();
+  const isAdmin = membership && ['owner', 'admin', 'manager'].includes(membership.role);
   const statusColors = { active: 'success', on_notice: 'warning', exited: 'error' };
   const roleColors = { owner: 'error', admin: 'warning', manager: 'info', member: 'neutral' };
 
@@ -50,9 +53,10 @@ export default async function employeeProfile(container) {
           <p class="page-subtitle" style="margin:0;margin-top:var(--space-1)">${esc(emp.designation || '—')}</p>
         </div>
       </div>
-      <div style="display:flex;gap:var(--space-2)">
+      <div style="display:flex;gap:var(--space-2);align-items:center">
         <span class="badge badge-${roleColors[emp.role] || 'neutral'}">${esc(emp.role || 'member')}</span>
         <span class="badge badge-${statusColors[emp.status] || 'neutral'}"><span class="badge-dot"></span>${esc(emp.status || 'active')}</span>
+        ${isAdmin ? '<button class="btn btn-secondary btn-sm" id="edit-emp-btn">Edit</button>' : ''}
       </div>
     </div>
 
@@ -120,6 +124,95 @@ export default async function employeeProfile(container) {
 
   // Back button
   document.getElementById('back-btn').addEventListener('click', () => navigate('employees'));
+
+  // Edit employee
+  if (isAdmin) {
+    document.getElementById('edit-emp-btn')?.addEventListener('click', async () => {
+      const { data: depts } = await sb.from('departments').select('id, name').order('name');
+      const { data: managers } = await sb.from('users').select('id, full_name').neq('id', empId).order('full_name');
+
+      const f = document.createElement('div');
+      f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+        <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="ed-name" value="${esc(emp.full_name || '')}"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="ed-email" value="${esc(emp.email || '')}"></div>
+          <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" id="ed-phone" value="${esc(emp.phone || '')}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Designation</label><input type="text" class="form-input" id="ed-designation" value="${esc(emp.designation || '')}"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="form-group"><label class="form-label">Department</label>
+            <select class="form-input" id="ed-dept">
+              <option value="">None</option>
+              ${(depts || []).map(d => `<option value="${d.id}"${d.id === emp.department_id ? ' selected' : ''}>${esc(d.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Role</label>
+            <select class="form-input" id="ed-role">
+              ${['member', 'manager', 'admin', 'owner'].map(r => `<option value="${r}"${r === emp.role ? ' selected' : ''}>${r}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-input" id="ed-status">
+              ${['active', 'on_notice', 'exited'].map(s => `<option value="${s}"${s === emp.status ? ' selected' : ''}>${s.replace('_', ' ')}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Date of Joining</label><input type="date" class="form-input" id="ed-doj" value="${emp.date_of_joining || ''}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Reporting Manager</label>
+          <select class="form-input" id="ed-manager">
+            <option value="">None</option>
+            ${(managers || []).map(m => `<option value="${m.id}"${m.id === emp.reporting_manager_id ? ' selected' : ''}>${esc(m.full_name)}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-primary" id="ed-save">Save Changes</button>
+      </div>`;
+
+      openModal('Edit Employee', f);
+
+      f.querySelector('#ed-save').addEventListener('click', async () => {
+        const name = f.querySelector('#ed-name').value.trim();
+        const email = f.querySelector('#ed-email').value.trim();
+        if (!name || !email) return toast('Name and email are required');
+
+        const btn = f.querySelector('#ed-save');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        const updates = {
+          full_name: name,
+          email,
+          phone: f.querySelector('#ed-phone').value.trim() || null,
+          designation: f.querySelector('#ed-designation').value.trim() || null,
+          department_id: f.querySelector('#ed-dept').value || null,
+          role: f.querySelector('#ed-role').value,
+          status: f.querySelector('#ed-status').value,
+          date_of_joining: f.querySelector('#ed-doj').value || null,
+          reporting_manager_id: f.querySelector('#ed-manager').value || null,
+        };
+
+        const oldValues = {};
+        for (const key of Object.keys(updates)) {
+          if (emp[key] !== updates[key]) oldValues[key] = emp[key];
+        }
+
+        const { error: updateErr } = await sb.from('users').update(updates).eq('id', empId);
+        if (updateErr) {
+          toast('Failed: ' + updateErr.message);
+          btn.disabled = false;
+          btn.textContent = 'Save Changes';
+          return;
+        }
+
+        await logAction('people', 'employee', empId, 'updated', oldValues, updates);
+        await publishEvent('people.employee.updated', { employee_id: empId, changes: Object.keys(oldValues) });
+        closeModal();
+        toast('Employee updated');
+        employeeProfile(container);
+      });
+    });
+  }
 
   // Tab logic
   let currentTab = 'attendance';

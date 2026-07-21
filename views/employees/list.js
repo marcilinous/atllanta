@@ -169,7 +169,9 @@ export default async function employeeList(container) {
         if (!ids.length) return;
         for (const id of ids) {
           await sb.from('users').update({ status: 'active' }).eq('id', id);
+          await logAction('people', 'employee', id, 'updated', { status: 'exited' }, { status: 'active' });
         }
+        await publishEvent('people.employees.bulk_status_changed', { employee_ids: ids, new_status: 'active', org_id: org.id });
         toast(`${ids.length} employee${ids.length > 1 ? 's' : ''} set to active`);
         const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
         allEmployees = refreshed || [];
@@ -181,7 +183,9 @@ export default async function employeeList(container) {
         if (!ids.length) return;
         for (const id of ids) {
           await sb.from('users').update({ status: 'exited' }).eq('id', id);
+          await logAction('people', 'employee', id, 'updated', { status: 'active' }, { status: 'exited' });
         }
+        await publishEvent('people.employees.bulk_status_changed', { employee_ids: ids, new_status: 'exited', org_id: org.id });
         toast(`${ids.length} employee${ids.length > 1 ? 's' : ''} set to exited`);
         const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
         allEmployees = refreshed || [];
@@ -206,6 +210,7 @@ export default async function employeeList(container) {
           const deptId = f.querySelector('#bulk-dept-select').value || null;
           for (const id of ids) {
             await sb.from('users').update({ department_id: deptId }).eq('id', id);
+            await logAction('people', 'employee', id, 'updated', null, { department_id: deptId });
           }
           closeModal();
           toast(`Department updated for ${ids.length} employee${ids.length > 1 ? 's' : ''}`);
