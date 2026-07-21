@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, initials, avColor, formatDate, timeAgo } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function settingsUsers(container) {
   const user = getUser();
@@ -118,12 +119,14 @@ export default async function settingsUsers(container) {
         select.addEventListener('change', async () => {
           const memberId = select.dataset.roleChange;
           const newRole = select.value;
+          const member = allMembers.find(m => m.id === memberId);
           const { error } = await sb.from('memberships').update({ role: newRole }).eq('id', memberId);
           if (error) {
             toast('Failed to update role: ' + error.message);
             loadMembers();
             return;
           }
+          await logAction('people', 'membership', memberId, 'role_changed', { role: member?.role }, { role: newRole });
           toast('Role updated');
         });
       });
@@ -133,11 +136,13 @@ export default async function settingsUsers(container) {
         btn.addEventListener('click', async () => {
           if (!confirm('Remove this member from the organization?')) return;
           const memberId = btn.dataset.removeMember;
+          const member = allMembers.find(m => m.id === memberId);
           const { error } = await sb.from('memberships').delete().eq('id', memberId);
           if (error) {
             toast('Failed to remove member: ' + error.message);
             return;
           }
+          await logAction('people', 'membership', memberId, 'removed', { email: member?.email, role: member?.role }, null);
           toast('Member removed');
           loadMembers();
         });
@@ -211,6 +216,7 @@ export default async function settingsUsers(container) {
           return;
         }
 
+        await logAction('people', 'membership', null, 'invited', null, { email, role });
         await publishEvent('people.member.invited', { email, role });
         closeModal();
         toast('Invite sent to ' + email);

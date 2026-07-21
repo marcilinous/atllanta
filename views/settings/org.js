@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function settingsOrg(container) {
   const org = getOrg();
@@ -72,8 +73,9 @@ export default async function settingsOrg(container) {
         const newName = document.getElementById('org-name-edit').value.trim();
         if (!newName) return;
         const { error } = await sb.from('organizations').update({ name: newName }).eq('id', org.id);
-        if (error) toast('Error: ' + error.message);
-        else toast('Organization updated');
+        if (error) { toast('Error: ' + error.message); return; }
+        await logAction('people', 'organization', org.id, 'updated', { name: org.name }, { name: newName });
+        toast('Organization updated');
       });
     }
   }
@@ -125,6 +127,7 @@ export default async function settingsOrg(container) {
           if (!name) return toast('Name required');
           const { error } = await sb.from('departments').insert({ org_id: org.id, name });
           if (error) return toast(error.message);
+          await logAction('people', 'department', null, 'created', null, { name });
           closeModal(); toast('Department added'); renderDepartments();
         });
       });
@@ -142,6 +145,7 @@ export default async function settingsOrg(container) {
             if (!name) return toast('Name required');
             const { error } = await sb.from('teams').insert({ org_id: org.id, department_id: btn.dataset.addTeam, name });
             if (error) return toast(error.message);
+            await logAction('people', 'team', null, 'created', null, { name });
             closeModal(); toast('Team added'); renderDepartments();
           });
         });
@@ -152,6 +156,7 @@ export default async function settingsOrg(container) {
           if (!confirm('Delete this department?')) return;
           const { error } = await sb.from('departments').delete().eq('id', btn.dataset.delDept);
           if (error) return toast(error.message);
+          await logAction('people', 'department', btn.dataset.delDept, 'deleted', null, null);
           toast('Department deleted'); renderDepartments();
         });
       });
@@ -161,6 +166,7 @@ export default async function settingsOrg(container) {
           if (!confirm('Delete this team?')) return;
           const { error } = await sb.from('teams').delete().eq('id', btn.dataset.delTeam);
           if (error) return toast(error.message);
+          await logAction('people', 'team', btn.dataset.delTeam, 'deleted', null, null);
           toast('Team deleted'); renderDepartments();
         });
       });
@@ -215,6 +221,7 @@ export default async function settingsOrg(container) {
             is_paid: f.querySelector('#lt-paid').checked,
           });
           if (error) return toast(error.message);
+          await logAction('leave', 'leave_type', null, 'created', null, { name, code });
           closeModal(); toast('Leave type added'); renderLeaveTypes();
         });
       });
@@ -224,6 +231,7 @@ export default async function settingsOrg(container) {
           if (!confirm('Delete this leave type?')) return;
           const { error } = await sb.from('leave_types').delete().eq('id', btn.dataset.delLt);
           if (error) return toast(error.message);
+          await logAction('leave', 'leave_type', btn.dataset.delLt, 'deleted', null, null);
           toast('Leave type deleted'); renderLeaveTypes();
         });
       });
@@ -273,6 +281,7 @@ export default async function settingsOrg(container) {
             year: new Date(date).getFullYear(),
           });
           if (error) return toast(error.message);
+          await logAction('leave', 'holiday', null, 'created', null, { name, date });
           closeModal(); toast('Holiday added'); renderHolidays();
         });
       });
@@ -282,6 +291,7 @@ export default async function settingsOrg(container) {
           if (!confirm('Delete this holiday?')) return;
           const { error } = await sb.from('holidays').delete().eq('id', btn.dataset.delHol);
           if (error) return toast(error.message);
+          await logAction('leave', 'holiday', btn.dataset.delHol, 'deleted', null, null);
           toast('Holiday deleted'); renderHolidays();
         });
       });
@@ -338,6 +348,7 @@ export default async function settingsOrg(container) {
             is_default: f.querySelector('#ws-default').checked,
           });
           if (error) return toast(error.message);
+          await logAction('attendance', 'work_schedule', null, 'created', null, { name });
           closeModal(); toast('Schedule added'); renderSchedules();
         });
       });
@@ -347,6 +358,7 @@ export default async function settingsOrg(container) {
           if (!confirm('Delete this schedule?')) return;
           const { error } = await sb.from('work_schedules').delete().eq('id', btn.dataset.delWs);
           if (error) return toast(error.message);
+          await logAction('attendance', 'work_schedule', btn.dataset.delWs, 'deleted', null, null);
           toast('Schedule deleted'); renderSchedules();
         });
       });
