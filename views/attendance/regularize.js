@@ -239,7 +239,8 @@ export default async function regularizeView(container) {
             const diff = (new Date(attUpdate.check_out) - new Date(attUpdate.check_in)) / 3600000;
             attUpdate.total_hours = Math.round(diff * 100) / 100;
           }
-          await sb.from('attendance').update(attUpdate).eq('id', attId);
+          const { error: attErr } = await sb.from('attendance').update(attUpdate).eq('id', attId);
+          if (attErr) { toast('Failed to update attendance: ' + attErr.message); return; }
         }
 
         await logAction('attendance', 'regularization', regId, 'approved', { status: 'pending' }, { status: 'approved' });

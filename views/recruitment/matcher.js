@@ -136,18 +136,20 @@ export default async function matcherView(container) {
         .select('id').eq('job_id', jobId).eq('candidate_id', c.id).maybeSingle();
 
       if (existing) {
-        await sb.from('job_applications').update({
+        const { error } = await sb.from('job_applications').update({
           match_score: totalScore,
           match_breakdown: { skills_match: Math.round(skillsScore / 0.7), nice_to_have_match: Math.round(niceScore / 0.3), overall: totalScore },
           match_method: 'tfidf',
         }).eq('id', existing.id);
+        if (error) { toast('Failed to update match: ' + error.message); continue; }
       } else {
-        await sb.from('job_applications').insert({
+        const { error } = await sb.from('job_applications').insert({
           [orgCol]: cid, job_id: jobId, candidate_id: c.id,
           match_score: totalScore,
           match_breakdown: { skills_match: Math.round(skillsScore / 0.7), nice_to_have_match: Math.round(niceScore / 0.3), overall: totalScore },
           match_method: 'tfidf', status: 'applied',
         });
+        if (error) { toast('Failed to insert match: ' + error.message); continue; }
       }
       matched++;
     }

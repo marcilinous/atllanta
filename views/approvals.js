@@ -194,7 +194,8 @@ export default async function approvalsInbox(container) {
         if (btn.dataset.reqOut) attUpdate.check_out = btn.dataset.reqOut;
         if (Object.keys(attUpdate).length) {
           attUpdate.status = 'present';
-          await sb.from('attendance').update(attUpdate).eq('id', btn.dataset.attId);
+          const { error: attErr } = await sb.from('attendance').update(attUpdate).eq('id', btn.dataset.attId);
+          if (attErr) { toast('Failed to update attendance: ' + attErr.message); return; }
         }
         await logAction('attendance', 'regularization', btn.dataset.id, 'approved', { status: 'pending' }, { status: 'approved' });
         await publishEvent('attendance.regularization.approved', { regularization_id: btn.dataset.id });

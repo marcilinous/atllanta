@@ -1,4 +1,4 @@
-const CACHE_NAME = "atllanta-v3";
+const CACHE_NAME = "atllanta-v4";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

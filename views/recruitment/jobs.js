@@ -351,7 +351,8 @@ export default async function recruitmentJobs(container) {
             const { data: existing } = await q.maybeSingle();
             if (existing) {
               candId = existing.id;
-              await sb.from('candidates').update({ resume_text: parseData.text, full_name: name }).eq('id', candId);
+              const { error: updErr } = await sb.from('candidates').update({ resume_text: parseData.text, full_name: name }).eq('id', candId);
+              if (updErr) throw updErr;
             }
           }
 
@@ -371,7 +372,8 @@ export default async function recruitmentJobs(container) {
             const { data: existingApp } = await sb.from('job_applications')
               .select('id').eq('job_id', jobId).eq('candidate_id', candId).maybeSingle();
             if (!existingApp) {
-              await sb.from('job_applications').insert({ job_id: jobId, candidate_id: candId });
+              const { error: appErr } = await sb.from('job_applications').insert({ job_id: jobId, candidate_id: candId });
+              if (appErr) throw appErr;
             }
           }
 

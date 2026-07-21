@@ -224,7 +224,7 @@ export default async function onboarding(container) {
       }
 
       for (const lt of leaveTypes) {
-        await sb.from('leave_types').upsert({
+        const { error: ltErr } = await sb.from('leave_types').upsert({
           org_id: org.id,
           name: lt.name,
           code: lt.code,
@@ -232,16 +232,18 @@ export default async function onboarding(container) {
           is_paid: lt.is_paid,
           is_active: true,
         }, { onConflict: 'org_id,code' });
+        if (ltErr) toast('Leave type error: ' + ltErr.message);
       }
 
       for (const inv of invites) {
-        await sb.from('memberships').insert({
+        const { error: invErr } = await sb.from('memberships').insert({
           organization_id: org.id,
           user_id: null,
           email: inv.email,
           role: inv.role,
           status: 'invited',
         }).select().maybeSingle();
+        if (invErr) toast('Invite error: ' + invErr.message);
       }
     }
 

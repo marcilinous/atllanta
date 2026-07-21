@@ -87,7 +87,8 @@ export default async function departmentsView(container) {
       el.querySelectorAll('[data-delete-dept]').forEach(btn => {
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this department and its teams?')) return;
-          await sb.from('teams').delete().eq('department_id', btn.dataset.deleteDept);
+          const { error: teamErr } = await sb.from('teams').delete().eq('department_id', btn.dataset.deleteDept);
+          if (teamErr) { toast('Failed to delete teams: ' + teamErr.message); return; }
           const { error } = await sb.from('departments').delete().eq('id', btn.dataset.deleteDept);
           if (error) { toast('Failed: ' + error.message); return; }
           await logAction('people', 'department', btn.dataset.deleteDept, 'deleted', null, null);
