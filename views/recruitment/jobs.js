@@ -26,11 +26,14 @@ export default async function recruitmentJobs(container) {
         <button class="btn btn-primary" id="create-job-btn">+ New Job</button>
       </div>
     </div>
-    <div class="tabs" id="job-tabs">
-      <button class="tab active" data-filter="all">All</button>
-      <button class="tab" data-filter="open">Open</button>
-      <button class="tab" data-filter="paused">Paused</button>
-      <button class="tab" data-filter="closed">Closed</button>
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+      <div class="tabs" id="job-tabs" style="flex:1;min-width:0">
+        <button class="tab active" data-filter="all">All</button>
+        <button class="tab" data-filter="open">Open</button>
+        <button class="tab" data-filter="paused">Paused</button>
+        <button class="tab" data-filter="closed">Closed</button>
+      </div>
+      <input type="text" class="form-input" id="job-search" placeholder="Search jobs..." style="max-width:220px;height:34px">
     </div>
     <div id="jobs-grid" style="display:grid;gap:var(--space-4);margin-top:var(--space-4)">
       <div class="skeleton skeleton-text" style="height:80px;border-radius:var(--radius-lg)"></div>
@@ -68,9 +71,12 @@ export default async function recruitmentJobs(container) {
 
   await loadData();
 
+  let searchTerm = '';
+
   function renderJobs() {
     const grid = document.getElementById('jobs-grid');
-    const filtered = filter === 'all' ? jobs : jobs.filter(j => j.status === filter);
+    let filtered = filter === 'all' ? jobs : jobs.filter(j => j.status === filter);
+    if (searchTerm) filtered = filtered.filter(j => (j.title || '').toLowerCase().includes(searchTerm) || (j.location || '').toLowerCase().includes(searchTerm));
 
     if (!filtered.length) {
       grid.innerHTML = `<div class="empty-state">
@@ -143,7 +149,7 @@ export default async function recruitmentJobs(container) {
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
               <div style="flex:1;min-width:0">
                 <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">${esc(j.title)}</div>
-                <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:var(--space-1)">${esc(j.description || '')}</div>
+                <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:var(--space-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.location ? esc(j.location) + ' · ' : ''}${j.employment_type ? esc(j.employment_type.replace('_', ' ')) + ' · ' : ''}${esc((j.description || '').slice(0, 80))}</div>
               </div>
               ${stagePill(j.status)}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="flex-shrink:0;transition:transform .2s;${isExpanded ? 'transform:rotate(180deg)' : ''}"><polyline points="6 9 12 15 18 9"/></svg>
@@ -196,6 +202,11 @@ export default async function recruitmentJobs(container) {
     document.querySelectorAll('#job-tabs .tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     filter = tab.dataset.filter;
+    renderJobs();
+  });
+
+  document.getElementById('job-search').addEventListener('input', (e) => {
+    searchTerm = e.target.value.toLowerCase();
     renderJobs();
   });
 

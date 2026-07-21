@@ -136,8 +136,17 @@ export default async function leaveModule(container) {
               <div class="form-group"><label class="form-label">Start Date</label><input type="date" class="form-input" id="leave-start" required></div>
               <div class="form-group"><label class="form-label">End Date</label><input type="date" class="form-input" id="leave-end" required></div>
             </div>
-            <div id="leave-days-preview" style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-3)"></div>
+            <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-3)">
+              <div id="leave-days-preview" style="font-size:var(--text-sm);color:var(--color-text-secondary);flex:1"></div>
+              <label style="display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);cursor:pointer;white-space:nowrap">
+                <input type="checkbox" id="leave-half-day"> Half day
+              </label>
+            </div>
             <div class="form-group"><label class="form-label">Reason</label><textarea class="form-input" id="leave-reason" rows="3" placeholder="Optional reason..."></textarea></div>
+            <div class="form-group" id="leave-doc-group" style="display:none">
+              <label class="form-label">Attachment <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">(medical certificate, etc.)</span></label>
+              <input type="file" class="form-input" id="leave-doc" accept=".pdf,.jpg,.jpeg,.png" style="padding:var(--space-2)">
+            </div>
             <button type="submit" class="btn btn-primary" style="width:100%">Submit Request</button>
           </form>
         </div>
@@ -146,38 +155,82 @@ export default async function leaveModule(container) {
     const startInput = el.querySelector('#leave-start');
     const endInput = el.querySelector('#leave-end');
     const preview = el.querySelector('#leave-days-preview');
+    const halfDayCheck = el.querySelector('#leave-half-day');
+    const typeSelect = el.querySelector('#leave-type');
+    const docGroup = el.querySelector('#leave-doc-group');
+
+    function countWorkingDays(start, end) {
+      let count = 0;
+      const d = new Date(start);
+      const e = new Date(end);
+      while (d <= e) {
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) count++;
+        d.setDate(d.getDate() + 1);
+      }
+      return count;
+    }
 
     function updatePreview() {
       const s = startInput.value;
       const e = endInput.value;
       if (s && e) {
-        const days = (new Date(e) - new Date(s)) / 86400000 + 1;
-        if (days > 0) preview.textContent = `${days} day${days !== 1 ? 's' : ''}`;
-        else preview.textContent = 'End date must be after start date';
+        const rawDays = (new Date(e) - new Date(s)) / 86400000 + 1;
+        if (rawDays <= 0) { preview.textContent = 'End date must be after start date'; return; }
+        let workDays = countWorkingDays(s, e);
+        const isHalf = halfDayCheck.checked;
+        if (isHalf && s === e) workDays = 0.5;
+        else if (isHalf) workDays = Math.max(0.5, workDays - 0.5);
+        const skipped = rawDays - (isHalf ? workDays : countWorkingDays(s, e));
+        preview.innerHTML = `<strong>${workDays}</strong> working day${workDays !== 1 ? 's' : ''}` +
+          (skipped > 0 ? ` <span style="color:var(--color-text-tertiary)">(${skipped} weekend${skipped > 1 ? 's' : ''} excluded)</span>` : '');
       } else {
         preview.textContent = '';
       }
     }
     startInput.addEventListener('change', updatePreview);
     endInput.addEventListener('change', updatePreview);
+    halfDayCheck.addEventListener('change', () => {
+      if (halfDayCheck.checked) endInput.value = startInput.value;
+      endInput.disabled = halfDayCheck.checked;
+      updatePreview();
+    });
+
+    typeSelect.addEventListener('change', () => {
+      const lt = leaveTypes.find(t => t.id === typeSelect.value);
+      docGroup.style.display = lt?.requires_document ? 'block' : 'none';
+    });
 
     el.querySelector('#leave-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const leaveTypeId = el.querySelector('#leave-type').value;
+      const leaveTypeId = typeSelect.value;
       const startDate = startInput.value;
-      const endDate = endInput.value;
+      const endDate = halfDayCheck.checked ? startDate : endInput.value;
       if (!leaveTypeId) return toast('Select a leave type');
-      const days = (new Date(endDate) - new Date(startDate)) / 86400000 + 1;
-      if (days <= 0) return toast('End date must be after start date');
+      const rawDays = (new Date(endDate) - new Date(startDate)) / 86400000 + 1;
+      if (rawDays <= 0) return toast('End date must be after start date');
+      let days = countWorkingDays(startDate, endDate);
+      if (halfDayCheck.checked) days = 0.5;
+      if (days <= 0) return toast('No working days in selected range');
 
       const submitBtn = el.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
+      let documentUrl = null;
+      const docFile = el.querySelector('#leave-doc')?.files?.[0];
+      if (docFile) {
+        const path = `leave-docs/${org.id}/${user.id}/${Date.now()}_${docFile.name}`;
+        const { error: upErr } = await sb.storage.from('documents').upload(path, docFile);
+        if (upErr) { toast('File upload failed: ' + upErr.message); submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; return; }
+        documentUrl = path;
+      }
+
       const { data, error } = await sb.from('leave_requests').insert({
         org_id: org.id, user_id: user.id, leave_type_id: leaveTypeId,
         start_date: startDate, end_date: endDate, days,
         reason: el.querySelector('#leave-reason').value || null,
+        document_url: documentUrl,
       }).select().single();
 
       if (error) {
@@ -192,6 +245,9 @@ export default async function leaveModule(container) {
       toast('Leave request submitted!');
       e.target.reset();
       preview.textContent = '';
+      halfDayCheck.checked = false;
+      endInput.disabled = false;
+      docGroup.style.display = 'none';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Submit Request';
 
