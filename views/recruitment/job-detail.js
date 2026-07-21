@@ -65,7 +65,7 @@ export default async function jobDetail(container) {
   if (!content) return;
 
   content.innerHTML = `
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-6)">
+    <div class="grid-2col" style="grid-template-columns:2fr 1fr">
       <div>
         <div class="card" style="margin-bottom:var(--space-4)">
           <div class="card-header"><span class="card-title">Job Details</span><span class="badge badge-${job.status === 'open' ? 'success' : job.status === 'closed' ? 'error' : 'warning'}">${job.status}</span></div>

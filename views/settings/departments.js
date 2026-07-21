@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function departmentsView(container) {
   const org = getOrg();
@@ -88,6 +89,7 @@ export default async function departmentsView(container) {
           if (!confirm('Delete this department and its teams?')) return;
           await sb.from('teams').delete().eq('department_id', btn.dataset.deleteDept);
           await sb.from('departments').delete().eq('id', btn.dataset.deleteDept);
+          await logAction('people', 'department', btn.dataset.deleteDept, 'deleted', null, null);
           toast('Department deleted');
           load();
         });
@@ -99,6 +101,7 @@ export default async function departmentsView(container) {
         btn.addEventListener('click', async () => {
           if (!confirm('Delete this team?')) return;
           await sb.from('teams').delete().eq('id', btn.dataset.deleteTeam);
+          await logAction('people', 'team', btn.dataset.deleteTeam, 'deleted', null, null);
           toast('Team deleted');
           load();
         });
@@ -120,8 +123,10 @@ export default async function departmentsView(container) {
       if (!name) return toast('Name is required');
       if (dept) {
         await sb.from('departments').update({ name }).eq('id', dept.id);
+        await logAction('people', 'department', dept.id, 'updated', { name: dept.name }, { name });
       } else {
         await sb.from('departments').insert({ org_id: org.id, name });
+        await logAction('people', 'department', null, 'created', null, { name });
       }
       closeModal();
       toast(dept ? 'Department updated' : 'Department created');
@@ -149,8 +154,10 @@ export default async function departmentsView(container) {
       if (!name || !deptId) return toast('Name and department are required');
       if (team) {
         await sb.from('teams').update({ name, department_id: deptId }).eq('id', team.id);
+        await logAction('people', 'team', team.id, 'updated', { name: team.name }, { name });
       } else {
         await sb.from('teams').insert({ org_id: org.id, name, department_id: deptId });
+        await logAction('people', 'team', null, 'created', null, { name });
       }
       closeModal();
       toast(team ? 'Team updated' : 'Team created');

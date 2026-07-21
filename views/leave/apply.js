@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, stagePill } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function leaveModule(container) {
   const user = getUser();
@@ -116,6 +117,7 @@ export default async function leaveModule(container) {
       }).select().single();
 
       if (error) { msg.textContent = error.message; msg.style.color = 'var(--color-error)'; msg.classList.remove('hidden'); return; }
+      await logAction('leave', 'leave_request', data.id, 'created', null, { start_date: startDate, end_date: endDate, days });
       await publishEvent('leave.request.created', { leave_request_id: data.id });
       msg.textContent = 'Leave request submitted!'; msg.style.color = 'var(--color-success)'; msg.classList.remove('hidden');
       e.target.reset();
@@ -151,6 +153,7 @@ export default async function leaveModule(container) {
     el.querySelectorAll('[data-cancel]').forEach(btn => {
       btn.addEventListener('click', async () => {
         await sb.from('leave_requests').update({ status: 'cancelled' }).eq('id', btn.dataset.cancel);
+        await logAction('leave', 'leave_request', btn.dataset.cancel, 'cancelled', { status: 'pending' }, { status: 'cancelled' });
         toast('Leave request cancelled');
         renderRequests(el);
       });
@@ -192,6 +195,7 @@ export default async function leaveModule(container) {
         await sb.from('leave_requests').update({
           status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString(),
         }).eq('id', btn.dataset.approve);
+        await logAction('leave', 'leave_request', btn.dataset.approve, 'approved', { status: 'pending' }, { status: 'approved' });
         await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.approve, approved_by: user.id });
         toast('Leave approved');
         renderApprovals(el);
@@ -207,10 +211,12 @@ export default async function leaveModule(container) {
         </div>`;
         openModal('Reject Leave', f);
         f.querySelector('#rej-confirm').addEventListener('click', async () => {
+          const comment = f.querySelector('#rej-comment').value || null;
           await sb.from('leave_requests').update({
             status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString(),
-            review_comment: f.querySelector('#rej-comment').value || null,
+            review_comment: comment,
           }).eq('id', btn.dataset.reject);
+          await logAction('leave', 'leave_request', btn.dataset.reject, 'rejected', { status: 'pending' }, { status: 'rejected', review_comment: comment });
           closeModal();
           toast('Leave rejected');
           renderApprovals(el);

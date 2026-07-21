@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, formatDate, initials, avColor } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function regularizeView(container) {
   const user = getUser();
@@ -159,6 +160,7 @@ export default async function regularizeView(container) {
         return;
       }
 
+      await logAction('attendance', 'regularization', attendanceId, 'created', null, { reason, requested_check_in: checkin || null, requested_check_out: checkout || null });
       await publishEvent('attendance.regularization.requested', { attendance_id: attendanceId });
       closeModal();
       toast('Regularization request submitted');
@@ -239,6 +241,7 @@ export default async function regularizeView(container) {
           await sb.from('attendance').update(attUpdate).eq('id', attId);
         }
 
+        await logAction('attendance', 'regularization', regId, 'approved', { status: 'pending' }, { status: 'approved' });
         await publishEvent('attendance.regularization.approved', { regularization_id: regId });
         toast('Regularization approved');
         renderPending(el);
@@ -250,6 +253,7 @@ export default async function regularizeView(container) {
         await sb.from('attendance_regularizations').update({
           status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString(),
         }).eq('id', btn.dataset.rejectReg);
+        await logAction('attendance', 'regularization', btn.dataset.rejectReg, 'rejected', { status: 'pending' }, { status: 'rejected' });
         await publishEvent('attendance.regularization.rejected', { regularization_id: btn.dataset.rejectReg });
         toast('Regularization rejected');
         renderPending(el);

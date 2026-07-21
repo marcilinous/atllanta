@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, formatDate } from '../../js/ui.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function leaveSettings(container) {
   const org = getOrg();
@@ -83,6 +84,7 @@ export default async function leaveSettings(container) {
       btn.addEventListener('click', async () => {
         const isActive = btn.dataset.active === 'true';
         await sb.from('leave_types').update({ is_active: !isActive }).eq('id', btn.dataset.toggleType);
+        await logAction('leave', 'leave_type', btn.dataset.toggleType, isActive ? 'deactivated' : 'activated', { is_active: isActive }, { is_active: !isActive });
         toast(isActive ? 'Leave type deactivated' : 'Leave type activated');
         renderTypes(el);
       });
@@ -129,10 +131,12 @@ export default async function leaveSettings(container) {
       if (type) {
         const { error } = await sb.from('leave_types').update(data).eq('id', type.id);
         if (error) return toast(error.message);
+        await logAction('leave', 'leave_type', type.id, 'updated', { name: type.name, code: type.code }, data);
       } else {
         data.org_id = org.id;
         const { error } = await sb.from('leave_types').insert(data);
         if (error) return toast(error.message);
+        await logAction('leave', 'leave_type', null, 'created', null, data);
       }
       closeModal();
       toast(type ? 'Leave type updated' : 'Leave type created');
@@ -186,6 +190,7 @@ export default async function leaveSettings(container) {
           year: new Date(date).getFullYear(),
         });
         if (error) return toast(error.message);
+        await logAction('leave', 'holiday', null, 'created', null, { name, date });
         closeModal();
         toast('Holiday added');
         renderHolidays(el);
@@ -196,6 +201,7 @@ export default async function leaveSettings(container) {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete this holiday?')) return;
         await sb.from('holidays').delete().eq('id', btn.dataset.deleteHoliday);
+        await logAction('leave', 'holiday', btn.dataset.deleteHoliday, 'deleted', null, null);
         toast('Holiday deleted');
         renderHolidays(el);
       });

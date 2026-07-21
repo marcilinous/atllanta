@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { esc, toast, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor, formatDate } from '../../js/ui.js';
 import { getOrg } from '../../js/auth.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function interviewsView(container) {
   const org = getOrg();
@@ -118,7 +119,9 @@ export default async function interviewsView(container) {
         </div>`;
       openModal('Update Stage', f);
       f.querySelector('#int-stage-save').addEventListener('click', async () => {
-        await sb.from('job_applications').update({ status: f.querySelector('#int-stage').value, updated_at: new Date().toISOString() }).eq('id', btn.dataset.app);
+        const newStatus = f.querySelector('#int-stage').value;
+        await sb.from('job_applications').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', btn.dataset.app);
+        await logAction('recruitment', 'job_application', btn.dataset.app, 'stage_updated', { status: app?.status }, { status: newStatus });
         closeModal();
         toast('Stage updated');
         interviewsView(container);

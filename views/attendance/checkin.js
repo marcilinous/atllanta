@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg } from '../../js/auth.js';
 import { esc, toast } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
+import { logAction } from '../../js/audit.js';
 
 export default async function checkinView(container) {
   const user = getUser();
@@ -103,6 +104,7 @@ export default async function checkinView(container) {
         check_in_lat: currentLat, check_in_lng: currentLng,
       });
       if (error) { toast('Check-in failed: ' + error.message); actionBtn.disabled = false; return; }
+      await logAction('attendance', 'attendance', null, 'check_in', null, { date: today, check_in: now });
       await publishEvent('attendance.checkin.completed', { user_id: user.id, time: now });
       toast('Checked in successfully!');
       checkinView(container);
@@ -122,6 +124,7 @@ export default async function checkinView(container) {
         check_out_lat: currentLat, check_out_lng: currentLng,
       }).eq('id', myAtt.id);
       if (error) { toast('Check-out failed: ' + error.message); actionBtn.disabled = false; return; }
+      await logAction('attendance', 'attendance', myAtt.id, 'check_out', null, { check_out: now.toISOString(), total_hours: totalHours });
       toast('Checked out successfully!');
       checkinView(container);
     };
