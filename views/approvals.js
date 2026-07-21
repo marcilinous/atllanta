@@ -176,7 +176,7 @@ export default async function approvalsInbox(container) {
           <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--text-sm)">${esc(r.reason || '—')}</td>
           <td>
             <div style="display:flex;gap:var(--space-1)">
-              <button class="btn btn-primary btn-sm" data-action="approve-reg" data-id="${r.id}" data-att-id="${r.attendance_id}" data-req-in="${r.requested_check_in || ''}" data-req-out="${r.requested_check_out || ''}">Approve</button>
+              <button class="btn btn-primary btn-sm" data-action="approve-reg" data-id="${r.id}" data-uid="${r.user_id}" data-att-id="${r.attendance_id}" data-req-in="${r.requested_check_in || ''}" data-req-out="${r.requested_check_out || ''}">Approve</button>
               <button class="btn btn-secondary btn-sm" data-action="reject-reg" data-id="${r.id}">Reject</button>
             </div>
           </td>
@@ -198,7 +198,7 @@ export default async function approvalsInbox(container) {
           if (attErr) { toast('Failed to update attendance: ' + attErr.message); return; }
         }
         await logAction('attendance', 'regularization', btn.dataset.id, 'approved', { status: 'pending' }, { status: 'approved' });
-        await publishEvent('attendance.regularization.approved', { regularization_id: btn.dataset.id });
+        await publishEvent('attendance.regularization.approved', { regularization_id: btn.dataset.id, user_id: btn.dataset.uid, org_id: org.id });
         toast('Regularization approved');
         renderRegularizations();
       });

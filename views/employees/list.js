@@ -171,8 +171,9 @@ export default async function employeeList(container) {
       btn.disabled = true;
       btn.textContent = 'Adding...';
 
+      const newId = crypto.randomUUID();
       const { error } = await sb.from('users').insert({
-        id: crypto.randomUUID(),
+        id: newId,
         org_id: org.id,
         full_name: name,
         email,
@@ -193,8 +194,8 @@ export default async function employeeList(container) {
 
       closeModal();
       toast('Employee added');
-      await logAction('people', 'employee', null, 'created', null, { full_name: name, email });
-      await publishEvent('people.employee.created', { name, email });
+      await logAction('people', 'employee', newId, 'created', null, { full_name: name, email });
+      await publishEvent('people.employee.created', { employee_id: newId, org_id: org.id, name, email });
       const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
       allEmployees = refreshed || [];
       renderTable();

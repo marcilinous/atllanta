@@ -216,7 +216,7 @@ export default async function regularizeView(container) {
               <div style="font-size:var(--text-sm);color:var(--color-text-tertiary)"><strong>Reason:</strong> ${esc(r.reason)}</div>
             </div>
             <div style="display:flex;gap:var(--space-2);flex-shrink:0">
-              <button class="btn btn-primary btn-sm" data-approve-reg="${r.id}" data-att-id="${r.attendance_id}" data-checkin="${r.requested_check_in || ''}" data-checkout="${r.requested_check_out || ''}">Approve</button>
+              <button class="btn btn-primary btn-sm" data-approve-reg="${r.id}" data-uid="${r.user_id}" data-att-id="${r.attendance_id}" data-checkin="${r.requested_check_in || ''}" data-checkout="${r.requested_check_out || ''}">Approve</button>
               <button class="btn btn-danger btn-sm" data-reject-reg="${r.id}">Reject</button>
             </div>
           </div>
@@ -247,7 +247,7 @@ export default async function regularizeView(container) {
         }
 
         await logAction('attendance', 'regularization', regId, 'approved', { status: 'pending' }, { status: 'approved' });
-        await publishEvent('attendance.regularization.approved', { regularization_id: regId });
+        await publishEvent('attendance.regularization.approved', { regularization_id: regId, user_id: btn.dataset.uid, org_id: org.id });
         toast('Regularization approved');
         renderPending(el);
       });

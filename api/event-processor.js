@@ -197,23 +197,62 @@ const recipes = {
   },
 
   "recruitment.candidate.shortlisted": async (sb, event) => {
-    const { job_id, candidate_id, org_id } = event.payload;
+    const { job_id, candidate_id, org_id, application_id } = event.payload;
 
-    const { data: job } = await sb
-      .from("jobs")
-      .select("title, created_by")
-      .eq("id", job_id)
-      .single();
+    const [{ data: job }, { data: candidate }] = await Promise.all([
+      sb.from("jobs").select("title, created_by").eq("id", job_id).single(),
+      sb.from("candidates").select("full_name").eq("id", candidate_id).maybeSingle(),
+    ]);
+
+    const candidateName = candidate?.full_name || "A candidate";
+    const jobTitle = job?.title || "a position";
 
     if (job?.created_by) {
       await createNotification(sb, {
         org_id,
         user_id: job.created_by,
-        title: "Candidate shortlisted",
-        body: `A candidate has been shortlisted for ${job.title || "a position"}.`,
+        title: "Candidate shortlisted — schedule interview",
+        body: `${candidateName} has been shortlisted for ${jobTitle}. Please schedule an interview.`,
         module: "recruitment",
         entity_type: "job_application",
-        entity_id: candidate_id,
+        entity_id: application_id || candidate_id,
+      });
+    }
+
+    const { data: hrUsers } = await sb
+      .from("users")
+      .select("id")
+      .eq("org_id", org_id)
+      .in("role", ["owner", "admin"]);
+    if (hrUsers?.length) {
+      const notifications = hrUsers
+        .filter((u) => u.id !== job?.created_by && u.id !== event.actor_id)
+        .map((u) => ({
+          org_id,
+          user_id: u.id,
+          title: "Candidate shortlisted",
+          body: `${candidateName} shortlisted for ${jobTitle}.`,
+          module: "recruitment",
+          entity_type: "job_application",
+          entity_id: application_id || candidate_id,
+          channel: "in_app",
+          status: "unread",
+        }));
+      if (notifications.length) await sb.from("notifications").insert(notifications);
+    }
+  },
+
+  "attendance.regularization.approved": async (sb, event) => {
+    const { regularization_id, user_id, org_id } = event.payload;
+    if (user_id) {
+      await createNotification(sb, {
+        org_id,
+        user_id,
+        title: "Regularization approved",
+        body: "Your attendance regularization request has been approved.",
+        module: "attendance",
+        entity_type: "regularization",
+        entity_id: regularization_id,
       });
     }
   },
