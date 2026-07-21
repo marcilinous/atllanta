@@ -285,6 +285,13 @@
   gap: var(--space-6);
 }
 
+.ai-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-6);
+  height: calc(100vh - 200px);
+}
+
 /* ── Mobile ──────────────────────────────── */
 @media (max-width: 768px) {
   .app {
@@ -324,7 +331,8 @@
   .page-header { margin-bottom: var(--space-4); }
   .page-title { font-size: var(--text-xl); }
 
-  .dash-grid, .grid-2col { grid-template-columns: 1fr; gap: var(--space-4); }
+  .dash-grid, .grid-2col, .ai-layout { grid-template-columns: 1fr; gap: var(--space-4); }
+  .ai-layout { height: auto; }
   .dash-grid { margin-top: var(--space-4); }
 }
 

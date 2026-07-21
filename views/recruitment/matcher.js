@@ -20,12 +20,12 @@ export default async function matcherView(container) {
     <div class="card" style="margin-bottom:var(--space-6)">
       <div class="card-header"><span class="card-title">Run Matching</span></div>
       <div class="card-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-4);align-items:end">
-          <div class="form-group">
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:end">
+          <div class="form-group" style="flex:1;min-width:180px">
             <label class="form-label">Select Job</label>
             <select class="form-input" id="match-job"><option value="">Loading jobs...</option></select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="flex:1;min-width:180px">
             <label class="form-label">Candidates</label>
             <select class="form-input" id="match-candidates">
               <option value="all">All unmatched candidates</option>

@@ -118,11 +118,13 @@ export default async function recruitmentJobs(container) {
               </div>
             </div>
             ${sorted.length ? `
-              <div style="border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden">
+              <div style="overflow-x:auto">
+              <div style="border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;min-width:480px">
                 <div style="display:grid;grid-template-columns:1fr 120px 120px 80px;padding:var(--space-2) var(--space-4);background:var(--color-bg-secondary);font-size:var(--text-xs);color:var(--color-text-secondary);font-weight:var(--font-weight-medium);text-transform:uppercase;letter-spacing:0.05em">
                   <div>Name</div><div>Score</div><div>Stage</div><div></div>
                 </div>
                 ${candRows}
+              </div>
               </div>
             ` : `<div style="text-align:center;padding:var(--space-6);color:var(--color-text-tertiary)">No candidates yet. Upload resumes to get started.</div>`}
           </div>`;

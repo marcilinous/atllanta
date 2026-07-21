@@ -33,7 +33,7 @@ export default async function attendanceReport(container) {
           <button class="btn btn-secondary btn-sm" id="rpt-export">Export CSV</button>
         </div>
       </div>
-      <div id="rpt-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-3);padding:var(--space-4)">
+      <div id="rpt-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-3);padding:var(--space-4)">
         <div class="stat-card"><div class="stat-label">Working Days</div><div class="stat-value" id="rpt-working">—</div></div>
         <div class="stat-card"><div class="stat-label">Avg Present</div><div class="stat-value" id="rpt-avg-present">—</div></div>
         <div class="stat-card"><div class="stat-label">Avg Hours</div><div class="stat-value" id="rpt-avg-hours">—</div></div>

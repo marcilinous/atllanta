@@ -11,7 +11,7 @@ export default async function aiAssistant(container) {
       <h1 class="page-title">AI Assistant</h1>
       <p class="page-subtitle">Ask questions about your organization data</p>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:var(--space-6);height:calc(100vh - 200px)">
+    <div class="ai-layout">
       <div class="card" style="display:flex;flex-direction:column">
         <div class="card-body" id="ai-chat" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4)"></div>
         <div style="border-top:1px solid var(--color-border);padding:var(--space-3);display:flex;gap:var(--space-2)">
