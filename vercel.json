@@ -7,7 +7,15 @@
     "api/parse-resume.js": { "maxDuration": 30 },
     "api/extract-candidate.js": { "maxDuration": 15 },
     "api/screen-job.js": { "maxDuration": 60 },
-    "api/match.js": { "maxDuration": 30 }
+    "api/match.js": { "maxDuration": 30 },
+    "api/parse-jd.js": { "maxDuration": 30 },
+    "api/ai-query.js": { "maxDuration": 30 },
+    "api/send-notification.js": { "maxDuration": 10 },
+    "api/bulk-import.js": { "maxDuration": 60 },
+    "api/reports/attendance.js": { "maxDuration": 15 },
+    "api/reports/leave.js": { "maxDuration": 15 },
+    "api/reports/recruitment.js": { "maxDuration": 15 },
+    "workers/event-processor.js": { "maxDuration": 60 }
   },
   "headers": [
     {

@@ -11,6 +11,10 @@
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/layout.css">
 <link rel="stylesheet" href="/css/components.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2563EB">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
 
@@ -143,6 +147,10 @@ import uploadResumes from '/views/recruitment/upload-resumes.js';
 import matcherView from '/views/recruitment/matcher.js';
 import aiAssistant from '/views/ai/assistant.js';
 import auditLog from '/views/audit/log.js';
+import leaveCalendar from '/views/leave/calendar.js';
+import leaveBalances from '/views/leave/balances.js';
+import leaveApprovals from '/views/leave/approvals.js';
+import jobDetail from '/views/recruitment/job-detail.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -313,10 +321,18 @@ registerRoute('recruitment/candidate', candidateProfile);
 registerRoute('recruitment/shortlist', shortlistView);
 registerRoute('recruitment/upload', uploadResumes);
 registerRoute('recruitment/matcher', matcherView);
+registerRoute('leave/calendar', leaveCalendar);
+registerRoute('leave/balances', leaveBalances);
+registerRoute('leave/approvals', leaveApprovals);
+registerRoute('recruitment/job', jobDetail);
 registerRoute('ai', aiAssistant);
 registerRoute('audit', auditLog);
 
 initRouter(document.getElementById('main-content'));
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
