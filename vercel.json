@@ -15,7 +15,7 @@
     "api/reports/attendance.js": { "maxDuration": 15 },
     "api/reports/leave.js": { "maxDuration": 15 },
     "api/reports/recruitment.js": { "maxDuration": 15 },
-    "workers/event-processor.js": { "maxDuration": 60 }
+    "api/event-processor.js": { "maxDuration": 60 }
   },
   "headers": [
     {
