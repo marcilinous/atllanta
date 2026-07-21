@@ -114,9 +114,10 @@ export default async function shortlistView(container) {
       if (!top5.length) { toast('No candidates to shortlist'); return; }
 
       for (const a of top5) {
-        await sb.from('job_applications').update({
+        const { error } = await sb.from('job_applications').update({
           status: 'shortlisted', shortlisted_at: new Date().toISOString(),
         }).eq('id', a.id);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('recruitment', 'job_application', a.id, 'shortlisted', { status: a.status }, { status: 'shortlisted' });
         await publishEvent('recruitment.candidate.shortlisted', { job_id: jobId, candidate_id: a.candidate_id, score: a.match_score });
       }
@@ -126,9 +127,10 @@ export default async function shortlistView(container) {
 
     container.querySelectorAll('[data-shortlist]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await sb.from('job_applications').update({
+        const { error } = await sb.from('job_applications').update({
           status: 'shortlisted', shortlisted_at: new Date().toISOString(),
         }).eq('id', btn.dataset.shortlist);
+        if (error) { toast('Failed: ' + error.message); return; }
         const app = apps.find(a => a.id === btn.dataset.shortlist);
         await logAction('recruitment', 'job_application', btn.dataset.shortlist, 'shortlisted', { status: app?.status }, { status: 'shortlisted' });
         await publishEvent('recruitment.candidate.shortlisted', { job_id: jobId, candidate_id: app?.candidate_id, score: app?.match_score });
@@ -147,9 +149,10 @@ export default async function shortlistView(container) {
         openModal('Reject Candidate', f);
         f.querySelector('#rej-confirm').addEventListener('click', async () => {
           const reason = f.querySelector('#rej-reason').value || null;
-          await sb.from('job_applications').update({
+          const { error } = await sb.from('job_applications').update({
             status: 'rejected', rejection_reason: reason,
           }).eq('id', btn.dataset.reject);
+          if (error) { toast('Failed: ' + error.message); return; }
           await logAction('recruitment', 'job_application', btn.dataset.reject, 'rejected', { status: 'applied' }, { status: 'rejected', rejection_reason: reason });
           closeModal();
           toast('Candidate rejected');

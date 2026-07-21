@@ -83,7 +83,8 @@ export default async function leaveSettings(container) {
     el.querySelectorAll('[data-toggle-type]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const isActive = btn.dataset.active === 'true';
-        await sb.from('leave_types').update({ is_active: !isActive }).eq('id', btn.dataset.toggleType);
+        const { error } = await sb.from('leave_types').update({ is_active: !isActive }).eq('id', btn.dataset.toggleType);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('leave', 'leave_type', btn.dataset.toggleType, isActive ? 'deactivated' : 'activated', { is_active: isActive }, { is_active: !isActive });
         toast(isActive ? 'Leave type deactivated' : 'Leave type activated');
         renderTypes(el);
@@ -200,7 +201,8 @@ export default async function leaveSettings(container) {
     el.querySelectorAll('[data-delete-holiday]').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete this holiday?')) return;
-        await sb.from('holidays').delete().eq('id', btn.dataset.deleteHoliday);
+        const { error } = await sb.from('holidays').delete().eq('id', btn.dataset.deleteHoliday);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('leave', 'holiday', btn.dataset.deleteHoliday, 'deleted', null, null);
         toast('Holiday deleted');
         renderHolidays(el);

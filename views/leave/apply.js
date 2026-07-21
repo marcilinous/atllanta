@@ -152,7 +152,8 @@ export default async function leaveModule(container) {
 
     el.querySelectorAll('[data-cancel]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await sb.from('leave_requests').update({ status: 'cancelled' }).eq('id', btn.dataset.cancel);
+        const { error } = await sb.from('leave_requests').update({ status: 'cancelled' }).eq('id', btn.dataset.cancel);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('leave', 'leave_request', btn.dataset.cancel, 'cancelled', { status: 'pending' }, { status: 'cancelled' });
         toast('Leave request cancelled');
         renderRequests(el);
@@ -192,9 +193,10 @@ export default async function leaveModule(container) {
 
     el.querySelectorAll('[data-approve]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await sb.from('leave_requests').update({
+        const { error } = await sb.from('leave_requests').update({
           status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString(),
         }).eq('id', btn.dataset.approve);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('leave', 'leave_request', btn.dataset.approve, 'approved', { status: 'pending' }, { status: 'approved' });
         await publishEvent('leave.request.approved', { leave_request_id: btn.dataset.approve, approved_by: user.id });
         toast('Leave approved');
@@ -212,10 +214,11 @@ export default async function leaveModule(container) {
         openModal('Reject Leave', f);
         f.querySelector('#rej-confirm').addEventListener('click', async () => {
           const comment = f.querySelector('#rej-comment').value || null;
-          await sb.from('leave_requests').update({
+          const { error } = await sb.from('leave_requests').update({
             status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString(),
             review_comment: comment,
           }).eq('id', btn.dataset.reject);
+          if (error) { toast('Failed: ' + error.message); return; }
           await logAction('leave', 'leave_request', btn.dataset.reject, 'rejected', { status: 'pending' }, { status: 'rejected', review_comment: comment });
           closeModal();
           toast('Leave rejected');

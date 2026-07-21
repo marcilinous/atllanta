@@ -120,7 +120,8 @@ export default async function interviewsView(container) {
       openModal('Update Stage', f);
       f.querySelector('#int-stage-save').addEventListener('click', async () => {
         const newStatus = f.querySelector('#int-stage').value;
-        await sb.from('job_applications').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', btn.dataset.app);
+        const { error } = await sb.from('job_applications').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', btn.dataset.app);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('recruitment', 'job_application', btn.dataset.app, 'stage_updated', { status: app?.status }, { status: newStatus });
         closeModal();
         toast('Stage updated');
@@ -197,7 +198,8 @@ export default async function interviewsView(container) {
 
       listEl.querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          await sb.from('interview_slots').delete().eq('id', btn.dataset.del);
+          const { error } = await sb.from('interview_slots').delete().eq('id', btn.dataset.del);
+          if (error) { toast('Failed: ' + error.message); return; }
           const idx = allSlots.findIndex(s => s.id === btn.dataset.del);
           if (idx !== -1) allSlots.splice(idx, 1);
           renderSlots();

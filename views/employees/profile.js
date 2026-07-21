@@ -269,7 +269,8 @@ export default async function employeeProfile(container) {
       listEl.querySelectorAll('[data-del-doc]').forEach(btn => {
         btn.addEventListener('click', async () => {
           await sb.storage.from('documents').remove([btn.dataset.path]);
-          await sb.from('files').delete().eq('id', btn.dataset.delDoc);
+          const { error } = await sb.from('files').delete().eq('id', btn.dataset.delDoc);
+          if (error) { toast('Failed: ' + error.message); return; }
           await logAction('people', 'file', btn.dataset.delDoc, 'deleted', null, null);
           toast('Document deleted');
           renderDocuments();
@@ -285,7 +286,7 @@ export default async function employeeProfile(container) {
       const path = `employees/${empId}/${Date.now()}_${file.name}`;
       const { error: uploadErr } = await sb.storage.from('documents').upload(path, file);
       if (uploadErr) return toast('Upload failed: ' + uploadErr.message);
-      await sb.from('files').insert({
+      const { error: insertErr } = await sb.from('files').insert({
         org_id: org?.id,
         uploaded_by: getUser().id,
         file_name: file.name,
@@ -295,6 +296,7 @@ export default async function employeeProfile(container) {
         entity_type: 'employee',
         entity_id: empId,
       });
+      if (insertErr) { toast('Failed: ' + insertErr.message); return; }
       await logAction('people', 'file', null, 'uploaded', null, { file_name: file.name, entity_type: 'employee', entity_id: empId });
       toast('Document uploaded');
       fileInput.value = '';
