@@ -56,7 +56,7 @@ export default async function leaveApprovals(container) {
           </div>
           <div style="display:flex;gap:var(--space-2);flex-shrink:0">
             <button class="btn btn-primary btn-sm approve-btn" data-id="${r.id}" data-uid="${r.user_id}" data-ltid="${r.leave_type_id}" data-days="${r.days}">Approve</button>
-            <button class="btn btn-ghost btn-sm reject-btn" data-id="${r.id}">Reject</button>
+            <button class="btn btn-ghost btn-sm reject-btn" data-id="${r.id}" data-uid="${r.user_id}">Reject</button>
           </div>
         </div>
       </div>
@@ -94,6 +94,7 @@ export default async function leaveApprovals(container) {
           .eq('id', id);
         if (error) { toast(error.message, 'error'); btn.disabled = false; return; }
         await logAction('leave', 'leave_request', id, 'rejected', { status: 'pending' }, { status: 'rejected', review_comment: comment || null });
+        await publishEvent('leave.request.rejected', { leave_request_id: id, user_id: btn.dataset.uid, org_id: org.id });
         toast('Leave rejected', 'success');
         loadApprovals();
       });
