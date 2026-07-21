@@ -187,7 +187,8 @@ export default async function approvalsInbox(container) {
     content.querySelectorAll('[data-action="approve-reg"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const updates = { status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString() };
-        await sb.from('attendance_regularizations').update(updates).eq('id', btn.dataset.id);
+        const { error } = await sb.from('attendance_regularizations').update(updates).eq('id', btn.dataset.id);
+        if (error) { toast('Failed: ' + error.message); return; }
         const attUpdate = {};
         if (btn.dataset.reqIn) attUpdate.check_in = btn.dataset.reqIn;
         if (btn.dataset.reqOut) attUpdate.check_out = btn.dataset.reqOut;
@@ -204,9 +205,10 @@ export default async function approvalsInbox(container) {
 
     content.querySelectorAll('[data-action="reject-reg"]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await sb.from('attendance_regularizations').update({
+        const { error } = await sb.from('attendance_regularizations').update({
           status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString()
         }).eq('id', btn.dataset.id);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('attendance', 'regularization', btn.dataset.id, 'rejected', { status: 'pending' }, { status: 'rejected' });
         toast('Regularization rejected');
         renderRegularizations();

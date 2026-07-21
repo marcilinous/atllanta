@@ -227,7 +227,8 @@ export default async function regularizeView(container) {
         const attId = btn.dataset.attId;
 
         const updateData = { status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString() };
-        await sb.from('attendance_regularizations').update(updateData).eq('id', regId);
+        const { error } = await sb.from('attendance_regularizations').update(updateData).eq('id', regId);
+        if (error) { toast('Failed: ' + error.message); return; }
 
         const attUpdate = {};
         if (btn.dataset.checkin) attUpdate.check_in = btn.dataset.checkin;
@@ -250,9 +251,10 @@ export default async function regularizeView(container) {
 
     el.querySelectorAll('[data-reject-reg]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await sb.from('attendance_regularizations').update({
+        const { error } = await sb.from('attendance_regularizations').update({
           status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString(),
         }).eq('id', btn.dataset.rejectReg);
+        if (error) { toast('Failed: ' + error.message); return; }
         await logAction('attendance', 'regularization', btn.dataset.rejectReg, 'rejected', { status: 'pending' }, { status: 'rejected' });
         await publishEvent('attendance.regularization.rejected', { regularization_id: btn.dataset.rejectReg });
         toast('Regularization rejected');
