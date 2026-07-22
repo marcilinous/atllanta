@@ -21,6 +21,7 @@ export default async function reportsView(container) {
     { icon: '🌿', title: 'Leave Report', desc: 'Leave usage and balance summary', route: '#/leave/report', roles: ['owner', 'admin', 'manager'] },
     { icon: '💼', title: 'Recruitment Report', desc: 'Pipeline funnel, match scores, and job analytics', route: '#/reports/recruitment', roles: ['owner', 'admin', 'manager'] },
     { icon: '🎫', title: 'Helpdesk Report', desc: 'Ticket volume, categories, and resolution times', route: '#/reports/helpdesk', roles: ['owner', 'admin', 'manager'] },
+    { icon: '📅', title: 'Team Planner', desc: 'Weekly view of team availability and leave', route: '#/reports/planner', roles: ['owner', 'admin', 'manager'] },
     { icon: '📋', title: 'Audit Log', desc: 'Track all actions across the platform', route: '#/audit', roles: ['owner', 'admin'] },
   ];
 

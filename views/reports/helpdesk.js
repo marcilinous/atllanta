@@ -52,6 +52,7 @@ export default async function helpdeskReport(container) {
       <h1 style="font-size:var(--text-2xl);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-1)">Helpdesk Report</h1>
       <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin:0">Ticket analytics and category breakdown</p>
     </div>
+    <button class="btn btn-secondary btn-sm" id="hd-export" style="align-self:flex-start">Export CSV</button>
 
     <div class="stat-grid" style="margin-bottom:var(--space-6)">
       <div class="card"><div class="card-body" style="text-align:center">
@@ -133,4 +134,19 @@ export default async function helpdeskReport(container) {
         </table></div>
       </div>
     </div>` : ''}`;
+
+  document.getElementById('hd-export')?.addEventListener('click', () => {
+    if (!all.length) return;
+    const statusLabel = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed' };
+    const headers = 'Subject,Category,Priority,Status,Raised By,Assigned To,Created,Resolved At\n';
+    const rows = all.map(t =>
+      `"${(t.subject || '').replace(/"/g, '""')}","${t.category?.name || '—'}",${t.priority},${statusLabel[t.status] || t.status},"${t.creator?.full_name || '—'}","${t.assignee?.full_name || '—'}",${t.created_at?.split('T')[0] || ''},${t.resolved_at?.split('T')[0] || ''}`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `helpdesk_report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 }

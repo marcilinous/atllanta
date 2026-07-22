@@ -53,6 +53,7 @@ export default async function recruitmentReport(container) {
         <h1 style="font-size:var(--text-2xl);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-1)">Recruitment Report</h1>
         <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin:0">Pipeline analytics across all jobs</p>
       </div>
+      <button class="btn btn-secondary btn-sm" id="recruit-export">Export CSV</button>
     </div>
 
     <div class="stat-grid" style="margin-bottom:var(--space-6)">
@@ -126,4 +127,18 @@ export default async function recruitmentReport(container) {
         </table></div>`}
       </div>
     </div>`;
+
+  document.getElementById('recruit-export')?.addEventListener('click', () => {
+    if (!jobStats.length) return;
+    const headers = 'Job Title,Department,Status,Applications,Shortlisted,Interviewed,Hired,Avg Score\n';
+    const rows = jobStats.map(j =>
+      `"${j.title}","${j.department?.name || '—'}",${j.status},${j.total},${j.byStage.shortlisted},${j.byStage.interviewed + j.byStage.interview_scheduled},${j.byStage.hired},${j.avgScore}`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `recruitment_report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 }
