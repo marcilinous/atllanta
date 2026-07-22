@@ -45,7 +45,8 @@ export default async function leaveCalendar(container) {
     </div>
   `;
 
-  const { data: depts } = await sb.from('departments').select('id, name').eq('org_id', org.id).order('name');
+  const { data: depts, error: deptsErr } = await sb.from('departments').select('id, name').eq('org_id', org.id).order('name');
+  if (deptsErr) { console.error(deptsErr); }
   const deptSelect = document.getElementById('cal-dept-filter');
   (depts || []).forEach(d => {
     const opt = document.createElement('option');
@@ -65,20 +66,23 @@ export default async function leaveCalendar(container) {
 
     let userQuery = sb.from('users').select('id, full_name, designation, department_id, department:department_id(name)').eq('org_id', org.id).eq('status', 'active').order('full_name');
     if (filterDept) userQuery = userQuery.eq('department_id', filterDept);
-    const { data: users } = await userQuery;
+    const { data: users, error: usersErr } = await userQuery;
+    if (usersErr) { console.error(usersErr); }
     const teamUsers = users || [];
 
-    const { data: leaves } = await sb.from('leave_requests')
+    const { data: leaves, error: leavesErr } = await sb.from('leave_requests')
       .select('user_id, start_date, end_date, days, status, leave_type:leave_type_id(name, code)')
       .eq('org_id', org.id)
       .in('status', ['approved', 'pending'])
       .lte('start_date', monthEnd)
       .gte('end_date', monthStart);
+    if (leavesErr) { console.error(leavesErr); }
 
-    const { data: holidays } = await sb.from('holidays')
+    const { data: holidays, error: holidaysErr } = await sb.from('holidays')
       .select('date, name')
       .eq('org_id', org.id)
       .eq('year', currentYear);
+    if (holidaysErr) { console.error(holidaysErr); }
 
     const holidayMap = {};
     (holidays || []).forEach(h => { holidayMap[h.date] = h.name; });

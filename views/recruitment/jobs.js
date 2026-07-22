@@ -366,7 +366,8 @@ export default async function recruitmentJobs(container) {
             let q = sb.from('candidates').select('id').eq(orgCol, cid);
             if (email) q = q.eq('email', email);
             else q = q.eq('phone', phone);
-            const { data: existing } = await q.maybeSingle();
+            const { data: existing, error: existErr } = await q.maybeSingle();
+            if (existErr) console.error('Failed to check existing candidate:', existErr);
             if (existing) {
               candId = existing.id;
               const { error: updErr } = await sb.from('candidates').update({ resume_text: parseData.text, full_name: name }).eq('id', candId);
@@ -387,8 +388,9 @@ export default async function recruitmentJobs(container) {
           }
 
           if (jobId) {
-            const { data: existingApp } = await sb.from('job_applications')
+            const { data: existingApp, error: existAppErr } = await sb.from('job_applications')
               .select('id').eq('job_id', jobId).eq('candidate_id', candId).maybeSingle();
+            if (existAppErr) console.error('Failed to check existing application:', existAppErr);
             if (!existingApp) {
               const { error: appErr } = await sb.from('job_applications').insert({ job_id: jobId, candidate_id: candId });
               if (appErr) throw appErr;

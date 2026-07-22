@@ -472,7 +472,8 @@ export default async function inboxView(container) {
     leaveCount = lc ?? 0;
     regCount = rc ?? 0;
 
-    const { data: te } = await sb.from('events').select('payload').like('event_type', 'helpdesk.ticket.%').order('created_at', { ascending: false });
+    const { data: te, error: teError } = await sb.from('events').select('payload').like('event_type', 'helpdesk.ticket.%').order('created_at', { ascending: false });
+    if (teError) console.error('Failed to fetch ticket events:', teError);
     const tm = {};
     for (const ev of (te || [])) {
       const tid = ev.payload?.ticket_id;

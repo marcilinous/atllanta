@@ -48,11 +48,12 @@ export default async function regularizeView(container) {
   document.getElementById('new-reg-btn').addEventListener('click', openNewRegModal);
 
   async function openNewRegModal() {
-    const { data: myAtt } = await sb.from('attendance')
+    const { data: myAtt, error: myAttErr } = await sb.from('attendance')
       .select('id, date, check_in, check_out, status')
       .eq('user_id', user.id)
       .order('date', { ascending: false })
       .limit(30);
+    if (myAttErr) { console.error(myAttErr); }
 
     const f = document.createElement('div');
     f.innerHTML = `<div style="display:grid;gap:var(--space-4)">

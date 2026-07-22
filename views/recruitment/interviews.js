@@ -233,10 +233,11 @@ export default async function interviewsView(container) {
     const cand = allCands.find(c => c.id === app.candidate_id);
     const job = allJobs.find(j => j.id === app.job_id);
 
-    const { data: slots } = await sb.from('interview_slots')
+    const { data: slots, error: slotsError } = await sb.from('interview_slots')
       .select('*')
       .eq('application_id', appId)
       .order('slot_start');
+    if (slotsError) console.error('Failed to fetch interview slots:', slotsError);
 
     const allSlots = slots || [];
 
@@ -312,7 +313,8 @@ export default async function interviewsView(container) {
       const end = f.querySelector('#sl-end').value;
       if (!date || !start || !end) return toast('Fill date, start, and end time');
       if (start >= end) return toast('End must be after start');
-      const { data: membership } = await sb.from('memberships').select('organization_id').limit(1).single();
+      const { data: membership, error: memError } = await sb.from('memberships').select('organization_id').limit(1).single();
+      if (memError) return toast('Failed to fetch membership: ' + memError.message);
       const { data, error } = await sb.from('interview_slots').insert({
         organization_id: membership?.organization_id,
         job_id: app.job_id,
@@ -333,7 +335,8 @@ export default async function interviewsView(container) {
         const date = f.querySelector('#sl-date').value;
         if (!date) return toast('Pick a date first');
         const mins = +btn.dataset.quick;
-        const { data: membership } = await sb.from('memberships').select('organization_id').limit(1).single();
+        const { data: membership, error: memErr } = await sb.from('memberships').select('organization_id').limit(1).single();
+        if (memErr) return toast('Failed to fetch membership: ' + memErr.message);
         const userId = (await sb.auth.getUser()).data.user.id;
         const newSlots = [];
         for (let h = 9; h < 18;) {

@@ -41,17 +41,19 @@ export default async function jobDetail(container) {
   const titleEl = document.getElementById('job-title');
   if (titleEl) titleEl.textContent = job.title;
 
-  const { data: applications } = await sb
+  const { data: applications, error: appsError } = await sb
     .from('job_applications')
     .select('*, candidate:candidate_id(full_name, email)')
     .eq('job_id', jobId)
     .order('match_score', { ascending: false });
+  if (appsError) console.error('Failed to fetch applications:', appsError);
 
-  const { data: interviews } = await sb
+  const { data: interviews, error: intError } = await sb
     .from('interviews')
     .select('*, application:job_application_id(candidate:candidate_id(full_name))')
     .eq('status', 'scheduled')
     .order('scheduled_at');
+  if (intError) console.error('Failed to fetch interviews:', intError);
 
   const appInterviews = (interviews || []).filter(i =>
     (applications || []).some(a => a.id === i.job_application_id)

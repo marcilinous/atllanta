@@ -59,7 +59,8 @@ export default async function employeeList(container) {
 
   // If users table is empty, fall back to memberships
   if (!allEmployees.length) {
-    const { data: members } = await sb.from('memberships').select('*').order('created_at', { ascending: false });
+    const { data: members, error: membersErr } = await sb.from('memberships').select('*').order('created_at', { ascending: false });
+    if (membersErr) { console.error(membersErr); }
     if (members?.length) {
       allEmployees = members.map(m => ({
         id: m.user_id || m.id,
@@ -173,7 +174,8 @@ export default async function employeeList(container) {
         }
         await publishEvent('people.employees.bulk_status_changed', { employee_ids: ids, new_status: 'active', org_id: org.id });
         toast(`${ids.length} employee${ids.length > 1 ? 's' : ''} set to active`);
-        const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        const { data: refreshed, error: refreshErr } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        if (refreshErr) { toast('Failed to refresh: ' + refreshErr.message); }
         allEmployees = refreshed || [];
         renderTable();
       });
@@ -187,7 +189,8 @@ export default async function employeeList(container) {
         }
         await publishEvent('people.employees.bulk_status_changed', { employee_ids: ids, new_status: 'exited', org_id: org.id });
         toast(`${ids.length} employee${ids.length > 1 ? 's' : ''} set to exited`);
-        const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        const { data: refreshed, error: refreshErr } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        if (refreshErr) { toast('Failed to refresh: ' + refreshErr.message); }
         allEmployees = refreshed || [];
         renderTable();
       });
@@ -214,7 +217,8 @@ export default async function employeeList(container) {
           }
           closeModal();
           toast(`Department updated for ${ids.length} employee${ids.length > 1 ? 's' : ''}`);
-          const { data: refreshed } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+          const { data: refreshed, error: refreshErr } = await sb.from('users').select('*, department:department_id(name)').order('full_name');
+        if (refreshErr) { toast('Failed to refresh: ' + refreshErr.message); }
           allEmployees = refreshed || [];
           renderTable();
         });

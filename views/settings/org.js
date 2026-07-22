@@ -581,7 +581,8 @@ export default async function settingsOrg(container) {
         document.getElementById('add-hol-btn')?.addEventListener('click', () => openHolidayModal(null, year));
 
         document.getElementById('copy-hol-btn')?.addEventListener('click', async () => {
-          const { data: prevHols } = await sb.from('holidays').select('name, date, is_optional').eq('year', year - 1).eq('org_id', org.id);
+          const { data: prevHols, error: holError } = await sb.from('holidays').select('name, date, is_optional').eq('year', year - 1).eq('org_id', org.id);
+          if (holError) { toast('Failed to fetch holidays: ' + holError.message); return; }
           if (!prevHols?.length) return toast(`No holidays found in ${year - 1}`);
           if (!confirm(`Copy ${prevHols.length} holidays from ${year - 1} to ${year}? Dates will shift to the same month/day in ${year}.`)) return;
           const newHols = prevHols.map(h => {

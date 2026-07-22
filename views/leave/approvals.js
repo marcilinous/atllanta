@@ -286,10 +286,11 @@ export default async function leaveApprovals(container) {
   }
 
   async function reloadAndRender() {
-    const { data } = await sb.from('leave_requests')
+    const { data, error: reloadErr } = await sb.from('leave_requests')
       .select('*, leave_type:leave_type_id(name, code), requester:user_id(full_name, email, department:department_id(name))')
       .gte('start_date', `${year}-01-01`)
       .order('created_at', { ascending: false });
+    if (reloadErr) { console.error(reloadErr); }
     requests.length = 0;
     (data || []).forEach(r => requests.push(r));
     pending.length = 0;

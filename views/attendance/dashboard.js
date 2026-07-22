@@ -423,8 +423,9 @@ export default async function attendanceDashboard(container) {
         await publishEvent('attendance.regularization.requested', { attendance_id: attId });
         closeModal();
         toast('Regularization submitted');
-        const { data: updatedRegs } = await sb.from('attendance_regularizations')
+        const { data: updatedRegs, error: regsErr } = await sb.from('attendance_regularizations')
           .select('*, attendance:attendance_id(date)').eq('user_id', user.id).order('created_at', { ascending: false });
+        if (regsErr) { console.error(regsErr); }
         myRegs = updatedRegs || [];
         renderHeatmap();
         if (currentTab === 'regularization') renderTab();

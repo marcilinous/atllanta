@@ -93,7 +93,8 @@ export default async function matcherView(container) {
       const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
       query = query.gte('created_at', thirtyDaysAgo);
     }
-    const { data: candidates } = await query;
+    const { data: candidates, error: candError } = await query;
+    if (candError) console.error('Failed to fetch candidates:', candError);
     const cands = (candidates || []).filter(c => c.resume_text || c.parsed_skills);
 
     if (!cands.length) {
@@ -104,7 +105,8 @@ export default async function matcherView(container) {
       return;
     }
 
-    const { data: jobData } = await sb.from('jobs').select('parsed_skills, description').eq('id', jobId).single();
+    const { data: jobData, error: jobError } = await sb.from('jobs').select('parsed_skills, description').eq('id', jobId).single();
+    if (jobError) console.error('Failed to fetch job data:', jobError);
     const jobSkills = jobData?.parsed_skills?.must_have || [];
     const jobNiceToHave = jobData?.parsed_skills?.nice_to_have || [];
     const allJobSkills = [...jobSkills, ...jobNiceToHave].map(s => s.toLowerCase());
@@ -133,8 +135,9 @@ export default async function matcherView(container) {
       const niceScore = jobNiceToHave.length ? (niceMatch / jobNiceToHave.length) * 30 : 15;
       const totalScore = Math.round(skillsScore + niceScore);
 
-      const { data: existing } = await sb.from('job_applications')
+      const { data: existing, error: existError } = await sb.from('job_applications')
         .select('id').eq('job_id', jobId).eq('candidate_id', c.id).maybeSingle();
+      if (existError) { console.error('Failed to check existing application:', existError); continue; }
 
       if (existing) {
         const { error } = await sb.from('job_applications').update({
@@ -178,7 +181,8 @@ export default async function matcherView(container) {
     else if (sortBy === 'score_asc') query = query.order('match_score', { ascending: true });
     else query = query.order('created_at', { ascending: false });
 
-    const { data: results } = await query;
+    const { data: results, error: resultsError } = await query;
+    if (resultsError) console.error('Failed to fetch match results:', resultsError);
     const apps = results || [];
 
     if (!apps.length) {

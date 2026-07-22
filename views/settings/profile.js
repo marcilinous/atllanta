@@ -8,11 +8,12 @@ export default async function profileSettings(container) {
   const org = getOrg();
   const membership = getMembership();
 
-  const { data: profile } = await sb
+  const { data: profile, error: profileError } = await sb
     .from('users')
     .select('*, department:department_id(name), team:team_id(name), manager:reporting_manager_id(full_name)')
     .eq('id', user.id)
     .maybeSingle();
+  if (profileError) console.error('Failed to fetch profile:', profileError);
 
   const name = profile?.full_name || user?.user_metadata?.full_name || '';
   const email = profile?.email || user?.email || '';
