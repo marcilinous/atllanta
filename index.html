@@ -139,6 +139,7 @@ import { registerRoute, initRouter, navigate } from '/js/router.js';
 import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
+import { startEventProcessor } from '/js/event-processor.js';
 
 // Views
 import dashboard from '/views/dashboard.js';
@@ -255,6 +256,7 @@ onUnreadChange(count => {
 });
 fetchUnreadCount();
 subscribeRealtime();
+startEventProcessor();
 
 initGlobalSearch();
 initAIPanel();
