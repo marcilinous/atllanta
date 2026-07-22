@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, formatDate } from '../../js/ui.js';
+import { publishEvent } from '../../js/events.js';
 
 const TEMPLATES = [
   { key: 'offer', title: 'Offer Letter', icon: '📋', desc: 'Generate an offer letter for a new hire' },
@@ -107,20 +108,13 @@ export default async function lettersView(container) {
       if (!empId) { toast('Please select an employee', 'error'); return; }
       const selected = users.find(u => u.id === empId);
 
-      const { error } = await sb.from('events').insert({
-        org_id: org.id,
-        event_type: 'people.letter.generated',
-        actor_id: user.id,
-        payload: {
-          template: tmpl.key,
-          template_title: tmpl.title,
-          employee_id: empId,
-          employee_name: selected?.full_name || '',
-          letter_body: body
-        },
-        status: 'completed'
+      await publishEvent('people.letter.generated', {
+        template: tmpl.key,
+        template_title: tmpl.title,
+        employee_id: empId,
+        employee_name: selected?.full_name || '',
+        letter_body: body
       });
-      if (error) { toast(error.message, 'error'); return; }
       toast('Letter generated');
       closeModal();
       await render();

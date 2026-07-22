@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, formatDate, initials, avColor } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
+import { publishEvent } from '../../js/events.js';
 
 export default async function leaveBalances(container) {
   const user = getUser();
@@ -238,6 +239,7 @@ export default async function leaveBalances(container) {
         }).eq('id', existing.id);
         if (error) return toast(error.message);
         await logAction('leave', 'leave_balance', existing.id, 'adjusted', null, { opening_balance: opening, accrued, used, reason });
+        publishEvent('leave.balance.adjusted', { user_id: userId, leave_type_id: typeId, org_id: org.id });
       } else {
         const { error } = await sb.from('leave_balances').insert({
           org_id: org.id, user_id: userId, leave_type_id: typeId, year: viewYear,
@@ -245,6 +247,7 @@ export default async function leaveBalances(container) {
         });
         if (error) return toast(error.message);
         await logAction('leave', 'leave_balance', null, 'created', null, { user_id: userId, leave_type_id: typeId, year: viewYear, opening_balance: opening, accrued, used, reason });
+        publishEvent('leave.balance.adjusted', { user_id: userId, leave_type_id: typeId, org_id: org.id });
       }
 
       closeModal();

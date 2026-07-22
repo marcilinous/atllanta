@@ -41,7 +41,8 @@ export default async function attendanceReport(container) {
     </div>
   `;
 
-  const { data: depts } = await sb.from('departments').select('id, name').eq('org_id', org.id).order('name');
+  const { data: depts, error: deptsErr } = await sb.from('departments').select('id, name').eq('org_id', org.id).order('name');
+  if (deptsErr) { console.error(deptsErr); }
   const deptSelect = document.getElementById('rpt-dept');
   (depts || []).forEach(d => {
     const opt = document.createElement('option');
@@ -63,14 +64,16 @@ export default async function attendanceReport(container) {
     let userQuery = sb.from('users').select('id, full_name, email, department_id, department:department_id(name)')
       .eq('org_id', org.id).eq('status', 'active').order('full_name');
     if (filterDept) userQuery = userQuery.eq('department_id', filterDept);
-    const { data: users } = await userQuery;
+    const { data: users, error: usersErr } = await userQuery;
+    if (usersErr) { console.error(usersErr); }
     const teamUsers = users || [];
 
     const userIds = teamUsers.map(u => u.id);
     let attData = [];
     if (userIds.length) {
-      const { data } = await sb.from('attendance').select('user_id, date, status, total_hours, check_in, check_out')
+      const { data, error: attErr } = await sb.from('attendance').select('user_id, date, status, total_hours, check_in, check_out')
         .in('user_id', userIds).gte('date', monthStart).lte('date', monthEnd);
+      if (attErr) { console.error(attErr); }
       attData = data || [];
     }
 

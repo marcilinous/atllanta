@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, formatDate } from '../../js/ui.js';
+import { publishEvent } from '../../js/events.js';
 
 const BUCKET = 'documents';
 
@@ -129,8 +130,10 @@ export default async function documentsView(container) {
         if (!confirm('Delete this document?')) return;
         const { error: storageErr } = await sb.storage.from(BUCKET).remove([btn.dataset.path]);
         if (storageErr) { toast(storageErr.message, 'error'); return; }
-        const { error: dbErr } = await sb.from('files').delete().eq('id', btn.dataset.id);
+        const fileId = btn.dataset.id;
+        const { error: dbErr } = await sb.from('files').delete().eq('id', fileId);
         if (dbErr) { toast(dbErr.message, 'error'); return; }
+        publishEvent('documents.file.deleted', { file_id: fileId, org_id: org.id });
         toast('Document deleted');
         await render();
       });
@@ -158,8 +161,9 @@ export default async function documentsView(container) {
           entity_type: entityType,
           entity_id: entityId,
         };
-        const { error: dbErr } = await sb.from('files').insert(row);
+        const { data, error: dbErr } = await sb.from('files').insert(row).select().single();
         if (dbErr) { toast(dbErr.message, 'error'); return; }
+        publishEvent('documents.file.uploaded', { file_id: data.id, org_id: org.id, file_name: file.name });
         toast('Document uploaded');
         await render();
       });

@@ -1,6 +1,7 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, initials, avColor, openModal, closeModal } from '../../js/ui.js';
+import { publishEvent } from '../../js/events.js';
 
 export default async function profileSettings(container) {
   const user = getUser();
@@ -163,6 +164,7 @@ export default async function profileSettings(container) {
     const { error } = await sb.from('users').update(updates).eq('id', user.id);
     if (error) return toast('Failed to save: ' + error.message);
 
+    publishEvent('people.employee.updated', { employee_id: profile.id, org_id: profile.org_id });
     toast('Profile updated');
   });
 
