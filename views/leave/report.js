@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
-import { esc, toast, formatDate, initials, avColor } from '../../js/ui.js';
+import { esc, toast, formatDate, initials, avColor, openModal } from '../../js/ui.js';
 
 export default async function leaveReport(container) {
   const user = getUser();
@@ -296,16 +296,7 @@ export default async function leaveReport(container) {
       </table></div>
     `;
 
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay active';
-    modal.innerHTML = `<div class="modal" style="max-width:600px">
-      <div class="modal-header"><span class="modal-title">Leave Details</span><button class="modal-close">&times;</button></div>
-      <div class="modal-body"></div>
-    </div>`;
-    modal.querySelector('.modal-body').appendChild(detailEl);
-    modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    document.body.appendChild(modal);
+    openModal('Leave Details', detailEl);
   }
 
   document.querySelectorAll('[data-mode]').forEach(btn => {

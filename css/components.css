@@ -85,6 +85,12 @@
 textarea.form-input { height: auto; min-height: 80px; resize: vertical; }
 select.form-input { cursor: pointer; }
 
+.form-input-sm {
+  height: 30px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
 .form-hint {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
@@ -675,6 +681,10 @@ select.form-input { cursor: pointer; }
 .ai-input:focus { border-color: var(--color-accent); }
 
 /* ── Org Chart ────────────────────────────── */
+.orgchart-tree {
+  padding: var(--space-2) 0;
+}
+
 .orgchart-node:hover { background: var(--color-bg-secondary); }
 
 /* ── Progress Bar ────────────────────────── */
@@ -715,6 +725,15 @@ select.form-input { cursor: pointer; }
   .btn-lg { height: 38px; padding: var(--space-2) var(--space-4); font-size: var(--text-sm); }
 
   .table th, .table td { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+}
+
+/* ── Attendance Cards ────────────────────── */
+.att-checkin-card {
+  min-height: 200px;
+}
+
+.att-stats-card {
+  min-height: 200px;
 }
 
 /* ── Attendance Heatmap & Layout ─────────── */
