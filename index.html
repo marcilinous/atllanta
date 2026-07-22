@@ -140,7 +140,7 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
-import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead } from '/js/notifications.js';
+import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 
@@ -258,6 +258,7 @@ onUnreadChange(count => {
   document.getElementById('notif-dot').classList.toggle('hidden', count === 0);
 });
 fetchUnreadCount();
+subscribeRealtime();
 
 initGlobalSearch();
 initAIPanel();

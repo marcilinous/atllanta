@@ -3,6 +3,7 @@ import { getUser } from './auth.js';
 
 let unreadCount = 0;
 let onCountChange = null;
+let realtimeChannel = null;
 
 export function onUnreadChange(callback) {
   onCountChange = callback;
@@ -49,4 +50,27 @@ export async function markAllRead() {
   if (!user) return;
   const { error } = await sb.from('notifications').update({ status: 'read' }).eq('user_id', user.id).eq('status', 'unread');
   if (!error) await fetchUnreadCount();
+}
+
+export function subscribeRealtime() {
+  const user = getUser();
+  if (!user || realtimeChannel) return;
+
+  realtimeChannel = sb
+    .channel('notifications-realtime')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+      (payload) => {
+        unreadCount++;
+        if (onCountChange) onCountChange(unreadCount);
+      }
+    )
+    .subscribe();
+}
+
+export function unsubscribeRealtime() {
+  if (realtimeChannel) {
+    sb.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 }
