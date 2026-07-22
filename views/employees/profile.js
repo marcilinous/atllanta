@@ -128,8 +128,10 @@ export default async function employeeProfile(container) {
   // Edit employee
   if (isAdmin) {
     document.getElementById('edit-emp-btn')?.addEventListener('click', async () => {
-      const { data: depts } = await sb.from('departments').select('id, name').order('name');
-      const { data: managers } = await sb.from('users').select('id, full_name').neq('id', empId).order('full_name');
+      const { data: depts, error: deptsErr } = await sb.from('departments').select('id, name').order('name');
+      if (deptsErr) { console.error(deptsErr); }
+      const { data: managers, error: managersErr } = await sb.from('users').select('id, full_name').neq('id', empId).order('full_name');
+      if (managersErr) { console.error(managersErr); }
 
       const f = document.createElement('div');
       f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
