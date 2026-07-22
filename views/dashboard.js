@@ -14,6 +14,8 @@ export default async function dashboard(container) {
   const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = membership?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || '';
 
+  const dayTheme = getDayTheme(today);
+
   container.innerHTML = `
     <style>
       @keyframes dash-float {
@@ -28,6 +30,55 @@ export default async function dashboard(container) {
       @keyframes dash-pulse {
         0%, 100% { opacity: 0.04; }
         50% { opacity: 0.09; }
+      }
+      @keyframes dash-fall {
+        0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+        10% { opacity: 1; }
+        100% { transform: translateY(calc(100vh + 20px)) rotate(360deg); opacity: 0.6; }
+      }
+      @keyframes dash-rise {
+        0% { transform: translateY(20px) scale(0.8); opacity: 0; }
+        50% { opacity: 1; }
+        100% { transform: translateY(-100vh) scale(1.2); opacity: 0; }
+      }
+      @keyframes dash-twinkle {
+        0%, 100% { opacity: 0.1; transform: scale(0.8); }
+        50% { opacity: 0.6; transform: scale(1.3); }
+      }
+      @keyframes dash-sway {
+        0%, 100% { transform: translateX(0) rotate(-5deg); }
+        50% { transform: translateX(15px) rotate(5deg); }
+      }
+      .dash-scene {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 0;
+      }
+      .dash-scene .particle {
+        position: absolute;
+        font-size: 20px;
+        opacity: 0;
+        will-change: transform;
+      }
+      .dash-wrapper {
+        position: relative;
+        min-height: 100%;
+      }
+      .dash-wrapper > *:not(.dash-scene) {
+        position: relative;
+        z-index: 1;
+      }
+      .dash-banner {
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-4);
+        font-size: var(--text-sm);
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        border: 1px solid var(--color-border-light);
       }
       .dash-two-col {
         display: grid;
@@ -103,6 +154,9 @@ export default async function dashboard(container) {
       .leave-row:hover { background: rgba(255,255,255,0.03); }
     </style>
 
+    <div class="dash-wrapper">
+    <div class="dash-scene" id="dash-scene"></div>
+    <div id="dash-banner-slot"></div>
     <div id="dash-header" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-6);flex-wrap:wrap">
       <div>
         <h1 class="page-title" style="margin:0">${greeting}${firstName ? ', ' + esc(firstName) : ''}</h1>
@@ -140,7 +194,10 @@ export default async function dashboard(container) {
         </div>
       </div>
     </div>
+    </div>
   `;
+
+  renderDayScene(dayTheme);
 
   if (!org) return;
 
@@ -231,6 +288,22 @@ export default async function dashboard(container) {
           ${isToday ? '<span style="font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);background:var(--color-success-light);color:var(--color-success)">Today</span>' : ''}
         </div>
       </div>`;
+  }
+
+  // Holiday banner + scene upgrade if today is an org holiday
+  const todayHoliday = (leavesResult.data || []).find(h => h.date === todayStr);
+  const bannerSlot = document.getElementById('dash-banner-slot');
+  if (todayHoliday && bannerSlot) {
+    const hTheme = getHolidayTheme(todayHoliday.name);
+    bannerSlot.innerHTML = `
+      <div class="dash-banner" style="background:${hTheme.bannerBg}">
+        <span style="font-size:var(--text-xl)">${hTheme.emoji}</span>
+        <div>
+          <div style="font-weight:var(--font-weight-semibold);color:${hTheme.bannerText}">${esc(todayHoliday.name)}</div>
+          <div style="font-size:var(--text-xs);color:${hTheme.bannerText};opacity:0.8">${hTheme.message}</div>
+        </div>
+      </div>`;
+    renderDayScene({ ...dayTheme, ...hTheme });
   }
 
   // Composer (managers+)
@@ -465,4 +538,80 @@ export default async function dashboard(container) {
 
 function formatPostContent(text) {
   return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function getDayTheme(date) {
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const md = `${m}-${d}`;
+
+  const known = {
+    '1-1':   { particles: ['🎆','🥂','✨','🎊','🎇'], anim: 'fall', emoji: '🎆', message: 'Happy New Year!', bannerBg: 'linear-gradient(135deg,#1a1a2e,#16213e)', bannerText: '#ffd700' },
+    '1-26':  { particles: ['🇮🇳','🪷','🏛️','⭐','🎖️'], anim: 'sway', emoji: '🇮🇳', message: 'Happy Republic Day!', bannerBg: 'linear-gradient(135deg,#FF9933,#fff,#138808)', bannerText: '#1a1a2e' },
+    '3-8':   { particles: ['💜','🌸','✨','👩','💐'], anim: 'rise', emoji: '💜', message: "Happy Women's Day!", bannerBg: 'linear-gradient(135deg,#7c3aed15,#c084fc15)', bannerText: 'var(--color-text-primary)' },
+    '5-1':   { particles: ['⚒️','✊','🏗️','👷','⭐'], anim: 'sway', emoji: '⚒️', message: 'Happy Labour Day!', bannerBg: 'linear-gradient(135deg,#dc262615,#f97316 15)', bannerText: 'var(--color-text-primary)' },
+    '8-15':  { particles: ['🇮🇳','🪁','🎆','🕊️','⭐'], anim: 'fall', emoji: '🇮🇳', message: 'Happy Independence Day!', bannerBg: 'linear-gradient(135deg,#FF9933,#fff,#138808)', bannerText: '#1a1a2e' },
+    '10-2':  { particles: ['🕊️','🌸','🪷','☮️','✨'], anim: 'rise', emoji: '🕊️', message: 'Gandhi Jayanti', bannerBg: 'linear-gradient(135deg,#f0fdf415,#dcfce715)', bannerText: 'var(--color-text-primary)' },
+    '10-31': { particles: ['🎃','👻','🦇','🕷️','🍬'], anim: 'fall', emoji: '🎃', message: 'Happy Halloween!', bannerBg: 'linear-gradient(135deg,#f97316 15,#1a1a2e15)', bannerText: 'var(--color-text-primary)' },
+    '12-25': { particles: ['🎄','⭐','🎁','❄️','🔔'], anim: 'fall', emoji: '🎄', message: 'Merry Christmas!', bannerBg: 'linear-gradient(135deg,#dc262615,#16a34a15)', bannerText: 'var(--color-text-primary)' },
+    '12-31': { particles: ['🎆','🥂','🎊','✨','🎇'], anim: 'fall', emoji: '🎆', message: 'New Year Eve!', bannerBg: 'linear-gradient(135deg,#1e293b,#0f172a)', bannerText: '#ffd700' },
+  };
+
+  if (known[md]) return known[md];
+
+  if (m >= 3 && m <= 5) return { particles: ['🌸','🌿','🌻','🦋','☀️'], anim: 'sway', emoji: '🌸', message: '', bannerBg: '', bannerText: '' };
+  if (m >= 6 && m <= 9) return { particles: ['🌧️','☁️','🌈','🍃','💧'], anim: 'fall', emoji: '🌧️', message: '', bannerBg: '', bannerText: '' };
+  if (m >= 10 && m <= 11) return { particles: ['🍂','🍁','🌾','🪵','🌅'], anim: 'sway', emoji: '🍂', message: '', bannerBg: '', bannerText: '' };
+  return { particles: ['❄️','✨','☃️','🌟','💫'], anim: 'twinkle', emoji: '❄️', message: '', bannerBg: '', bannerText: '' };
+}
+
+function getHolidayTheme(name) {
+  const n = name.toLowerCase();
+  if (n.includes('diwali') || n.includes('deepavali'))
+    return { particles: ['🪔','✨','🎆','🎇','💫'], anim: 'rise', emoji: '🪔', message: 'Festival of Lights!', bannerBg: 'linear-gradient(135deg,#f59e0b15,#d9770615)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('holi'))
+    return { particles: ['🎨','💜','💚','💛','❤️'], anim: 'fall', emoji: '🎨', message: 'Festival of Colors!', bannerBg: 'linear-gradient(135deg,#a855f715,#ec489915,#eab30815)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('eid'))
+    return { particles: ['🌙','⭐','✨','🕌','🌟'], anim: 'twinkle', emoji: '🌙', message: 'Eid Mubarak!', bannerBg: 'linear-gradient(135deg,#16a34a15,#f59e0b15)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('christmas') || n.includes('xmas'))
+    return { particles: ['🎄','⭐','🎁','❄️','🔔'], anim: 'fall', emoji: '🎄', message: 'Merry Christmas!', bannerBg: 'linear-gradient(135deg,#dc262615,#16a34a15)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('ganesh') || n.includes('vinayak'))
+    return { particles: ['🪷','🌺','🙏','✨','🎉'], anim: 'rise', emoji: '🪷', message: 'Ganpati Bappa Morya!', bannerBg: 'linear-gradient(135deg,#f97316 15,#eab30815)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('pongal') || n.includes('makar') || n.includes('sankranti') || n.includes('lohri'))
+    return { particles: ['🪁','☀️','🌾','✨','🎉'], anim: 'sway', emoji: '🪁', message: 'Happy Harvest Festival!', bannerBg: 'linear-gradient(135deg,#f59e0b15,#ea580c15)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('navratri') || n.includes('durga') || n.includes('dasara') || n.includes('dussehra'))
+    return { particles: ['🪷','✨','🔱','🎊','💫'], anim: 'rise', emoji: '🪷', message: 'Happy Navratri!', bannerBg: 'linear-gradient(135deg,#dc262615,#f59e0b15)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('onam'))
+    return { particles: ['🛶','🌸','🌺','🪷','🎉'], anim: 'sway', emoji: '🛶', message: 'Happy Onam!', bannerBg: 'linear-gradient(135deg,#eab30815,#16a34a15)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('raksha') || n.includes('rakhi'))
+    return { particles: ['🪢','💝','✨','🎊','💐'], anim: 'twinkle', emoji: '🪢', message: 'Happy Raksha Bandhan!', bannerBg: 'linear-gradient(135deg,#ec489915,#a855f715)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('republic'))
+    return { particles: ['🇮🇳','🪷','🏛️','⭐','🎖️'], anim: 'sway', emoji: '🇮🇳', message: 'Happy Republic Day!', bannerBg: 'linear-gradient(135deg,#FF993315,#13880815)', bannerText: 'var(--color-text-primary)' };
+  if (n.includes('independence'))
+    return { particles: ['🇮🇳','🪁','🎆','🕊️','⭐'], anim: 'fall', emoji: '🇮🇳', message: 'Happy Independence Day!', bannerBg: 'linear-gradient(135deg,#FF993315,#13880815)', bannerText: 'var(--color-text-primary)' };
+  return { particles: ['🎉','✨','🎊','💫','⭐'], anim: 'twinkle', emoji: '🎉', message: 'Happy Holiday!', bannerBg: 'linear-gradient(135deg,#2563eb15,#7c3aed15)', bannerText: 'var(--color-text-primary)' };
+}
+
+function renderDayScene(theme) {
+  const scene = document.getElementById('dash-scene');
+  if (!scene) return;
+
+  const count = 18;
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    const p = theme.particles[i % theme.particles.length];
+    const left = Math.random() * 100;
+    const delay = Math.random() * 8;
+    const dur = 6 + Math.random() * 10;
+    const size = 14 + Math.random() * 18;
+    const top = Math.random() * 100;
+
+    let animName = 'dash-fall';
+    if (theme.anim === 'rise') animName = 'dash-rise';
+    else if (theme.anim === 'twinkle') animName = 'dash-twinkle';
+    else if (theme.anim === 'sway') animName = 'dash-sway';
+
+    html += `<span class="particle" style="left:${left}%;top:${top}%;font-size:${size}px;animation:${animName} ${dur}s ${delay}s ease-in-out infinite">${p}</span>`;
+  }
+  scene.innerHTML = html;
 }
