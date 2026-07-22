@@ -56,6 +56,7 @@ export default async function settingsOrg(container) {
       <button class="tab" data-tab="leave-types">Leave Types</button>
       <button class="tab" data-tab="holidays">Holidays</button>
       <button class="tab" data-tab="schedules">Work Schedules</button>
+      <button class="tab" data-tab="expenses">Expense Categories</button>
       <button class="tab" data-tab="integrations">Integrations</button>
     </div>
     <div id="settings-content" style="margin-top:var(--space-4)"></div>
@@ -86,6 +87,7 @@ export default async function settingsOrg(container) {
     else if (currentTab === 'leave-types') await renderLeaveTypes();
     else if (currentTab === 'holidays') await renderHolidays();
     else if (currentTab === 'schedules') await renderSchedules();
+    else if (currentTab === 'expenses') await renderExpenseCategories();
     else if (currentTab === 'integrations') { navigate('settings/integrations'); return; }
   }
 
@@ -765,6 +767,69 @@ export default async function settingsOrg(container) {
           if (error) return toast(error.message);
           await logAction('attendance', 'work_schedule', btn.dataset.delWs, 'deleted', null, null);
           toast('Schedule deleted'); renderSchedules();
+        });
+      });
+    }
+  }
+
+  async function renderExpenseCategories() {
+    const { data: categories, error } = await sb.from('expense_categories')
+      .select('*').eq('org_id', org.id).order('name');
+    if (error) console.error(error);
+
+    contentEl.innerHTML = `
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
+          <span class="card-title">Expense Categories</span>
+          ${isAdmin ? '<button class="btn btn-primary btn-sm" id="btn-add-cat">Add Category</button>' : ''}
+        </div>
+        <div class="card-body">
+          ${!categories?.length ? '<div class="empty-state"><p>No expense categories configured</p></div>' : `
+            <div class="table-wrap"><table class="table">
+              <thead><tr><th>Name</th><th>Code</th><th>Spending Limit</th><th>Status</th><th></th></tr></thead>
+              <tbody>${categories.map(c => `<tr>
+                <td style="font-weight:var(--font-weight-medium)">${esc(c.name)}</td>
+                <td><span class="badge">${esc(c.code)}</span></td>
+                <td>${c.spending_limit ? `${org?.currency || 'INR'} ${parseFloat(c.spending_limit).toLocaleString()}` : '—'}</td>
+                <td><span class="badge ${c.is_active ? 'badge-success' : 'badge-error'}">${c.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td>${isAdmin ? `<button class="btn btn-ghost btn-sm" data-del-cat="${c.id}" style="color:var(--color-error)">Delete</button>` : ''}</td>
+              </tr>`).join('')}</tbody>
+            </table></div>
+          `}
+        </div>
+      </div>
+    `;
+
+    if (isAdmin) {
+      contentEl.querySelector('#btn-add-cat')?.addEventListener('click', () => {
+        openModal('Add Expense Category', `
+          <form id="cat-form" style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <div><label class="form-label">Name</label><input class="form-input" name="name" required placeholder="e.g. Travel"></div>
+            <div><label class="form-label">Code</label><input class="form-input" name="code" required placeholder="e.g. TRV" style="text-transform:uppercase"></div>
+            <div><label class="form-label">Spending Limit (optional)</label><input class="form-input" name="spending_limit" type="number" step="0.01" placeholder="0.00"></div>
+            <div style="display:flex;gap:var(--space-2);justify-content:flex-end"><button type="button" class="btn btn-secondary" onclick="document.querySelector('.modal-overlay').remove()">Cancel</button><button type="submit" class="btn btn-primary">Add</button></div>
+          </form>
+        `);
+        document.getElementById('cat-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const { error } = await sb.from('expense_categories').insert({
+            org_id: org.id,
+            name: fd.get('name').trim(),
+            code: fd.get('code').trim().toUpperCase(),
+            spending_limit: fd.get('spending_limit') ? parseFloat(fd.get('spending_limit')) : null,
+          });
+          if (error) { toast(error.message); return; }
+          closeModal(); toast('Category added'); renderExpenseCategories();
+        });
+      });
+
+      contentEl.querySelectorAll('[data-del-cat]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this category?')) return;
+          const { error } = await sb.from('expense_categories').delete().eq('id', btn.dataset.delCat);
+          if (error) return toast(error.message);
+          toast('Category deleted'); renderExpenseCategories();
         });
       });
     }

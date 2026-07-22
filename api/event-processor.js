@@ -242,6 +242,43 @@ const recipes = {
     }
   },
 
+  "finance.expense.created": async (sb, event) => {
+    const { expense_id, org_id, amount, title } = event.payload;
+    const { data: expense } = await sb.from("expenses").select("user_id").eq("id", expense_id).maybeSingle();
+    if (!expense) return;
+
+    const { data: submitter } = await sb.from("users").select("full_name, reporting_manager_id").eq("id", expense.user_id).maybeSingle();
+    const name = submitter?.full_name || "An employee";
+
+    const notifyIds = new Set();
+    if (submitter?.reporting_manager_id) notifyIds.add(submitter.reporting_manager_id);
+
+    const { data: admins } = await sb.from("users").select("id").eq("org_id", org_id).in("role", ["owner", "admin"]);
+    (admins || []).forEach(u => notifyIds.add(u.id));
+    notifyIds.delete(expense.user_id);
+
+    if (notifyIds.size) {
+      const notifications = [...notifyIds].map(uid => ({
+        org_id, user_id: uid,
+        title: "New expense claim",
+        body: `${name} submitted an expense of ${amount} for "${title}".`,
+        module: "finance", entity_type: "expense", entity_id: expense_id,
+        channel: "in_app", status: "unread",
+      }));
+      await sb.from("notifications").insert(notifications);
+    }
+  },
+
+  "finance.expense.approved": async (sb, event) => {
+    const { expense_id, user_id, org_id } = event.payload;
+    await createNotification(sb, {
+      org_id, user_id,
+      title: "Expense approved",
+      body: "Your expense claim has been approved.",
+      module: "finance", entity_type: "expense", entity_id: expense_id,
+    });
+  },
+
   "attendance.regularization.approved": async (sb, event) => {
     const { regularization_id, user_id, org_id } = event.payload;
     if (user_id) {
