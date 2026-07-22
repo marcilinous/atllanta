@@ -231,10 +231,10 @@ test.describe('Navigation', () => {
         });
       });
     });
-    const recruitBtn = page.locator('.nav-btn[data-view="recruitment"]');
-    await recruitBtn.click();
+    const peopleBtn = page.locator('.nav-btn[data-view="people"]');
+    await peopleBtn.click();
     await page.waitForTimeout(100);
-    await expect(recruitBtn).toHaveClass(/active/);
+    await expect(peopleBtn).toHaveClass(/active/);
   });
 
   test('nav buttons have correct data-view attributes', async ({ page }) => {
@@ -244,6 +244,6 @@ test.describe('Navigation', () => {
     );
     expect(views).toContain('dashboard');
     expect(views).toContain('me');
-    expect(views).toContain('recruitment');
+    expect(views).toContain('people');
   });
 });

@@ -56,6 +56,14 @@ export default async function peopleHub(container) {
       color: 'var(--color-success)',
       requiresAdmin: true,
     },
+    {
+      title: 'Recruitment',
+      desc: 'Post jobs, match resumes to JDs, shortlist candidates, and schedule interviews',
+      icon: 'M3 7h18v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 12h4',
+      route: 'recruitment',
+      color: 'var(--color-warning)',
+      requiresAdmin: true,
+    },
   ];
 
   const visible = sections.filter(s => !s.requiresAdmin || isAdmin);

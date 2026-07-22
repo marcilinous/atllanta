@@ -45,7 +45,7 @@ async function handleRoute() {
 
 function updateActiveNav(path) {
   const base = path.split('/')[0];
-  const navAliases = { employees: 'people', approvals: 'inbox', leave: 'me', attendance: 'me', lifecycle: 'people', assets: 'people', letters: 'people', announcements: 'admin', audit: 'admin' };
+  const navAliases = { employees: 'people', approvals: 'inbox', leave: 'me', attendance: 'me', lifecycle: 'people', assets: 'people', letters: 'people', recruitment: 'people', announcements: 'admin', audit: 'admin' };
   const navKey = navAliases[base] || base;
   document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === path || btn.dataset.view === base || btn.dataset.view === navKey);
