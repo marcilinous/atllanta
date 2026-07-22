@@ -415,6 +415,7 @@
   .nav-btn .nav-tooltip { display: none !important; }
 
   .topbar-center { display: none; }
+  .topbar-left { flex: 1; }
 
   .mobile-search-btn { display: grid; }
 
