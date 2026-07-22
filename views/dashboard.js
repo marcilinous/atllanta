@@ -201,12 +201,13 @@ export default async function dashboard(container) {
 
   if (!org) return;
 
-  const [attResult, postsResult, eventsResult, membersResult, leavesResult] = await Promise.all([
+  const [attResult, postsResult, eventsResult, membersResult, leavesResult, annResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
     sb.from('posts').select('*').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(30),
     sb.from('events').select('*, actor:actor_id(full_name, email)').order('created_at', { ascending: false }).limit(15),
     sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org.id),
     sb.from('holidays').select('*').eq('year', today.getFullYear()).order('date', { ascending: true }),
+    sb.from('announcements').select('*, author:author_id(full_name)').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(5),
   ]);
 
   const allMembers = membersResult.data || [];
@@ -418,6 +419,19 @@ export default async function dashboard(container) {
     });
   }
 
+  for (const ann of (annResult.data || [])) {
+    feedItems.push({
+      id: ann.id,
+      type: 'announcement',
+      pinned: ann.pinned,
+      author: ann.author?.full_name || 'Admin',
+      authorId: ann.author_id,
+      title: ann.title,
+      content: ann.body,
+      time: ann.created_at,
+    });
+  }
+
   feedItems.sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
@@ -466,6 +480,25 @@ export default async function dashboard(container) {
                 <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="🎉" style="font-size:var(--text-sm)">${reactions['🎉'] ? '🎉 ' + reactions['🎉'] : '🎉'}</button>
                 <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="❤️" style="font-size:var(--text-sm)">${reactions['❤️'] ? '❤️ ' + reactions['❤️'] : '❤️'}</button>
               </div>
+            </div>
+          </div>`;
+      }
+
+      if (item.type === 'announcement') {
+        return `
+          <div class="card" style="padding:0;overflow:hidden;border-left:3px solid var(--color-warning)">
+            <div style="padding:var(--space-1) var(--space-4);background:var(--color-warning-light);font-size:var(--text-xs);color:var(--color-warning);font-weight:var(--font-weight-medium);display:flex;align-items:center;gap:var(--space-1)">📢 Announcement${item.pinned ? ' · 📌 Pinned' : ''}</div>
+            <div style="padding:var(--space-4)">
+              <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-2)">
+                <div style="width:36px;height:36px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-xs);flex-shrink:0">${initials(authorName)}</div>
+                <div>
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
+                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago}</div>
+                </div>
+              </div>
+              ${item.title ? `<h4 style="margin:0 0 var(--space-1);font-size:var(--text-md);font-weight:var(--font-weight-semibold)">${esc(item.title)}</h4>` : ''}
+              <p style="margin:0;font-size:var(--text-sm);color:var(--color-text-secondary);white-space:pre-wrap;max-height:120px;overflow:hidden">${esc(item.content)}</p>
+              <a href="#/announcements" style="font-size:var(--text-xs);color:var(--color-accent);text-decoration:none;margin-top:var(--space-2);display:inline-block">View all announcements &rarr;</a>
             </div>
           </div>`;
       }
