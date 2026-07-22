@@ -1,6 +1,6 @@
 import sb from '../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../js/auth.js';
-import { esc, toast, timeAgo, initials, avColor, openModal, closeModal } from '../js/ui.js';
+import { esc, toast, timeAgo, initials, avColor, openModal, closeModal, formatDate } from '../js/ui.js';
 
 export default async function dashboard(container) {
   const org = getOrg();
@@ -15,6 +15,94 @@ export default async function dashboard(container) {
   const firstName = membership?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || '';
 
   container.innerHTML = `
+    <style>
+      @keyframes dash-float {
+        0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.07; }
+        50% { transform: translateY(-20px) rotate(3deg); opacity: 0.12; }
+      }
+      @keyframes dash-drift {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(10px, -15px) scale(1.05); }
+        66% { transform: translate(-8px, -8px) scale(0.97); }
+      }
+      @keyframes dash-pulse {
+        0%, 100% { opacity: 0.04; }
+        50% { opacity: 0.09; }
+      }
+      .dash-two-col {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: var(--space-6);
+        align-items: start;
+      }
+      @media (max-width: 1024px) {
+        .dash-two-col { grid-template-columns: 1fr; }
+      }
+      .leaves-panel {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--radius-xl);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+      }
+      .leaves-bg {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 0;
+      }
+      .leaves-bg .shape {
+        position: absolute;
+        border-radius: 50%;
+      }
+      .leaves-bg .s1 {
+        width: 120px; height: 120px;
+        background: var(--color-accent);
+        top: -30px; right: -20px;
+        animation: dash-float 8s ease-in-out infinite;
+      }
+      .leaves-bg .s2 {
+        width: 80px; height: 80px;
+        background: var(--color-success);
+        bottom: 40px; left: -20px;
+        animation: dash-drift 10s ease-in-out infinite;
+      }
+      .leaves-bg .s3 {
+        width: 60px; height: 60px;
+        background: var(--color-warning);
+        top: 50%; right: 30%;
+        animation: dash-pulse 6s ease-in-out infinite;
+      }
+      .leaves-bg .s4 {
+        width: 160px; height: 160px;
+        background: var(--color-info);
+        bottom: -60px; right: -40px;
+        animation: dash-float 12s ease-in-out infinite reverse;
+      }
+      .leaves-bg .s5 {
+        width: 40px; height: 40px;
+        background: var(--color-error);
+        top: 30%; left: 20%;
+        animation: dash-drift 7s ease-in-out infinite reverse;
+      }
+      .leaves-content {
+        position: relative;
+        z-index: 1;
+      }
+      .leave-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: var(--space-3);
+        align-items: center;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: 1px solid var(--color-border-light);
+        transition: background var(--transition-fast);
+      }
+      .leave-row:last-child { border-bottom: none; }
+      .leave-row:hover { background: rgba(255,255,255,0.03); }
+    </style>
+
     <div id="dash-header" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-6);flex-wrap:wrap">
       <div>
         <h1 class="page-title" style="margin:0">${greeting}${firstName ? ', ' + esc(firstName) : ''}</h1>
@@ -25,22 +113,43 @@ export default async function dashboard(container) {
         <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Loading...</span>
       </div>
     </div>
-    <div style="max-width:640px;margin:0 auto">
-      <div id="composer" style="margin-bottom:var(--space-6)"></div>
-      <div id="feed" style="display:grid;gap:var(--space-4)">
-        <div class="card" style="padding:var(--space-6);text-align:center"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:60%"></div></div>
+
+    <div class="dash-two-col">
+      <div>
+        <div id="composer" style="margin-bottom:var(--space-4)"></div>
+        <div id="feed" style="display:grid;gap:var(--space-4)">
+          <div class="card" style="padding:var(--space-6);text-align:center"><div class="skeleton skeleton-text"></div></div>
+        </div>
+      </div>
+      <div class="leaves-panel" id="leaves-panel">
+        <div class="leaves-bg">
+          <div class="shape s1"></div>
+          <div class="shape s2"></div>
+          <div class="shape s3"></div>
+          <div class="shape s4"></div>
+          <div class="shape s5"></div>
+        </div>
+        <div class="leaves-content">
+          <div style="padding:var(--space-4);border-bottom:1px solid var(--color-border-light)">
+            <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">Organization Leaves</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Who's out today & upcoming</div>
+          </div>
+          <div id="leaves-list" style="max-height:520px;overflow-y:auto">
+            <div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:70%"></div></div>
+          </div>
+        </div>
       </div>
     </div>
   `;
 
   if (!org) return;
 
-  // Load data in parallel
-  const [attResult, postsResult, eventsResult, membersResult] = await Promise.all([
+  const [attResult, postsResult, eventsResult, membersResult, leavesResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
     sb.from('posts').select('*').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(30),
     sb.from('events').select('*, actor:actor_id(full_name, email)').order('created_at', { ascending: false }).limit(15),
     sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org.id),
+    sb.from('leave_requests').select('*, requester:user_id(full_name, email), leave_type:leave_type_id(name, code)').in('status', ['approved', 'pending']).gte('end_date', todayStr).order('start_date', { ascending: true }).limit(20),
   ]);
 
   const allMembers = membersResult.data || [];
@@ -64,6 +173,59 @@ export default async function dashboard(container) {
       <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${label}</span>
       <a href="#/me" style="font-size:var(--text-xs);color:var(--color-accent);text-decoration:none;margin-left:var(--space-1)">My Hub &rarr;</a>
     `;
+  }
+
+  // Leaves panel
+  const leavesListEl = document.getElementById('leaves-list');
+  if (leavesListEl) {
+    const leaves = leavesResult.data || [];
+    if (!leaves.length) {
+      leavesListEl.innerHTML = `
+        <div style="padding:var(--space-8);text-align:center">
+          <div style="font-size:var(--text-2xl);margin-bottom:var(--space-2)">🌴</div>
+          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">No one is on leave</div>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">Everyone's in today</div>
+        </div>`;
+    } else {
+      const todayLeaves = leaves.filter(l => l.start_date <= todayStr && l.end_date >= todayStr);
+      const upcoming = leaves.filter(l => l.start_date > todayStr);
+
+      let html = '';
+      if (todayLeaves.length) {
+        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-error);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Out Today (${todayLeaves.length})</div>`;
+        html += todayLeaves.map(l => leaveRow(l, true)).join('');
+      }
+      if (upcoming.length) {
+        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Upcoming</div>`;
+        html += upcoming.map(l => leaveRow(l, false)).join('');
+      }
+      leavesListEl.innerHTML = html;
+    }
+  }
+
+  function leaveRow(l, isToday) {
+    const name = l.requester?.full_name || l.requester?.email || 'Unknown';
+    const leaveCode = l.leave_type?.code || l.leave_type?.name || 'Leave';
+    const startD = new Date(l.start_date);
+    const endD = new Date(l.end_date);
+    const sameDay = l.start_date === l.end_date;
+    const dateLabel = sameDay
+      ? startD.toLocaleDateString('en', { day: 'numeric', month: 'short' })
+      : `${startD.toLocaleDateString('en', { day: 'numeric', month: 'short' })} – ${endD.toLocaleDateString('en', { day: 'numeric', month: 'short' })}`;
+    const statusColor = l.status === 'approved' ? 'var(--color-success)' : 'var(--color-warning)';
+
+    return `
+      <div class="leave-row">
+        <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(name)}</div>
+        <div style="min-width:0">
+          <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</div>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dateLabel} ${sameDay ? '' : '· ' + l.days + 'd'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <span style="font-size:var(--text-xs);font-weight:var(--font-weight-medium);padding:2px 8px;border-radius:var(--radius-full);background:${statusColor}15;color:${statusColor}">${esc(leaveCode)}</span>
+          ${l.status === 'pending' ? '<div style="font-size:9px;color:var(--color-warning);margin-top:2px">pending</div>' : ''}
+        </div>
+      </div>`;
   }
 
   // Composer (managers+)
@@ -122,7 +284,6 @@ export default async function dashboard(container) {
   // Build feed items — mix posts + events
   const feedItems = [];
 
-  // Posts from noticeboard
   for (const post of (postsResult.data || [])) {
     const author = allMembers.find(m => m.user_id === post.author_id);
     feedItems.push({
@@ -138,7 +299,6 @@ export default async function dashboard(container) {
     });
   }
 
-  // Events as feed items
   for (const ev of (eventsResult.data || [])) {
     const parts = ev.event_type.split('.');
     const action = parts[parts.length - 1];
@@ -180,14 +340,12 @@ export default async function dashboard(container) {
     });
   }
 
-  // Sort: pinned posts first, then by time
   feedItems.sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
     return new Date(b.time) - new Date(a.time);
   });
 
-  // Render feed
   const feedEl = document.getElementById('feed');
   if (!feedItems.length) {
     feedEl.innerHTML = `
@@ -196,58 +354,55 @@ export default async function dashboard(container) {
         <div style="font-weight:var(--font-weight-semibold);margin-bottom:var(--space-1)">Your noticeboard is empty</div>
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${isManager ? 'Post an announcement to get things started.' : 'Updates and announcements from your organization will appear here.'}</div>
       </div>`;
-    return;
-  }
+  } else {
+    feedEl.innerHTML = feedItems.map(item => {
+      const authorName = item.author;
+      const color = avColor(authorName);
+      const ago = timeAgo(item.time);
 
-  feedEl.innerHTML = feedItems.map(item => {
-    const authorName = item.author;
-    const color = avColor(authorName);
-    const ago = timeAgo(item.time);
+      if (item.type === 'post') {
+        const typeLabel = { announcement: '📢', shoutout: '🎉', update: '📝', milestone: '🏆' };
+        const typeBadge = typeLabel[item.postType] || '';
+        const reactions = item.reactions;
+        const canPin = isAdmin && !item.pinned;
+        const canUnpin = isAdmin && item.pinned;
+        const canDelete = item.authorId === user.id || isAdmin;
 
-    if (item.type === 'post') {
-      const typeLabel = { announcement: '📢', shoutout: '🎉', update: '📝', milestone: '🏆' };
-      const typeBadge = typeLabel[item.postType] || '';
-      const reactions = item.reactions;
-      const reactionKeys = Object.keys(reactions);
-      const canPin = isAdmin && !item.pinned;
-      const canUnpin = isAdmin && item.pinned;
-      const canDelete = item.authorId === user.id || isAdmin;
+        return `
+          <div class="card" style="padding:0;overflow:hidden${item.pinned ? ';border-left:3px solid var(--color-accent)' : ''}">
+            ${item.pinned ? '<div style="padding:var(--space-1) var(--space-4);background:var(--color-accent-light);font-size:var(--text-xs);color:var(--color-accent);font-weight:var(--font-weight-medium)">📌 Pinned</div>' : ''}
+            <div style="padding:var(--space-4)">
+              <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+                <div style="width:40px;height:40px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);flex-shrink:0">${initials(authorName)}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
+                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago} ${typeBadge}</div>
+                </div>
+                ${canDelete || canPin || canUnpin ? `<div class="post-actions" style="position:relative">
+                  <button class="btn btn-ghost btn-sm post-menu-btn" data-post-id="${item.id}" style="padding:2px 6px;font-size:var(--text-base)">⋯</button>
+                </div>` : ''}
+              </div>
+              <div style="font-size:var(--text-base);line-height:var(--line-height-relaxed);white-space:pre-wrap;word-break:break-word">${formatPostContent(esc(item.content))}</div>
+              <div style="display:flex;gap:var(--space-3);margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--color-border-light)">
+                <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="👍" style="font-size:var(--text-sm)">${reactions['👍'] ? '👍 ' + reactions['👍'] : '👍'}</button>
+                <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="🎉" style="font-size:var(--text-sm)">${reactions['🎉'] ? '🎉 ' + reactions['🎉'] : '🎉'}</button>
+                <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="❤️" style="font-size:var(--text-sm)">${reactions['❤️'] ? '❤️ ' + reactions['❤️'] : '❤️'}</button>
+              </div>
+            </div>
+          </div>`;
+      }
 
       return `
-        <div class="card" style="padding:0;overflow:hidden${item.pinned ? ';border-left:3px solid var(--color-accent)' : ''}">
-          ${item.pinned ? '<div style="padding:var(--space-1) var(--space-4);background:var(--color-accent-light);font-size:var(--text-xs);color:var(--color-accent);font-weight:var(--font-weight-medium)">📌 Pinned</div>' : ''}
-          <div style="padding:var(--space-4)">
-            <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
-              <div style="width:40px;height:40px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);flex-shrink:0">${initials(authorName)}</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago} ${typeBadge}</div>
-              </div>
-              ${canDelete || canPin || canUnpin ? `<div class="post-actions" style="position:relative">
-                <button class="btn btn-ghost btn-sm post-menu-btn" data-post-id="${item.id}" style="padding:2px 6px;font-size:var(--text-base)">⋯</button>
-              </div>` : ''}
-            </div>
-            <div style="font-size:var(--text-base);line-height:var(--line-height-relaxed);white-space:pre-wrap;word-break:break-word">${formatPostContent(esc(item.content))}</div>
-            <div style="display:flex;gap:var(--space-3);margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--color-border-light)">
-              <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="👍" style="font-size:var(--text-sm)">${reactions['👍'] ? '👍 ' + reactions['👍'] : '👍'}</button>
-              <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="🎉" style="font-size:var(--text-sm)">${reactions['🎉'] ? '🎉 ' + reactions['🎉'] : '🎉'}</button>
-              <button class="btn btn-ghost btn-sm react-btn" data-post-id="${item.id}" data-emoji="❤️" style="font-size:var(--text-sm)">${reactions['❤️'] ? '❤️ ' + reactions['❤️'] : '❤️'}</button>
-            </div>
+        <div style="display:flex;gap:var(--space-3);padding:var(--space-2) var(--space-3);align-items:center">
+          <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(authorName)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:var(--text-sm)"><span style="font-weight:var(--font-weight-medium)">${esc(authorName)}</span> <span style="color:var(--color-text-secondary)">${formatPostContent(esc(item.content))}</span></div>
+            <div style="font-size:10px;color:var(--color-text-tertiary)">${ago}</div>
           </div>
+          <span style="font-size:var(--text-base)">${item.icon}</span>
         </div>`;
-    }
-
-    // Event item — compact
-    return `
-      <div style="display:flex;gap:var(--space-3);padding:var(--space-2) var(--space-3);align-items:center">
-        <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(authorName)}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:var(--text-sm)"><span style="font-weight:var(--font-weight-medium)">${esc(authorName)}</span> <span style="color:var(--color-text-secondary)">${formatPostContent(esc(item.content))}</span></div>
-          <div style="font-size:10px;color:var(--color-text-tertiary)">${ago}</div>
-        </div>
-        <span style="font-size:var(--text-base)">${item.icon}</span>
-      </div>`;
-  }).join('');
+    }).join('');
+  }
 
   // Reaction handlers
   feedEl.querySelectorAll('.react-btn').forEach(btn => {
@@ -265,7 +420,7 @@ export default async function dashboard(container) {
     });
   });
 
-  // Post menu handlers (pin/unpin/delete)
+  // Post menu handlers
   feedEl.querySelectorAll('.post-menu-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
