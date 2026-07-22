@@ -261,7 +261,7 @@ export default async function handler(req, res) {
   }
 
   let appsQuery = db
-    .from("applications")
+    .from("job_applications")
     .select("id, candidate_id, match_score")
     .eq("job_id", job_id);
 
@@ -279,7 +279,7 @@ export default async function handler(req, res) {
   const candIds = apps.map((a) => a.candidate_id);
   const { data: candidates } = await db
     .from("candidates")
-    .select("id, name, resume_raw_text")
+    .select("id, full_name, name, resume_text, resume_raw_text")
     .in("id", candIds);
 
   const candMap = {};
@@ -297,15 +297,15 @@ export default async function handler(req, res) {
 
   for (const app of apps) {
     const cand = candMap[app.candidate_id];
-    if (!cand?.resume_raw_text?.trim()) {
-      results.push({ application_id: app.id, candidate_name: cand?.name || "Unknown", score: null, error: "No resume text" });
+    if (!(cand?.resume_text || cand?.resume_raw_text)?.trim()) {
+      results.push({ application_id: app.id, candidate_name: cand?.full_name || cand?.name || "Unknown", score: null, error: "No resume text" });
       continue;
     }
 
     if (useAI) {
       // ── AI matching (Groq) ──────────────────────────────────────
       if (org.credit_overage_mode === "hard_stop" && creditsRemaining <= 0) {
-        results.push({ application_id: app.id, candidate_name: cand.name, score: null, error: "Out of credits" });
+        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Out of credits" });
         continue;
       }
 
@@ -317,7 +317,7 @@ JOB DESCRIPTION:
 ${jd.slice(0, 6000)}
 
 RESUME:
-${cand.resume_raw_text.slice(0, 6000)}
+${(cand.resume_text || cand.resume_raw_text).slice(0, 6000)}
 
 Respond ONLY with minified JSON, no markdown fences, in this exact shape:
 {"score": <0-100 number>, "summary": "<2-3 sentence assessment>", "strengths": ["..."], "gaps": ["..."]}`;
@@ -338,7 +338,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
         });
 
         if (!groqResp.ok) {
-          results.push({ application_id: app.id, candidate_name: cand.name, score: null, error: "Groq API error" });
+          results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Groq API error" });
           continue;
         }
 
@@ -348,11 +348,11 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
         const parsed = JSON.parse(raw);
         const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
 
-        await db.from("applications").update({
+        await db.from("job_applications").update({
           match_score: score,
           match_summary: parsed.summary || "",
           match_raw_response: parsed,
-          stage: "screened",
+          status: "screened",
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
 
@@ -366,27 +366,27 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
           reference_id: app.id,
         });
 
-        results.push({ application_id: app.id, candidate_name: cand.name, score, summary: parsed.summary });
+        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score, summary: parsed.summary });
       } catch (err) {
-        results.push({ application_id: app.id, candidate_name: cand.name, score: null, error: "Parse error" });
+        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Parse error" });
       }
     } else {
       // ── Algorithmic matching (free) ─────────────────────────────
       try {
-        const result = algorithmicMatch(jd, cand.resume_raw_text);
+        const result = algorithmicMatch(jd, cand.resume_text || cand.resume_raw_text);
         const score = result.score;
 
-        await db.from("applications").update({
+        await db.from("job_applications").update({
           match_score: score,
           match_summary: result.summary || "",
           match_raw_response: result,
-          stage: "screened",
+          status: "screened",
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
 
-        results.push({ application_id: app.id, candidate_name: cand.name, score, summary: result.summary });
+        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score, summary: result.summary });
       } catch (err) {
-        results.push({ application_id: app.id, candidate_name: cand.name, score: null, error: "Matching error" });
+        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Matching error" });
       }
     }
   }

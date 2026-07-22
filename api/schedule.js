@@ -17,8 +17,8 @@ export default async function handler(req, res) {
     if (!token) return res.status(400).json({ error: "token required" });
 
     const { data: app } = await db
-      .from("applications")
-      .select("id, job_id, candidate_id, stage, interview_at, schedule_expires_at, meet_link")
+      .from("job_applications")
+      .select("id, job_id, candidate_id, status, interview_at, schedule_expires_at, meet_link")
       .eq("schedule_token", token)
       .single();
     if (!app) return res.status(404).json({ error: "Invalid or expired link" });
@@ -28,8 +28,8 @@ export default async function handler(req, res) {
     }
 
     const [{ data: job }, { data: cand }] = await Promise.all([
-      db.from("jobs").select("id, title, client_id").eq("id", app.job_id).single(),
-      db.from("candidates").select("name").eq("id", app.candidate_id).single(),
+      db.from("jobs").select("id, title, client_id, hiring_manager_id").eq("id", app.job_id).single(),
+      db.from("candidates").select("full_name, name").eq("id", app.candidate_id).single(),
     ]);
     if (!job) return res.status(404).json({ error: "Job not found" });
 
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       .from("clients").select("organization_id, name").eq("id", job.client_id).single();
 
     const { data: org } = client
-      ? await db.from("organizations").select("name").eq("id", client.organization_id).single()
+      ? await db.from("organizations").select("full_name, name").eq("id", client.organization_id).single()
       : { data: null };
 
     if (app.interview_at) {
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
         meet_link: app.meet_link || null,
         job_title: job.title,
         org_name: org?.name || client?.name || "",
-        candidate_name: cand?.name || "",
+        candidate_name: cand?.full_name || cand?.name || "",
       });
     }
 
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       booked: false,
       job_title: job.title,
       org_name: org?.name || client?.name || "",
-      candidate_name: cand?.name || "",
+      candidate_name: cand?.full_name || cand?.name || "",
       slots: slots || [],
       expires_at: expiresAt,
     });
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     if (!token || !slot_id) return res.status(400).json({ error: "token and slot_id required" });
 
     const { data: app } = await db
-      .from("applications")
+      .from("job_applications")
       .select("id, job_id, interview_at, schedule_expires_at")
       .eq("schedule_token", token)
       .single();
@@ -107,36 +107,37 @@ export default async function handler(req, res) {
     // Fetch candidate, job, org info for the calendar event
     const [{ data: job }, { data: cand }] = await Promise.all([
       db.from("jobs").select("title, client_id").eq("id", app.job_id).single(),
-      db.from("candidates").select("name, email").eq("id", app.candidate_id).single(),
+      db.from("candidates").select("full_name, name, email").eq("id", app.candidate_id).single(),
     ]);
 
     let meetLink = null;
     try {
-      // Get manager email for the calendar invite
+      // Use the job's hiring manager for Google Meet, fall back to slot creator
+      const creatorUserId = job.hiring_manager_id || slot.created_by;
       let managerEmail = null;
-      if (slot.created_by) {
-        const { data: mUser } = await db.auth.admin.getUserById(slot.created_by);
+      if (creatorUserId) {
+        const { data: mUser } = await db.auth.admin.getUserById(creatorUserId);
         managerEmail = mUser?.user?.email || null;
       }
 
       const meetResult = await createMeetEvent({
-        title: `Interview: ${cand?.name || "Candidate"} — ${job?.title || "Position"}`,
-        description: `Interview for ${job?.title || "Position"}\nCandidate: ${cand?.name || ""}`,
+        title: `Interview: ${cand?.full_name || cand?.name || "Candidate"} — ${job?.title || "Position"}`,
+        description: `Interview for ${job?.title || "Position"}\nCandidate: ${cand?.full_name || cand?.name || ""}`,
         startTime: slot.slot_start,
         endTime: slot.slot_end,
         attendees: [managerEmail, cand?.email],
-        creatorUserId: slot.created_by,
+        creatorUserId,
       });
       meetLink = meetResult?.meetLink || null;
     } catch (_) {
       // Meet creation is best-effort — booking still succeeds without it
     }
 
-    const updateData = { stage: "interview_scheduled", interview_at: slot.slot_start };
+    const updateData = { status: "interview_scheduled", interview_at: slot.slot_start };
     if (meetLink) updateData.meet_link = meetLink;
 
     const { error: appErr } = await db
-      .from("applications")
+      .from("job_applications")
       .update(updateData)
       .eq("id", app.id);
     if (appErr) return res.status(500).json({ error: "Update failed" });
