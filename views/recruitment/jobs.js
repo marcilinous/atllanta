@@ -70,6 +70,7 @@ export default async function recruitmentJobs(container) {
   }
 
   await loadData();
+  await loadOrgMembers();
 
   let searchTerm = '';
 
@@ -126,6 +127,7 @@ export default async function recruitmentJobs(container) {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
               <span style="font-weight:var(--font-weight-semibold)">Candidates (${appCount})</span>
               <div style="display:flex;gap:var(--space-2)">
+                <button class="btn btn-secondary btn-sm" data-act="assign-manager" data-job-id="${j.id}">${j.hiring_manager_id ? 'Change Manager' : 'Assign Manager'}</button>
                 <button class="btn btn-secondary btn-sm" data-act="upload" data-job-id="${j.id}">Upload Resumes</button>
                 <button class="btn btn-primary btn-sm" data-act="screen" data-job-id="${j.id}">Screen All</button>
               </div>
@@ -149,7 +151,7 @@ export default async function recruitmentJobs(container) {
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
               <div style="flex:1;min-width:0">
                 <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">${esc(j.title)}</div>
-                <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:var(--space-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.location ? esc(j.location) + ' · ' : ''}${j.employment_type ? esc(j.employment_type.replace('_', ' ')) + ' · ' : ''}${esc((j.description || '').slice(0, 80))}</div>
+                <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:var(--space-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.location ? esc(j.location) + ' · ' : ''}${j.employment_type ? esc(j.employment_type.replace('_', ' ')) + ' · ' : ''}${j.hiring_manager_id ? (() => { const m = orgMembers.find(x => x.user_id === j.hiring_manager_id); return m ? '<span style="color:var(--color-accent)">👤 ' + esc(m.full_name || m.email) + '</span> · ' : ''; })() : ''}${esc((j.description || '').slice(0, 80))}</div>
               </div>
               ${stagePill(j.status)}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="flex-shrink:0;transition:transform .2s;${isExpanded ? 'transform:rotate(180deg)' : ''}"><polyline points="6 9 12 15 18 9"/></svg>
@@ -179,6 +181,10 @@ export default async function recruitmentJobs(container) {
 
     grid.querySelectorAll('[data-act=screen]').forEach(el => {
       el.addEventListener('click', (e) => { e.stopPropagation(); screenJob(el.dataset.jobId); });
+    });
+
+    grid.querySelectorAll('[data-act=assign-manager]').forEach(el => {
+      el.addEventListener('click', (e) => { e.stopPropagation(); showAssignManager(el.dataset.jobId); });
     });
 
     grid.querySelectorAll('[data-act=stage-update]').forEach(el => {
@@ -218,8 +224,20 @@ export default async function recruitmentJobs(container) {
     navigate('recruitment/interviews');
   });
 
+  // ── Load org members for hiring manager dropdown ──
+  let orgMembers = [];
+  async function loadOrgMembers() {
+    if (orgMembers.length) return;
+    const { data: members } = await sb.from('memberships')
+      .select('user_id, full_name, email, role')
+      .eq('organization_id', org?.id || cid)
+      .in('role', ['owner', 'admin', 'manager', 'super_admin', 'agency_admin', 'client_admin']);
+    orgMembers = members || [];
+  }
+
   // ── Create Job Modal ──
-  function showJobForm() {
+  async function showJobForm() {
+    await loadOrgMembers();
     const f = document.createElement('div');
     f.innerHTML = `
       <div style="display:grid;gap:var(--space-4)">
@@ -232,6 +250,14 @@ export default async function recruitmentJobs(container) {
           <input type="text" class="form-input" id="jf-desc" placeholder="One-line summary for the listing">
         </div>
         <div class="form-group">
+          <label class="form-label">Hiring Manager</label>
+          <select class="form-input" id="jf-manager">
+            <option value="">— Select manager —</option>
+            ${orgMembers.map(m => `<option value="${m.user_id}">${esc(m.full_name || m.email || 'Unknown')} (${m.role})</option>`).join('')}
+          </select>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">This person will schedule interviews and receive Google Meet invites</div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Job Description (full JD text)</label>
           <textarea class="form-input" id="jf-jd" rows="6" placeholder="Paste the complete JD here — this is what resumes get scored against."></textarea>
         </div>
@@ -242,20 +268,59 @@ export default async function recruitmentJobs(container) {
     f.querySelector('#jf-save').addEventListener('click', async () => {
       const title = f.querySelector('#jf-title').value.trim();
       if (!title) return toast('Job title is required');
+      const managerId = f.querySelector('#jf-manager').value || null;
       const btn = f.querySelector('#jf-save');
       btn.disabled = true;
       btn.textContent = 'Creating...';
-      const { error } = await sb.from('jobs').insert({
+      const insertData = {
         [orgCol]: cid,
         title,
         description: f.querySelector('#jf-desc').value.trim(),
         jd_raw_text: f.querySelector('#jf-jd').value.trim(),
-      });
+      };
+      if (managerId) insertData.hiring_manager_id = managerId;
+      const { error } = await sb.from('jobs').insert(insertData);
       if (error) { toast(error.message); btn.disabled = false; btn.textContent = 'Create Job'; return; }
       closeModal();
       toast('Job created');
-      await logAction('recruitment', 'job', null, 'created', null, { title });
-      await publishEvent('recruitment.job.created', { title });
+      await logAction('recruitment', 'job', null, 'created', null, { title, hiring_manager_id: managerId });
+      await publishEvent('recruitment.job.created', { title, hiring_manager_id: managerId });
+      await loadData();
+      renderJobs();
+    });
+  }
+
+  // ── Assign Manager Modal ──
+  async function showAssignManager(jobId) {
+    await loadOrgMembers();
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    const f = document.createElement('div');
+    f.innerHTML = `
+      <div style="display:grid;gap:var(--space-4)">
+        <p style="color:var(--color-text-secondary)">${esc(job.title)}</p>
+        <div class="form-group">
+          <label class="form-label">Hiring Manager</label>
+          <select class="form-input" id="am-manager">
+            <option value="">— No manager assigned —</option>
+            ${orgMembers.map(m => `<option value="${m.user_id}" ${m.user_id === job.hiring_manager_id ? 'selected' : ''}>${esc(m.full_name || m.email || 'Unknown')} (${m.role})</option>`).join('')}
+          </select>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">This person will schedule interviews and their Google account will be used for Meet invites</div>
+        </div>
+        <button class="btn btn-primary" id="am-save">Save</button>
+      </div>`;
+    openModal('Assign Hiring Manager', f);
+
+    f.querySelector('#am-save').addEventListener('click', async () => {
+      const managerId = f.querySelector('#am-manager').value || null;
+      const btn = f.querySelector('#am-save');
+      btn.disabled = true;
+      const { error } = await sb.from('jobs').update({ hiring_manager_id: managerId }).eq('id', jobId);
+      if (error) { toast(error.message); btn.disabled = false; return; }
+      closeModal();
+      toast(managerId ? 'Hiring manager assigned' : 'Hiring manager removed');
+      await logAction('recruitment', 'job', jobId, 'manager_assigned', { hiring_manager_id: job.hiring_manager_id }, { hiring_manager_id: managerId });
       await loadData();
       renderJobs();
     });

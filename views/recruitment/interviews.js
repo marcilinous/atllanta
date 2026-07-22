@@ -43,10 +43,11 @@ export default async function interviewsView(container) {
     });
   });
 
-  const [{ data: jobs, error: jobsErr }, { data: candidates, error: candsErr }, { data: apps, error: appsErr }] = await Promise.all([
+  const [{ data: jobs, error: jobsErr }, { data: candidates, error: candsErr }, { data: apps, error: appsErr }, { data: members }] = await Promise.all([
     sb.from('jobs').select('*').eq(orgCol, cid),
     sb.from('candidates').select('*').eq(orgCol, cid),
     sb.from('job_applications').select('*').in('status', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
+    sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org?.id || cid),
   ]);
   if (jobsErr) toast('Failed to load jobs: ' + jobsErr.message);
   if (candsErr) toast('Failed to load candidates: ' + candsErr.message);
@@ -55,6 +56,7 @@ export default async function interviewsView(container) {
   const allJobs = jobs || [];
   const allCands = candidates || [];
   const allApps = (apps || []).filter(a => allJobs.some(j => j.id === a.job_id));
+  const allMembers = members || [];
 
   const interviewApps = allApps.filter(a => ['interview_scheduled', 'interviewed'].includes(a.status));
   const schedulable = allApps.filter(a => !['rejected', 'hired', 'interviewed'].includes(a.status) && !a.interview_at);
@@ -109,7 +111,7 @@ export default async function interviewsView(container) {
         </div>
         <div style="flex:1">
           <div style="font-weight:var(--font-weight-semibold)">${esc(c?.full_name || 'Unknown')}</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(j?.title || '')} · ${a.status.replaceAll('_', ' ')}</div>
+          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(j?.title || '')} · ${a.status.replaceAll('_', ' ')}${(() => { const mgr = j?.hiring_manager_id ? allMembers.find(m => m.user_id === j.hiring_manager_id) : null; return mgr ? ` · 👤 ${esc(mgr.full_name || mgr.email)}` : ''; })()}</div>
           <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${a.interview_at ? '' : ' (manual)'}</div>
           ${a.meet_link ? `<a href="${esc(a.meet_link)}" target="_blank" rel="noopener" style="font-size:var(--text-sm);color:var(--color-accent)">Google Meet</a>` : ''}
         </div>
@@ -241,10 +243,13 @@ export default async function interviewsView(container) {
 
     const allSlots = slots || [];
 
+    const hiringMgr = job?.hiring_manager_id ? allMembers.find(m => m.user_id === job.hiring_manager_id) : null;
+    const slotCreatorId = job?.hiring_manager_id || (await sb.auth.getUser()).data.user.id;
+
     const f = document.createElement('div');
     f.innerHTML = `
       <div style="display:grid;gap:var(--space-4)">
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.full_name)} for ${esc(job?.title)}</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.full_name)} for ${esc(job?.title)}${hiringMgr ? ` · Manager: ${esc(hiringMgr.full_name || hiringMgr.email)}` : ''}</div>
         <div style="display:flex;gap:var(--space-2);align-items:flex-end">
           <div class="form-group" style="flex:1"><label class="form-label">Date</label><input type="date" class="form-input" id="sl-date" min="${new Date().toISOString().slice(0, 10)}"></div>
           <div class="form-group"><label class="form-label">Start</label><input type="time" class="form-input" id="sl-start" value="10:00"></div>
@@ -313,15 +318,13 @@ export default async function interviewsView(container) {
       const end = f.querySelector('#sl-end').value;
       if (!date || !start || !end) return toast('Fill date, start, and end time');
       if (start >= end) return toast('End must be after start');
-      const { data: membership, error: memError } = await sb.from('memberships').select('organization_id').limit(1).single();
-      if (memError) return toast('Failed to fetch membership: ' + memError.message);
       const { data, error } = await sb.from('interview_slots').insert({
-        organization_id: membership?.organization_id,
+        organization_id: org?.id || cid,
         job_id: app.job_id,
         application_id: appId,
         slot_start: new Date(`${date}T${start}:00`).toISOString(),
         slot_end: new Date(`${date}T${end}:00`).toISOString(),
-        created_by: (await sb.auth.getUser()).data.user.id,
+        created_by: slotCreatorId,
       }).select().single();
       if (error) return toast(error.message);
       allSlots.push(data);
@@ -335,9 +338,6 @@ export default async function interviewsView(container) {
         const date = f.querySelector('#sl-date').value;
         if (!date) return toast('Pick a date first');
         const mins = +btn.dataset.quick;
-        const { data: membership, error: memErr } = await sb.from('memberships').select('organization_id').limit(1).single();
-        if (memErr) return toast('Failed to fetch membership: ' + memErr.message);
-        const userId = (await sb.auth.getUser()).data.user.id;
         const newSlots = [];
         for (let h = 9; h < 18;) {
           const m = h * 60;
@@ -351,12 +351,12 @@ export default async function interviewsView(container) {
           const slot_end = new Date(`${date}T${eh}:${em}:00`).toISOString();
           if (!allSlots.some(s => s.slot_start === slot_start && s.slot_end === slot_end)) {
             newSlots.push({
-              organization_id: membership?.organization_id,
+              organization_id: org?.id || cid,
               job_id: app.job_id,
               application_id: appId,
               slot_start,
               slot_end,
-              created_by: userId,
+              created_by: slotCreatorId,
             });
           }
           h = mEnd / 60;

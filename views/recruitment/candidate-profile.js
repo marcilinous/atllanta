@@ -26,20 +26,26 @@ export default async function candidateProfile(container) {
     return;
   }
 
-  const [{ data: applications, error: appsErr }, { data: interviews, error: intErr }] = await Promise.all([
-    sb.from('job_applications')
-      .select('*, job:job_id(title, status)')
-      .eq('candidate_id', candidateId)
-      .order('created_at', { ascending: false }),
-    sb.from('interviews')
-      .select('*, application:job_application_id(job:job_id(title))')
-      .eq('job_application_id', candidateId)
-      .order('scheduled_at', { ascending: false }),
-  ]);
+  const { data: applications, error: appsErr } = await sb.from('job_applications')
+    .select('*, job:job_id(title, status)')
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false });
   if (appsErr) toast('Failed to load applications: ' + appsErr.message);
-  if (intErr) toast('Failed to load interviews: ' + intErr.message);
 
   const apps = applications || [];
+  const appIds = apps.map(a => a.id);
+
+  let interviews = [];
+  let intErr = null;
+  if (appIds.length) {
+    const result = await sb.from('interviews')
+      .select('*, application:job_application_id(job:job_id(title))')
+      .in('job_application_id', appIds)
+      .order('scheduled_at', { ascending: false });
+    interviews = result.data;
+    intErr = result.error;
+  }
+  if (intErr) toast('Failed to load interviews: ' + intErr.message);
   const intvs = interviews || [];
   const skills = candidate.parsed_skills?.skills || [];
 

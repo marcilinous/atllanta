@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     }
 
     const [{ data: job }, { data: cand }] = await Promise.all([
-      db.from("jobs").select("id, title, client_id").eq("id", app.job_id).single(),
+      db.from("jobs").select("id, title, client_id, hiring_manager_id").eq("id", app.job_id).single(),
       db.from("candidates").select("full_name, name").eq("id", app.candidate_id).single(),
     ]);
     if (!job) return res.status(404).json({ error: "Job not found" });
@@ -112,10 +112,11 @@ export default async function handler(req, res) {
 
     let meetLink = null;
     try {
-      // Get manager email for the calendar invite
+      // Use the job's hiring manager for Google Meet, fall back to slot creator
+      const creatorUserId = job.hiring_manager_id || slot.created_by;
       let managerEmail = null;
-      if (slot.created_by) {
-        const { data: mUser } = await db.auth.admin.getUserById(slot.created_by);
+      if (creatorUserId) {
+        const { data: mUser } = await db.auth.admin.getUserById(creatorUserId);
         managerEmail = mUser?.user?.email || null;
       }
 
@@ -125,7 +126,7 @@ export default async function handler(req, res) {
         startTime: slot.slot_start,
         endTime: slot.slot_end,
         attendees: [managerEmail, cand?.email],
-        creatorUserId: slot.created_by,
+        creatorUserId,
       });
       meetLink = meetResult?.meetLink || null;
     } catch (_) {
