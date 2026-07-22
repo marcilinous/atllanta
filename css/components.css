@@ -731,7 +731,7 @@ select.form-input { cursor: pointer; }
   .table-wrap { border-radius: var(--radius-md); }
 
   .toast {
-    bottom: calc(48px + var(--space-3));
+    bottom: calc(52px + var(--space-3));
     max-width: calc(100vw - var(--space-4));
     left: 50%;
   }
