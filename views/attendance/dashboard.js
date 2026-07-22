@@ -27,9 +27,15 @@ export default async function attendanceDashboard(container) {
   let currentLat = null, currentLng = null;
 
   container.innerHTML = `
-    <div class="page-header" style="margin-bottom:var(--space-4)">
-      <h1 class="page-title">Attendance</h1>
-      <p class="page-subtitle">${today.toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+    <div class="page-header" style="margin-bottom:var(--space-4);display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-2)">
+      <div>
+        <h1 class="page-title">Attendance</h1>
+        <p class="page-subtitle">${today.toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+      </div>
+      <div style="display:flex;gap:var(--space-2)">
+        ${isManager ? '<a href="#/attendance/report" class="btn btn-secondary btn-sm">Report</a>' : ''}
+        <a href="#/attendance/regularize" class="btn btn-secondary btn-sm">Regularize</a>
+      </div>
     </div>
 
     <div class="att-top-row">

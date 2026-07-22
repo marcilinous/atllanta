@@ -26,7 +26,13 @@ export default async function leaveModule(container) {
         <h1 class="page-title">Leave</h1>
         <p class="page-subtitle">Manage leaves, balances, and approvals</p>
       </div>
-      ${isManager ? '<a href="#/leave/settings" class="btn btn-secondary btn-sm">Leave Settings</a>' : ''}
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+        <a href="#/leave/balances" class="btn btn-secondary btn-sm">Balances</a>
+        ${isManager ? '<a href="#/leave/approvals" class="btn btn-secondary btn-sm">Approvals</a>' : ''}
+        ${isManager ? '<a href="#/leave/report" class="btn btn-secondary btn-sm">Report</a>' : ''}
+        <a href="#/leave/calendar" class="btn btn-secondary btn-sm">Calendar</a>
+        ${isManager ? '<a href="#/leave/settings" class="btn btn-secondary btn-sm">Settings</a>' : ''}
+      </div>
     </div>
 
     <div id="leave-balances-row" style="margin-bottom:var(--space-4)">
