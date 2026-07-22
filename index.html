@@ -175,6 +175,7 @@ import leaveReport from '/views/leave/report.js';
 import jobDetail from '/views/recruitment/job-detail.js';
 import orgChart from '/views/employees/orgchart.js';
 import approvalsInbox from '/views/approvals.js';
+import inboxView from '/views/inbox.js';
 import onboarding from '/views/onboarding.js';
 import reportsView from '/views/reports/index.js';
 import documentsView from '/views/documents/index.js';
@@ -185,6 +186,8 @@ import helpdeskView from '/views/helpdesk/index.js';
 import assetsView from '/views/people/assets.js';
 import lettersView from '/views/people/letters.js';
 import lifecycleView from '/views/people/lifecycle.js';
+import peopleHub from '/views/people/index.js';
+import profileSettings from '/views/settings/profile.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -402,15 +405,16 @@ async function loadNotifList() {
 // Route registrations
 registerRoute('dashboard', dashboard);
 registerRoute('me', meView);
-registerRoute('inbox', approvalsInbox);
-registerRoute('people', employeeList);
+registerRoute('inbox', inboxView);
+registerRoute('people', peopleHub);
 registerRoute('employees', employeeList);
 registerRoute('attendance', attendanceDashboard);
 registerRoute('leave', leaveApply);
 registerRoute('recruitment', recruitmentJobs);
 registerRoute('recruitment/jobs', recruitmentJobs);
 registerRoute('recruitment/interviews', interviewsView);
-registerRoute('settings', settingsOrg);
+registerRoute('settings', profileSettings);
+registerRoute('settings/org', settingsOrg);
 registerRoute('settings/users', settingsUsers);
 registerRoute('settings/departments', departmentsView);
 registerRoute('settings/integrations', integrationsView);
