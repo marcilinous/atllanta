@@ -146,59 +146,68 @@ export default async function leaveSettings(container) {
     });
   }
 
+  let holidayYear = new Date().getFullYear();
+
   async function renderHolidays(el) {
-    const year = new Date().getFullYear();
+    const year = holidayYear;
     const { data: holidays, error: holErr } = await sb.from('holidays').select('*').eq('org_id', org.id).eq('year', year).order('date');
     if (holErr) toast('Failed to load holidays: ' + holErr.message);
     const allHolidays = holidays || [];
+    const mandatory = allHolidays.filter(h => !h.is_optional).length;
+    const optional = allHolidays.filter(h => h.is_optional).length;
+    const todayStr = new Date().toISOString().split('T')[0];
 
     el.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
-        <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${year} — ${allHolidays.length} holiday${allHolidays.length !== 1 ? 's' : ''}</span>
-        <button class="btn btn-primary" id="add-holiday-btn">+ Add Holiday</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4);flex-wrap:wrap;gap:var(--space-3)">
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <button class="btn btn-ghost btn-sm" id="hol-prev-yr" style="padding:var(--space-1) var(--space-2)">&larr;</button>
+          <span style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">${year}</span>
+          <button class="btn btn-ghost btn-sm" id="hol-next-yr" style="padding:var(--space-1) var(--space-2)">&rarr;</button>
+          <span style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-left:var(--space-2)">${allHolidays.length} total · ${mandatory} mandatory · ${optional} optional</span>
+        </div>
+        <div style="display:flex;gap:var(--space-2)">
+          <button class="btn btn-secondary btn-sm" id="hol-template-btn">Load Template</button>
+          <button class="btn btn-primary btn-sm" id="add-holiday-btn">+ Add Holiday</button>
+        </div>
       </div>
       ${allHolidays.length ? `<div class="card"><div class="table-wrap"><table class="table">
-        <thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Actions</th></tr></thead>
-        <tbody>${allHolidays.map(h => `<tr>
+        <thead><tr><th>Date</th><th>Day</th><th>Name</th><th>Type</th><th>Actions</th></tr></thead>
+        <tbody>${allHolidays.map(h => {
+          const d = new Date(h.date);
+          const dayName = d.toLocaleDateString('en', { weekday: 'short' });
+          const isPast = h.date < todayStr;
+          return `<tr style="${isPast ? 'opacity:0.5' : ''}">
           <td style="font-weight:var(--font-weight-medium)">${formatDate(h.date)}</td>
-          <td>${esc(h.name)}</td>
+          <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${dayName}</td>
+          <td>${esc(h.name)}${h.date === todayStr ? ' <span class="badge badge-success" style="margin-left:var(--space-1)">Today</span>' : ''}</td>
           <td>${h.is_optional ? '<span class="badge badge-warning">Optional</span>' : '<span class="badge badge-success">Mandatory</span>'}</td>
-          <td><button class="btn btn-ghost btn-sm" data-delete-holiday="${h.id}" style="color:var(--color-error)">Delete</button></td>
-        </tr>`).join('')}</tbody>
+          <td>
+            <div style="display:flex;gap:var(--space-1)">
+              <button class="btn btn-ghost btn-sm" data-edit-holiday="${h.id}">Edit</button>
+              <button class="btn btn-ghost btn-sm" data-delete-holiday="${h.id}" style="color:var(--color-error)">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+        }).join('')}</tbody>
       </table></div></div>` : `<div class="card"><div class="empty-state" style="padding:var(--space-8)">
-        <div class="empty-state-title">No holidays configured</div>
-        <div class="empty-state-desc">Add holidays for ${year}.</div>
+        <div class="empty-state-title">No holidays for ${year}</div>
+        <div class="empty-state-desc">Add holidays manually or load a template of common Indian holidays.</div>
       </div></div>`}
     `;
 
-    document.getElementById('add-holiday-btn').addEventListener('click', () => {
-      const f = document.createElement('div');
-      f.innerHTML = `
-        <div style="display:grid;gap:var(--space-4)">
-          <div class="form-group"><label class="form-label">Holiday Name</label><input type="text" class="form-input" id="hol-name" placeholder="e.g. Diwali"></div>
-          <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="hol-date"></div>
-          <label class="form-label"><input type="checkbox" id="hol-optional"> Optional Holiday</label>
-          <button class="btn btn-primary" id="hol-save">Add Holiday</button>
-        </div>`;
-      openModal('Add Holiday', f);
+    document.getElementById('hol-prev-yr').addEventListener('click', () => { holidayYear--; renderHolidays(el); });
+    document.getElementById('hol-next-yr').addEventListener('click', () => { holidayYear++; renderHolidays(el); });
 
-      f.querySelector('#hol-save').addEventListener('click', async () => {
-        const name = f.querySelector('#hol-name').value.trim();
-        const date = f.querySelector('#hol-date').value;
-        if (!name || !date) return toast('Name and date are required');
+    document.getElementById('add-holiday-btn').addEventListener('click', () => editHoliday(null, year, el));
 
-        const { error } = await sb.from('holidays').insert({
-          org_id: org.id, name, date,
-          is_optional: f.querySelector('#hol-optional').checked,
-          year: new Date(date).getFullYear(),
-        });
-        if (error) return toast(error.message);
-        await logAction('leave', 'holiday', null, 'created', null, { name, date });
-        closeModal();
-        toast('Holiday added');
-        renderHolidays(el);
+    el.querySelectorAll('[data-edit-holiday]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const h = allHolidays.find(x => x.id === btn.dataset.editHoliday);
+        if (h) editHoliday(h, year, el);
       });
     });
+
+    document.getElementById('hol-template-btn').addEventListener('click', () => loadTemplate(year, allHolidays, el));
 
     el.querySelectorAll('[data-delete-holiday]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -209,6 +218,118 @@ export default async function leaveSettings(container) {
         toast('Holiday deleted');
         renderHolidays(el);
       });
+    });
+  }
+
+  function editHoliday(h, year, el) {
+    const f = document.createElement('div');
+    f.innerHTML = `
+      <div style="display:grid;gap:var(--space-4)">
+        <div class="form-group"><label class="form-label">Holiday Name</label><input type="text" class="form-input" id="hol-name" value="${esc(h?.name || '')}" placeholder="e.g. Diwali"></div>
+        <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="hol-date" value="${h?.date || ''}"></div>
+        <label class="form-label"><input type="checkbox" id="hol-optional" ${h?.is_optional ? 'checked' : ''}> Optional Holiday</label>
+        <button class="btn btn-primary" id="hol-save">${h ? 'Update' : 'Add'} Holiday</button>
+      </div>`;
+    openModal(h ? 'Edit Holiday' : 'Add Holiday', f);
+
+    f.querySelector('#hol-save').addEventListener('click', async () => {
+      const name = f.querySelector('#hol-name').value.trim();
+      const date = f.querySelector('#hol-date').value;
+      if (!name || !date) return toast('Name and date are required');
+
+      const data = { name, date, is_optional: f.querySelector('#hol-optional').checked, year: new Date(date).getFullYear() };
+      if (h) {
+        const { error } = await sb.from('holidays').update(data).eq('id', h.id);
+        if (error) return toast(error.message);
+        await logAction('leave', 'holiday', h.id, 'updated', { name: h.name, date: h.date }, data);
+      } else {
+        data.org_id = org.id;
+        const { error } = await sb.from('holidays').insert(data);
+        if (error) return toast(error.message);
+        await logAction('leave', 'holiday', null, 'created', null, data);
+      }
+      closeModal();
+      toast(h ? 'Holiday updated' : 'Holiday added');
+      renderHolidays(el);
+    });
+  }
+
+  function loadTemplate(year, existing, el) {
+    const templates = [
+      { name: 'New Year', date: `${year}-01-01` },
+      { name: 'Republic Day', date: `${year}-01-26` },
+      { name: 'Holi', date: `${year}-03-14` },
+      { name: 'Good Friday', date: `${year}-04-18` },
+      { name: 'Labour Day', date: `${year}-05-01` },
+      { name: 'Independence Day', date: `${year}-08-15` },
+      { name: 'Janmashtami', date: `${year}-08-16`, optional: true },
+      { name: 'Gandhi Jayanti', date: `${year}-10-02` },
+      { name: 'Dussehra', date: `${year}-10-02`, optional: true },
+      { name: 'Diwali', date: `${year}-10-20` },
+      { name: 'Diwali (Day 2)', date: `${year}-10-21` },
+      { name: 'Guru Nanak Jayanti', date: `${year}-11-05`, optional: true },
+      { name: 'Christmas', date: `${year}-12-25` },
+    ];
+
+    const existingDates = new Set(existing.map(h => h.date));
+    const available = templates.filter(t => !existingDates.has(t.date));
+
+    const f = document.createElement('div');
+    f.innerHTML = `
+      <div style="margin-bottom:var(--space-3);font-size:var(--text-sm);color:var(--color-text-secondary)">Select holidays to add for ${year}. Already-added dates are excluded.</div>
+      ${available.length ? `
+        <div style="margin-bottom:var(--space-3)">
+          <label class="form-label" style="cursor:pointer"><input type="checkbox" id="tpl-select-all" checked> Select All</label>
+        </div>
+        <div style="max-height:360px;overflow-y:auto;display:grid;gap:var(--space-2)">
+          ${available.map((t, i) => {
+            const d = new Date(t.date);
+            const dayName = d.toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' });
+            return `<label style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:1px solid var(--color-border-light);cursor:pointer">
+              <input type="checkbox" class="tpl-check" data-idx="${i}" checked>
+              <div style="flex:1">
+                <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(t.name)}</div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dayName}${t.optional ? ' · Optional' : ''}</div>
+              </div>
+            </label>`;
+          }).join('')}
+        </div>
+        <button class="btn btn-primary" id="tpl-add" style="margin-top:var(--space-4);width:100%">Add Selected Holidays</button>
+      ` : `<div style="text-align:center;padding:var(--space-4);color:var(--color-text-tertiary)">All template holidays are already added for ${year}.</div>`}
+    `;
+    openModal(`Indian Holiday Template — ${year}`, f);
+
+    if (!available.length) return;
+
+    f.querySelector('#tpl-select-all').addEventListener('change', (e) => {
+      f.querySelectorAll('.tpl-check').forEach(c => c.checked = e.target.checked);
+    });
+
+    f.querySelector('#tpl-add').addEventListener('click', async () => {
+      const selected = [];
+      f.querySelectorAll('.tpl-check:checked').forEach(c => {
+        selected.push(available[parseInt(c.dataset.idx)]);
+      });
+      if (!selected.length) return toast('Select at least one holiday');
+
+      const btn = f.querySelector('#tpl-add');
+      btn.disabled = true;
+      btn.textContent = `Adding ${selected.length} holidays...`;
+
+      const rows = selected.map(t => ({
+        org_id: org.id,
+        name: t.name,
+        date: t.date,
+        is_optional: !!t.optional,
+        year,
+      }));
+
+      const { error } = await sb.from('holidays').insert(rows);
+      if (error) { toast('Failed: ' + error.message); btn.disabled = false; btn.textContent = 'Add Selected Holidays'; return; }
+      await logAction('leave', 'holiday', null, 'bulk_created', null, { count: rows.length, year });
+      closeModal();
+      toast(`${selected.length} holidays added`);
+      renderHolidays(el);
     });
   }
 
