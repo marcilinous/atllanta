@@ -26,6 +26,8 @@ export default async function adminView(container) {
       icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>' },
     { href: '#/announcements', title: 'Announcements', desc: 'Post company-wide announcements',
       icon: '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51M2 12l9-8 9 8M4 10v10a1 1 0 0 0 1 1h4"/><path d="M12 3v18"/>' },
+    { href: '#/helpdesk/settings', title: 'Helpdesk Categories', desc: 'Configure ticket categories and assign handlers',
+      icon: '<path d="M15 5v2M15 11v2M15 17v2M5 5a2 2 0 0 0-2 2v3c1.66 0 3 1.34 3 3s-1.34 3-3 3v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3c-1.66 0-3-1.34-3-3s1.34-3 3-3V7a2 2 0 0 0-2-2H5z"/>' },
     { href: '#/settings/integrations', title: 'Integrations', desc: 'Connected services and API keys',
       icon: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>' }
   ];

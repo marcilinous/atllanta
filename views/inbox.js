@@ -365,47 +365,20 @@ export default async function inboxView(container) {
   }
 
   async function renderHelpdesk() {
-    const { data: events, error } = await sb
-      .from('events')
-      .select('*, actor:actor_id(full_name, email)')
-      .like('event_type', 'helpdesk.ticket.%')
+    let q = sb.from('helpdesk_tickets')
+      .select('*, category:category_id(name, icon), creator:created_by(full_name, email)')
       .order('created_at', { ascending: false });
+
+    if (!showHistory) q = q.in('status', ['open', 'in_progress']);
+
+    const { data: tickets, error } = await q;
 
     if (error) {
       content.innerHTML = `<div class="card"><div class="card-body" style="color:var(--color-error)">Failed to load: ${esc(error.message)}</div></div>`;
       return;
     }
 
-    const tmap = {};
-    for (const ev of (events || [])) {
-      const tid = ev.payload?.ticket_id;
-      if (!tid) continue;
-      if (!tmap[tid]) {
-        tmap[tid] = {
-          ticket_id: tid,
-          subject: ev.payload.subject || '(no subject)',
-          description: ev.payload.description || '',
-          category: ev.payload.category || 'Other',
-          priority: ev.payload.priority || 'Medium',
-          status: ev.payload.status || 'open',
-          created_at: ev.created_at,
-          actor: ev.actor,
-          actor_id: ev.actor_id,
-        };
-      }
-      if (ev.event_type === 'helpdesk.ticket.updated') {
-        if (ev.payload.status) tmap[tid].status = ev.payload.status;
-        if (ev.payload.priority) tmap[tid].priority = ev.payload.priority;
-      }
-    }
-
-    let tickets = Object.values(tmap).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-    if (!showHistory) {
-      tickets = tickets.filter(t => t.status === 'open');
-    }
-
-    if (!tickets.length) {
+    if (!tickets?.length) {
       content.innerHTML = `<div class="card"><div class="empty-state" style="padding:var(--space-8)">
         <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
         <div class="empty-state-title">All caught up</div>
@@ -415,7 +388,8 @@ export default async function inboxView(container) {
     }
 
     const priorityColors = { Low: 'neutral', Medium: 'info', High: 'warning', Urgent: 'error' };
-    const statusColors = { open: 'warning', resolved: 'success', closed: 'neutral' };
+    const statusColors = { open: 'warning', in_progress: 'info', resolved: 'success', closed: 'neutral' };
+    const statusLabels = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed' };
 
     content.innerHTML = `<div class="card">
       <div class="table-wrap"><table class="table">
@@ -423,22 +397,22 @@ export default async function inboxView(container) {
       <tbody>${tickets.map(t => `<tr>
         <td>
           <div style="display:flex;align-items:center;gap:var(--space-2)">
-            <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(t.actor?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(t.actor?.full_name || '?')}</div>
-            <span style="font-size:var(--text-sm)">${esc(t.actor?.full_name || '—')}</span>
+            <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(t.creator?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(t.creator?.full_name || '?')}</div>
+            <span style="font-size:var(--text-sm)">${esc(t.creator?.full_name || '—')}</span>
           </div>
         </td>
         <td style="font-weight:var(--font-weight-medium);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.subject)}</td>
-        <td><span class="badge badge-info">${esc(t.category)}</span></td>
+        <td>${t.category ? `<span class="badge badge-info">${esc(t.category.icon || '📋')} ${esc(t.category.name)}</span>` : '<span class="badge badge-neutral">—</span>'}</td>
         <td><span class="badge badge-${priorityColors[t.priority] || 'neutral'}">${esc(t.priority)}</span></td>
         ${showHistory
-          ? `<td><span class="badge badge-${statusColors[t.status] || 'neutral'}"><span class="badge-dot"></span>${esc(t.status)}</span></td>`
+          ? `<td><span class="badge badge-${statusColors[t.status] || 'neutral'}"><span class="badge-dot"></span>${statusLabels[t.status] || esc(t.status)}</span></td>`
           : `<td>${pendingDuration(t.created_at)}</td>`
         }
         <td>
-          ${t.status === 'open' && isManager ? `<div style="display:flex;gap:var(--space-1)">
-            <button class="btn btn-primary btn-sm" data-action="resolve-ticket" data-tid="${esc(t.ticket_id)}">Resolve</button>
-            <button class="btn btn-secondary btn-sm" data-action="close-ticket" data-tid="${esc(t.ticket_id)}">Close</button>
-          </div>` : t.status === 'resolved' && isManager ? `<button class="btn btn-secondary btn-sm" data-action="close-ticket" data-tid="${esc(t.ticket_id)}">Close</button>` : '—'}
+          ${['open', 'in_progress'].includes(t.status) && isManager ? `<div style="display:flex;gap:var(--space-1)">
+            <button class="btn btn-primary btn-sm" data-action="resolve-ticket" data-tid="${t.id}">Resolve</button>
+            <button class="btn btn-secondary btn-sm" data-action="close-ticket" data-tid="${t.id}">Close</button>
+          </div>` : t.status === 'resolved' && isManager ? `<button class="btn btn-secondary btn-sm" data-action="close-ticket" data-tid="${t.id}">Close</button>` : '—'}
         </td>
       </tr>`).join('')}</tbody>
     </table></div></div>`;
@@ -446,7 +420,9 @@ export default async function inboxView(container) {
     content.querySelectorAll('[data-action="resolve-ticket"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        await publishEvent('helpdesk.ticket.updated', { ticket_id: btn.dataset.tid, status: 'resolved' });
+        const t = tickets.find(x => x.id === btn.dataset.tid);
+        await sb.from('helpdesk_tickets').update({ status: 'resolved', resolved_by: user.id, resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', btn.dataset.tid);
+        await publishEvent('helpdesk.ticket.updated', { ticket_id: btn.dataset.tid, status: 'resolved', user_id: t?.created_by });
         toast('Ticket resolved');
         updateTabCounts();
         renderHelpdesk();
@@ -456,7 +432,9 @@ export default async function inboxView(container) {
     content.querySelectorAll('[data-action="close-ticket"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        await publishEvent('helpdesk.ticket.updated', { ticket_id: btn.dataset.tid, status: 'closed' });
+        const t = tickets.find(x => x.id === btn.dataset.tid);
+        await sb.from('helpdesk_tickets').update({ status: 'closed', updated_at: new Date().toISOString() }).eq('id', btn.dataset.tid);
+        await publishEvent('helpdesk.ticket.updated', { ticket_id: btn.dataset.tid, status: 'closed', user_id: t?.created_by });
         toast('Ticket closed');
         updateTabCounts();
         renderHelpdesk();
@@ -472,16 +450,8 @@ export default async function inboxView(container) {
     leaveCount = lc ?? 0;
     regCount = rc ?? 0;
 
-    const { data: te, error: teError } = await sb.from('events').select('payload').like('event_type', 'helpdesk.ticket.%').order('created_at', { ascending: false });
-    if (teError) console.error('Failed to fetch ticket events:', teError);
-    const tm = {};
-    for (const ev of (te || [])) {
-      const tid = ev.payload?.ticket_id;
-      if (!tid) continue;
-      if (!tm[tid]) tm[tid] = ev.payload.status || 'open';
-      if (ev.payload.status) tm[tid] = ev.payload.status;
-    }
-    ticketCount = Object.values(tm).filter(s => s === 'open').length;
+    const { count: tc } = await sb.from('helpdesk_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress']);
+    ticketCount = tc ?? 0;
 
     const tabs = document.querySelectorAll('#inbox-tabs .tab');
     if (tabs[0]) tabs[0].innerHTML = `Leave Requests${leaveCount ? ` <span class="badge badge-error" style="margin-left:var(--space-1);font-size:10px;padding:1px 6px">${leaveCount}</span>` : ''}`;

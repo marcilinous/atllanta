@@ -261,7 +261,38 @@ const HANDLERS = {
 
   'helpdesk.ticket.created': async (p, org) => {
     const name = await getUserName(p.user_id);
-    await notifyByRole(org.id, ['admin', 'owner'], 'New helpdesk ticket', `${name} raised: ${p.title || 'a new ticket'}`, 'helpdesk', 'helpdesk_ticket', p.ticket_id);
+    let notified = false;
+
+    if (p.category_id) {
+      const { data: handlers } = await sb
+        .from('helpdesk_category_handlers')
+        .select('user_id')
+        .eq('category_id', p.category_id);
+
+      if (handlers?.length) {
+        const rows = handlers
+          .filter(h => h.user_id !== p.user_id)
+          .map(h => ({
+            org_id: org.id,
+            user_id: h.user_id,
+            title: 'New helpdesk ticket',
+            body: `${name} raised: ${p.title || p.subject || 'a new ticket'}`,
+            module: 'helpdesk',
+            entity_type: 'helpdesk_ticket',
+            entity_id: p.ticket_id,
+            channel: 'in_app',
+            status: 'unread'
+          }));
+        if (rows.length) {
+          await sb.from('notifications').insert(rows);
+          notified = true;
+        }
+      }
+    }
+
+    if (!notified) {
+      await notifyByRole(org.id, ['admin', 'owner'], 'New helpdesk ticket', `${name} raised: ${p.title || p.subject || 'a new ticket'}`, 'helpdesk', 'helpdesk_ticket', p.ticket_id);
+    }
   },
 
   'helpdesk.ticket.updated': async (p, org) => {
