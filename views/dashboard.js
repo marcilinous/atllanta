@@ -131,8 +131,8 @@ export default async function dashboard(container) {
         </div>
         <div class="leaves-content">
           <div style="padding:var(--space-4);border-bottom:1px solid var(--color-border-light)">
-            <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">Organization Leaves</div>
-            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Who's out today & upcoming</div>
+            <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">Organization Holidays</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${today.getFullYear()} holiday calendar</div>
           </div>
           <div id="leaves-list" style="max-height:520px;overflow-y:auto">
             <div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:70%"></div></div>
@@ -149,7 +149,7 @@ export default async function dashboard(container) {
     sb.from('posts').select('*').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(30),
     sb.from('events').select('*, actor:actor_id(full_name, email)').order('created_at', { ascending: false }).limit(15),
     sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org.id),
-    sb.from('leave_requests').select('*, requester:user_id(full_name, email), leave_type:leave_type_id(name, code)').in('status', ['approved', 'pending']).gte('end_date', todayStr).order('start_date', { ascending: true }).limit(20),
+    sb.from('holidays').select('*').eq('year', today.getFullYear()).order('date', { ascending: true }),
   ]);
 
   const allMembers = membersResult.data || [];
@@ -175,55 +175,60 @@ export default async function dashboard(container) {
     `;
   }
 
-  // Leaves panel
+  // Holidays panel
   const leavesListEl = document.getElementById('leaves-list');
   if (leavesListEl) {
-    const leaves = leavesResult.data || [];
-    if (!leaves.length) {
+    const holidays = (leavesResult.data || []).filter(h => {
+      const d = new Date(h.date);
+      return d.getDay() !== 0;
+    });
+    if (!holidays.length) {
       leavesListEl.innerHTML = `
         <div style="padding:var(--space-8);text-align:center">
-          <div style="font-size:var(--text-2xl);margin-bottom:var(--space-2)">🌴</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">No one is on leave</div>
-          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">Everyone's in today</div>
+          <div style="font-size:var(--text-2xl);margin-bottom:var(--space-2)">📅</div>
+          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">No holidays configured</div>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">${isAdmin ? 'Add holidays in Leave Settings' : 'Ask your admin to set up the holiday calendar'}</div>
         </div>`;
     } else {
-      const todayLeaves = leaves.filter(l => l.start_date <= todayStr && l.end_date >= todayStr);
-      const upcoming = leaves.filter(l => l.start_date > todayStr);
+      const past = holidays.filter(h => h.date < todayStr);
+      const todayH = holidays.filter(h => h.date === todayStr);
+      const upcoming = holidays.filter(h => h.date > todayStr);
 
       let html = '';
-      if (todayLeaves.length) {
-        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-error);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Out Today (${todayLeaves.length})</div>`;
-        html += todayLeaves.map(l => leaveRow(l, true)).join('');
+      if (todayH.length) {
+        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-success);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Today</div>`;
+        html += todayH.map(h => holidayRow(h, 'today')).join('');
       }
       if (upcoming.length) {
-        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Upcoming</div>`;
-        html += upcoming.map(l => leaveRow(l, false)).join('');
+        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-accent);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Upcoming (${upcoming.length})</div>`;
+        html += upcoming.map(h => holidayRow(h, 'upcoming')).join('');
+      }
+      if (past.length) {
+        html += `<div style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.05em;background:var(--color-bg-secondary)">Past (${past.length})</div>`;
+        html += past.map(h => holidayRow(h, 'past')).join('');
       }
       leavesListEl.innerHTML = html;
     }
   }
 
-  function leaveRow(l, isToday) {
-    const name = l.requester?.full_name || l.requester?.email || 'Unknown';
-    const leaveCode = l.leave_type?.code || l.leave_type?.name || 'Leave';
-    const startD = new Date(l.start_date);
-    const endD = new Date(l.end_date);
-    const sameDay = l.start_date === l.end_date;
-    const dateLabel = sameDay
-      ? startD.toLocaleDateString('en', { day: 'numeric', month: 'short' })
-      : `${startD.toLocaleDateString('en', { day: 'numeric', month: 'short' })} – ${endD.toLocaleDateString('en', { day: 'numeric', month: 'short' })}`;
-    const statusColor = l.status === 'approved' ? 'var(--color-success)' : 'var(--color-warning)';
+  function holidayRow(h, period) {
+    const d = new Date(h.date);
+    const dayName = d.toLocaleDateString('en', { weekday: 'short' });
+    const dateLabel = d.toLocaleDateString('en', { day: 'numeric', month: 'short' });
+    const isPast = period === 'past';
+    const isToday = period === 'today';
+    const dotColor = isToday ? 'var(--color-success)' : isPast ? 'var(--color-text-tertiary)' : 'var(--color-accent)';
 
     return `
-      <div class="leave-row">
-        <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(name)}</div>
+      <div class="leave-row" style="${isPast ? 'opacity:0.5' : ''}">
+        <div style="width:32px;height:32px;border-radius:var(--radius-lg);background:${isToday ? 'var(--color-success-light)' : isPast ? 'var(--color-bg-tertiary)' : 'var(--color-accent-light)'};display:flex;align-items:center;justify-content:center;font-size:var(--text-sm);flex-shrink:0">${isToday ? '🎉' : h.is_optional ? '🔹' : '📅'}</div>
         <div style="min-width:0">
-          <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</div>
-          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dateLabel} ${sameDay ? '' : '· ' + l.days + 'd'}</div>
+          <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name)}</div>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dayName}, ${dateLabel}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <span style="font-size:var(--text-xs);font-weight:var(--font-weight-medium);padding:2px 8px;border-radius:var(--radius-full);background:${statusColor}15;color:${statusColor}">${esc(leaveCode)}</span>
-          ${l.status === 'pending' ? '<div style="font-size:9px;color:var(--color-warning);margin-top:2px">pending</div>' : ''}
+          ${h.is_optional ? '<span style="font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);background:var(--color-warning-light);color:var(--color-warning)">Optional</span>' : ''}
+          ${isToday ? '<span style="font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);background:var(--color-success-light);color:var(--color-success)">Today</span>' : ''}
         </div>
       </div>`;
   }
