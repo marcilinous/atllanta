@@ -191,13 +191,13 @@ export default async function settingsUsers(container) {
 
         try {
           const { data: { session } } = await sb.auth.getSession();
-          const resp = await fetch('/api/invite', {
+          const resp = await fetch('/api/create-org', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({ email, role }),
+            body: JSON.stringify({ action: 'invite', email, role }),
           });
           const result = await resp.json();
 
