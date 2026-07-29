@@ -189,40 +189,56 @@ export default async function settingsUsers(container) {
         btn.disabled = true;
         btn.textContent = 'Inviting...';
 
-        // Check if member already exists
-        const { data: existing } = await sb
-          .from('memberships')
-          .select('id')
-          .eq('organization_id', org.id)
-          .eq('email', email)
-          .maybeSingle();
+        try {
+          const { data: { session } } = await sb.auth.getSession();
+          const resp = await fetch('/api/create-org', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ action: 'invite', email, role }),
+          });
+          const result = await resp.json();
 
-        if (existing) {
-          toast('This email is already a member');
+          if (!resp.ok) {
+            toast(result.error || 'Invite failed');
+            btn.disabled = false;
+            btn.textContent = 'Send Invite';
+            return;
+          }
+
+          await logAction('people', 'membership', null, 'invited', null, { email, role });
+          await publishEvent('people.member.invited', { email, role });
+          closeModal();
+
+          if (result.new_account && result.temp_password) {
+            const info = document.createElement('div');
+            info.innerHTML = `
+              <div style="display:grid;gap:var(--space-4)">
+                <div style="text-align:center">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" width="48" height="48" style="margin:0 auto var(--space-3)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Account Created</div>
+                </div>
+                <div style="background:var(--color-bg-secondary);border-radius:var(--radius-md);padding:var(--space-4)">
+                  <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-2)">Share these credentials with the new member:</div>
+                  <div style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Email:</strong> ${esc(email)}</div>
+                  <div style="font-size:var(--text-sm)"><strong>Temporary Password:</strong> <code style="background:var(--color-bg-tertiary);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);user-select:all">${esc(result.temp_password)}</code></div>
+                </div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);text-align:center">They should change their password after first login.</div>
+                <button class="btn btn-primary" id="invite-done-btn">Done</button>
+              </div>`;
+            openModal('Member Invited', info);
+            info.querySelector('#invite-done-btn').addEventListener('click', closeModal);
+          } else {
+            toast('Invite sent to ' + email);
+          }
+          loadMembers();
+        } catch (err) {
+          toast('Invite failed: ' + err.message);
           btn.disabled = false;
           btn.textContent = 'Send Invite';
-          return;
         }
-
-        const { error } = await sb.from('memberships').insert({
-          organization_id: org.id,
-          email,
-          role,
-          invited_at: new Date().toISOString(),
-        });
-
-        if (error) {
-          toast('Invite failed: ' + error.message);
-          btn.disabled = false;
-          btn.textContent = 'Send Invite';
-          return;
-        }
-
-        await logAction('people', 'membership', null, 'invited', null, { email, role });
-        await publishEvent('people.member.invited', { email, role });
-        closeModal();
-        toast('Invite sent to ' + email);
-        loadMembers();
       });
     });
   }

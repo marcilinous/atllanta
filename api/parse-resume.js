@@ -2,8 +2,15 @@
 // Accepts a resume file (PDF or DOCX) as base64 JSON payload, extracts text.
 // Body: { filename: "resume.pdf", data: "<base64 string>" }
 // Returns: { text: "<extracted text>" }
+//
+// POST /api/parse-resume?action=parse-jd
+// Parses a job description via Groq and extracts structured skills.
+// Body: { description: "...", job_id?: "..." }
+// Returns: { parsed_skills: { must_have, nice_to_have, ... } }
 
-import { SUPABASE_URL } from "../lib/supabaseServer.js";
+import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -35,6 +42,9 @@ export default async function handler(req, res) {
 
   const user = await getUserFromToken(token);
   if (!user?.id) return res.status(401).json({ error: "Invalid session" });
+
+  const action = req.query?.action;
+  if (action === "parse-jd") return handleParseJD(req, res);
 
   const { filename, data } = req.body || {};
   if (!filename || !data) {
@@ -85,4 +95,61 @@ export default async function handler(req, res) {
   }
 
   return res.status(200).json({ text });
+}
+
+async function handleParseJD(req, res) {
+  const { description, job_id } = req.body || {};
+  if (!description) return res.status(400).json({ error: "description is required" });
+
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return res.status(500).json({ error: "GROQ_API_KEY not configured" });
+
+  const prompt = `Extract skills from this job description. Return JSON only:
+{
+  "must_have": ["skill1", "skill2"],
+  "nice_to_have": ["skill3", "skill4"],
+  "experience_min": 2,
+  "experience_max": 5,
+  "education": ["degree1"]
+}
+
+Job Description:
+${description.slice(0, 4000)}`;
+
+  const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        { role: "system", content: "You extract structured skills from job descriptions. Return valid JSON only, no markdown." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 1024,
+    }),
+  });
+
+  if (!groqResp.ok) {
+    const err = await groqResp.text();
+    return res.status(502).json({ error: "Groq API error", details: err });
+  }
+
+  const result = await groqResp.json();
+  const text = result.choices?.[0]?.message?.content || "";
+
+  let parsed;
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  } catch {
+    return res.status(200).json({ raw: text, parsed_skills: null });
+  }
+
+  if (job_id) {
+    const sb = supabaseAdmin();
+    await sb.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id);
+  }
+
+  return res.status(200).json({ parsed_skills: parsed });
 }
