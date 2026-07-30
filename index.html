@@ -136,7 +136,7 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
-import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
+import { onUnreadChange, onNewNotification, notifTarget, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 import { startEventProcessor } from '/js/event-processor.js';
@@ -258,7 +258,9 @@ document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
 });
 
 onUnreadChange(count => {
-  document.getElementById('notif-dot').classList.toggle('hidden', count === 0);
+  const dot = document.getElementById('notif-dot');
+  dot.textContent = count > 9 ? '9+' : String(count);
+  dot.classList.toggle('hidden', count === 0);
 });
 fetchUnreadCount();
 subscribeRealtime();
@@ -358,6 +360,11 @@ notifBtn.addEventListener('click', async () => {
   notifPanel.classList.remove('hidden');
 });
 
+// Live-refresh the panel if it's open when a new notification arrives.
+onNewNotification(() => {
+  if (notifPanel && !notifPanel.classList.contains('hidden')) loadNotifList();
+});
+
 async function loadNotifList() {
   const notifs = await fetchNotifications(15);
   const listEl = document.getElementById('notif-list');
@@ -392,7 +399,9 @@ async function loadNotifList() {
   }
 
   listEl.innerHTML = notifs.map(n => `
-    <div class="notif-item ${n.status === 'unread' ? 'unread' : ''}" data-notif-id="${n.id}">
+    <div class="notif-item ${n.status === 'unread' ? 'unread' : ''}" data-notif-id="${n.id}"
+      data-module="${esc(n.module || '')}" data-entity-type="${esc(n.entity_type || '')}"
+      data-entity-id="${esc(n.entity_id || '')}" data-title="${esc(n.title || '')}">
       <div class="notif-icon" style="background:${moduleColors[n.module] || 'var(--color-bg-tertiary)'}">${moduleIcons[n.module] || '\u{1F514}'}</div>
       <div class="notif-content">
         <div class="notif-title">${esc(n.title)}</div>
@@ -402,10 +411,20 @@ async function loadNotifList() {
     </div>
   `).join('');
 
-  listEl.querySelectorAll('.notif-item.unread').forEach(item => {
+  listEl.querySelectorAll('.notif-item').forEach(item => {
     item.addEventListener('click', async () => {
-      await markRead(item.dataset.notifId);
-      item.classList.remove('unread');
+      if (item.classList.contains('unread')) {
+        item.classList.remove('unread');
+        await markRead(item.dataset.notifId);
+      }
+      const target = notifTarget({
+        module: item.dataset.module,
+        entity_type: item.dataset.entityType,
+        entity_id: item.dataset.entityId || null,
+        title: item.dataset.title,
+      });
+      notifPanel.classList.add('hidden');
+      navigate(target);
     });
   });
 }
