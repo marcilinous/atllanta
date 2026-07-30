@@ -575,6 +575,15 @@ select.form-input { cursor: pointer; }
   color: var(--color-text-tertiary);
 }
 
+.notif-panel-footer {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-2);
+  display: flex;
+  justify-content: center;
+}
+
+.notif-panel-footer .btn { width: 100%; }
+
 /* ── AI Panel ────────────────────────────── */
 .ai-panel {
   position: fixed;

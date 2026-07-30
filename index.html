@@ -173,6 +173,7 @@ import jobDetail from '/views/recruitment/job-detail.js';
 import orgChart from '/views/employees/orgchart.js';
 import approvalsInbox from '/views/approvals.js';
 import inboxView from '/views/inbox.js';
+import notificationsView from '/views/notifications.js';
 import onboarding from '/views/onboarding.js';
 import reportsView from '/views/reports/index.js';
 import documentsView from '/views/documents/index.js';
@@ -341,12 +342,20 @@ notifBtn.addEventListener('click', async () => {
         <button class="btn btn-ghost btn-sm" id="notif-mark-all">Mark all read</button>
       </div>
       <div class="notif-list" id="notif-list"></div>
+      <div class="notif-panel-footer">
+        <button class="btn btn-ghost btn-sm" id="notif-view-all">View all notifications</button>
+      </div>
     `;
     document.querySelector('.topbar-right').appendChild(notifPanel);
 
     document.getElementById('notif-mark-all').addEventListener('click', async () => {
       await markAllRead();
       loadNotifList();
+    });
+
+    document.getElementById('notif-view-all').addEventListener('click', () => {
+      notifPanel.classList.add('hidden');
+      navigate('notifications');
     });
 
     document.addEventListener('click', (e) => {
@@ -433,6 +442,7 @@ async function loadNotifList() {
 registerRoute('dashboard', dashboard);
 registerRoute('me', meView);
 registerRoute('inbox', inboxView);
+registerRoute('notifications', notificationsView);
 registerRoute('people', peopleHub);
 registerRoute('employees', employeeList);
 registerRoute('attendance', attendanceDashboard);
