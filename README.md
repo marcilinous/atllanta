@@ -48,6 +48,32 @@ supabase/seed.sql      Demo orgs (Atllanta, BlueHire)
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side DB access for `/api` (never in frontend) |
 | `GROQ_API_KEY` | Resume-JD matching |
 | `SUPABASE_URL` | Optional — defaults to the Atllanta project URL |
+| `RESEND_API_KEY` | Email delivery for queued notifications (optional) |
+| `RESEND_FROM` | Optional — verified from-address, e.g. `Atllanta <notifications@yourdomain>` |
+| `CRON_SECRET` | Optional — bearer token guarding `/api/event-processor` |
+
+## Event bus & notifications
+
+Every mutation publishes to the `events` table (`publishEvent` in `js/events.js`).
+Events are consumed by workflow recipes that create in-app notifications and,
+for high-signal events, queue email:
+
+- **In-app (real-time):** `js/event-processor.js` runs in each signed-in
+  browser. It claims events atomically via the `claim_events` RPC
+  (`FOR UPDATE SKIP LOCKED`), so multiple open tabs never fire a recipe twice,
+  and marks them done via `resolve_event`.
+- **Email (queued):** the browser never holds the Resend key, so recipes only
+  flag notifications with `email_status = 'pending'`. The server worker
+  `api/event-processor.js` drains that queue via Resend and also acts as a
+  backstop, processing any events left pending when no browser was online.
+
+The worker runs daily via `vercel.json` → `crons`. For lower email latency,
+point any external cron (e.g. cron-job.org, free) at
+`POST /api/event-processor` with `Authorization: Bearer <CRON_SECRET>` (or
+`?key=<CRON_SECRET>`) as often as you like — in-app notifications stay
+real-time regardless.
+
+> Requires migration `20260730000000_event_bus_hardening.sql` to be applied.
 
 ## Run locally
 

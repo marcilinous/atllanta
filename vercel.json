@@ -3,6 +3,9 @@
   "rewrites": [
     { "source": "/login", "destination": "/login.html" }
   ],
+  "crons": [
+    { "path": "/api/event-processor", "schedule": "0 3 * * *" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
