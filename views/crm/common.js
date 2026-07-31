@@ -1,7 +1,48 @@
 // Shared helpers for the CRM module.
 import sb from '../../js/supabase.js';
-import { getOrg } from '../../js/auth.js';
+import { getOrg, getUser, getMembership } from '../../js/auth.js';
 import { esc } from '../../js/ui.js';
+
+export function currentUserId() {
+  return getUser()?.id || null;
+}
+
+// Owner display. CRM ownership keys off the auth identity (auth.users), so a
+// name is only available when the owner also has an employee profile. Falls
+// back to "Me" for the current user and "—" otherwise.
+export function ownerName(users, id) {
+  if (!id) return '—';
+  const me = getUser();
+  const u = (users || []).find(x => x.id === id);
+  if (u) return u.full_name || u.email || (id === me?.id ? 'Me' : '—');
+  return id === me?.id ? 'Me' : '—';
+}
+
+// Level-based scope. Reps only ever see their own (enforced by RLS); managers
+// and admins can also see their team / the whole org, so they get a switch.
+export function canSeeOthers() {
+  return ['owner', 'admin', 'manager'].includes(getMembership()?.role);
+}
+
+export function defaultScope() {
+  const r = getMembership()?.role;
+  return (r === 'owner' || r === 'admin') ? 'all' : 'mine';
+}
+
+// Client-side filter within the RLS-visible set.
+export function scopeFilter(rows, scope) {
+  if (scope === 'all') return rows;
+  const me = getUser();
+  return rows.filter(x => x.owner_id === me?.id || x.created_by === me?.id);
+}
+
+// Tabs markup for the scope switch (rendered only when canSeeOthers()).
+export function scopeTabs(scope, allLabel = 'Everyone I can see') {
+  return `<div class="tabs crm-scope" style="border-bottom:none;margin-bottom:0">
+    <button class="tab ${scope === 'mine' ? 'active' : ''}" data-scope="mine">My records</button>
+    <button class="tab ${scope === 'all' ? 'active' : ''}" data-scope="all">${esc(allLabel)}</button>
+  </div>`;
+}
 
 export function money(n, currency) {
   if (n === null || n === undefined || n === '') return '—';
@@ -36,9 +77,17 @@ export async function fetchOrgUsers() {
 }
 
 export function userOptions(users, selectedId) {
-  return `<option value="">— Unassigned —</option>` + users.map(u =>
+  const me = getUser();
+  const list = users || [];
+  const meListed = me && list.some(u => u.id === me.id);
+  let html = `<option value="">— Unassigned —</option>`;
+  if (me && !meListed) {
+    html += `<option value="${me.id}" ${selectedId === me.id ? 'selected' : ''}>Me (${esc(me.email || 'me')})</option>`;
+  }
+  html += list.map(u =>
     `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${esc(u.full_name || u.email)}</option>`
   ).join('');
+  return html;
 }
 
 export async function fetchAccountsLite() {

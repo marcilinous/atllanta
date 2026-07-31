@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, contactName, field } from './common.js';
+import { fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, contactName, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmContacts(container) {
   const org = getOrg();
@@ -15,6 +15,8 @@ export default async function crmContacts(container) {
   let users = [];
   let accounts = [];
   let search = '';
+  let scope = defaultScope();
+  const showScope = canSeeOthers();
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
@@ -25,7 +27,8 @@ export default async function crmContacts(container) {
       <button class="btn btn-primary" id="add-contact">+ Contact</button>
     </div>
     <div class="card">
-      <div class="card-header">
+      <div class="card-header" style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
+        ${showScope ? scopeTabs(scope) : ''}
         <input type="text" class="form-input" id="contact-search" placeholder="Search contacts..." style="max-width:280px;height:34px">
       </div>
       <div id="contact-list"></div>
@@ -45,7 +48,7 @@ export default async function crmContacts(container) {
 
   function render() {
     const el = document.getElementById('contact-list');
-    const rows = contacts.filter(c => {
+    const rows = scopeFilter(contacts, scope).filter(c => {
       if (!search) return true;
       return contactName(c).toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.account?.name?.toLowerCase().includes(search);
     });
@@ -85,7 +88,7 @@ export default async function crmContacts(container) {
         ${field('Title', `<input class="form-input" name="title" value="${esc(c.title || '')}">`)}
         ${field('Email', `<input class="form-input" type="email" name="email" value="${esc(c.email || '')}">`)}
         ${field('Phone', `<input class="form-input" name="phone" value="${esc(c.phone || '')}">`)}
-        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, c.owner_id)}</select>`)}
+        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, existing ? c.owner_id : currentUserId())}</select>`)}
       </div>
       ${field('Account', `<select class="form-input" name="account_id">${accountOptions(accounts, c.account_id)}</select>`)}
       <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)">
@@ -127,6 +130,13 @@ export default async function crmContacts(container) {
 
   document.getElementById('add-contact').addEventListener('click', () => openForm(null));
   document.getElementById('contact-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });
+  container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    scope = btn.dataset.scope;
+    container.querySelectorAll('.crm-scope .tab').forEach(t => t.classList.toggle('active', t === btn));
+    render();
+  });
 
   await load();
 }

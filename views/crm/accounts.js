@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers, userOptions, field } from './common.js';
+import { fetchOrgUsers, userOptions, field, ownerName, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmAccounts(container) {
   const org = getOrg();
@@ -14,6 +14,8 @@ export default async function crmAccounts(container) {
   let accounts = [];
   let users = [];
   let search = '';
+  let scope = defaultScope();
+  const showScope = canSeeOthers();
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
@@ -24,7 +26,8 @@ export default async function crmAccounts(container) {
       <button class="btn btn-primary" id="add-account">+ Account</button>
     </div>
     <div class="card">
-      <div class="card-header">
+      <div class="card-header" style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
+        ${showScope ? scopeTabs(scope) : ''}
         <input type="text" class="form-input" id="account-search" placeholder="Search accounts..." style="max-width:280px;height:34px">
       </div>
       <div id="account-list"></div>
@@ -32,10 +35,10 @@ export default async function crmAccounts(container) {
   `;
 
   async function load() {
-    [users] = await Promise.all([users.length ? users : fetchOrgUsers()]);
+    if (!users.length) users = await fetchOrgUsers();
     const { data } = await sb
       .from('crm_accounts')
-      .select('*, owner:owner_id(full_name, email)')
+      .select('*')
       .order('name');
     accounts = data || [];
     render();
@@ -43,7 +46,8 @@ export default async function crmAccounts(container) {
 
   function render() {
     const el = document.getElementById('account-list');
-    const rows = accounts.filter(a => !search || a.name?.toLowerCase().includes(search) || a.industry?.toLowerCase().includes(search));
+    const rows = scopeFilter(accounts, scope)
+      .filter(a => !search || a.name?.toLowerCase().includes(search) || a.industry?.toLowerCase().includes(search));
 
     if (!rows.length) {
       el.innerHTML = `<div class="empty-state" style="padding:var(--space-8)">
@@ -60,7 +64,7 @@ export default async function crmAccounts(container) {
           <td style="font-weight:var(--font-weight-medium)">${esc(a.name)}</td>
           <td>${a.industry ? esc(a.industry) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td>${a.website ? `<a href="${esc(a.website.startsWith('http') ? a.website : 'https://' + a.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--color-accent)">${esc(a.website)}</a>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
-          <td>${esc(a.owner?.full_name || a.owner?.email || '—')}</td>
+          <td>${esc(ownerName(users, a.owner_id))}</td>
           <td style="text-align:right"><button class="btn btn-ghost btn-sm" data-edit="${a.id}" onclick="event.stopPropagation()">Edit</button></td>
         </tr>`).join('')}</tbody>
     </table></div>`;
@@ -84,7 +88,7 @@ export default async function crmAccounts(container) {
         ${field('Phone', `<input class="form-input" name="phone" value="${esc(a.phone || '')}">`)}
         ${field('Employees', `<input class="form-input" type="number" name="employees_count" value="${a.employees_count ?? ''}">`)}
         ${field('Annual revenue', `<input class="form-input" type="number" name="annual_revenue" value="${a.annual_revenue ?? ''}">`)}
-        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, a.owner_id)}</select>`)}
+        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, existing ? a.owner_id : currentUserId())}</select>`)}
         ${field('City', `<input class="form-input" name="billing_city" value="${esc(a.billing_city || '')}">`)}
         ${field('Country', `<input class="form-input" name="billing_country" value="${esc(a.billing_country || '')}">`)}
       </div>
@@ -132,6 +136,13 @@ export default async function crmAccounts(container) {
 
   document.getElementById('add-account').addEventListener('click', () => openForm(null));
   document.getElementById('account-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });
+  container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    scope = btn.dataset.scope;
+    container.querySelectorAll('.crm-scope .tab').forEach(t => t.classList.toggle('active', t === btn));
+    render();
+  });
 
   await load();
 }

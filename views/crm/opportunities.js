@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { routeParams } from '../../js/router.js';
-import { money, contactName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field } from './common.js';
+import { money, contactName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmOpportunities(container) {
   const org = getOrg();
@@ -17,6 +17,8 @@ export default async function crmOpportunities(container) {
   let users = [];
   let accounts = [];
   let contacts = [];
+  let scope = defaultScope();
+  const showScope = canSeeOthers();
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
@@ -24,7 +26,10 @@ export default async function crmOpportunities(container) {
         <h1 class="page-title">Pipeline</h1>
         <p class="page-subtitle" id="pipeline-sub">Drag deals between stages</p>
       </div>
-      <button class="btn btn-primary" id="add-deal">+ Deal</button>
+      <div style="display:flex;gap:var(--space-3);align-items:center">
+        ${showScope ? scopeTabs(scope) : ''}
+        <button class="btn btn-primary" id="add-deal">+ Deal</button>
+      </div>
     </div>
     <div id="board" style="overflow-x:auto"></div>
   `;
@@ -32,7 +37,7 @@ export default async function crmOpportunities(container) {
   async function load() {
     const [stageRes, oppRes] = await Promise.all([
       sb.from('crm_pipeline_stages').select('*').order('sort_order'),
-      sb.from('crm_opportunities').select('*, account:account_id(id, name), contact:primary_contact_id(first_name, last_name), owner:owner_id(full_name)').order('created_at', { ascending: false }),
+      sb.from('crm_opportunities').select('*, account:account_id(id, name), contact:primary_contact_id(first_name, last_name)').order('created_at', { ascending: false }),
     ]);
     stages = stageRes.data || [];
     opps = oppRes.data || [];
@@ -50,7 +55,8 @@ export default async function crmOpportunities(container) {
       return;
     }
 
-    const openOpps = opps.filter(o => o.status === 'open');
+    const visible = scopeFilter(opps, scope);
+    const openOpps = visible.filter(o => o.status === 'open');
     const totalOpen = openOpps.reduce((s, o) => s + (Number(o.amount) || 0), 0);
     const weighted = openOpps.reduce((s, o) => {
       const stage = stages.find(st => st.id === o.stage_id);
@@ -61,7 +67,7 @@ export default async function crmOpportunities(container) {
       `${openOpps.length} open · ${money(totalOpen)} pipeline · ${money(weighted)} weighted`;
 
     board.innerHTML = `<div class="kanban">${stages.map(stage => {
-      const cards = opps.filter(o => o.stage_id === stage.id && (stage.is_won ? o.status === 'won' : stage.is_lost ? o.status === 'lost' : o.status === 'open'));
+      const cards = visible.filter(o => o.stage_id === stage.id && (stage.is_won ? o.status === 'won' : stage.is_lost ? o.status === 'lost' : o.status === 'open'));
       const sum = cards.reduce((s, o) => s + (Number(o.amount) || 0), 0);
       const accent = stage.is_won ? 'var(--color-success)' : stage.is_lost ? 'var(--color-error)' : 'var(--color-accent)';
       return `<div class="kanban-col" data-stage="${stage.id}">
@@ -150,7 +156,7 @@ export default async function crmOpportunities(container) {
         ${field('Stage', `<select class="form-input" name="stage_id">${stages.map(s => `<option value="${s.id}" ${(o.stage_id || defaultStage) === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>`)}
         ${field('Amount', `<input class="form-input" type="number" name="amount" value="${o.amount ?? ''}">`)}
         ${field('Close date', `<input class="form-input" type="date" name="close_date" value="${o.close_date || ''}">`)}
-        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, o.owner_id)}</select>`)}
+        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, existing ? o.owner_id : currentUserId())}</select>`)}
       </div>
       ${field('Source', `<input class="form-input" name="source" value="${esc(o.source || '')}" placeholder="referral, web, event...">`)}
       ${field('Notes', `<textarea class="form-input" name="description">${esc(o.description || '')}</textarea>`)}
@@ -211,6 +217,13 @@ export default async function crmOpportunities(container) {
   }
 
   document.getElementById('add-deal').addEventListener('click', () => openForm(null));
+  container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    scope = btn.dataset.scope;
+    container.querySelectorAll('.crm-scope .tab').forEach(t => t.classList.toggle('active', t === btn));
+    render();
+  });
   await load();
 
   // If arriving from an account with ?account=, open the new-deal form pre-filled.

@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate, routeParams } from '../../js/router.js';
-import { money, contactName, field } from './common.js';
+import { money, contactName, field, ownerName, fetchOrgUsers } from './common.js';
 import { renderTimeline, openActivityModal } from './activities.js';
 
 export default async function crmAccountDetail(container) {
@@ -15,7 +15,7 @@ export default async function crmAccountDetail(container) {
 
   const { data: account, error } = await sb
     .from('crm_accounts')
-    .select('*, owner:owner_id(full_name, email)')
+    .select('*')
     .eq('id', id)
     .maybeSingle();
 
@@ -26,10 +26,12 @@ export default async function crmAccountDetail(container) {
     return;
   }
 
-  const [{ data: contacts }, { data: opps }] = await Promise.all([
+  const [{ data: contacts }, { data: opps }, users] = await Promise.all([
     sb.from('crm_contacts').select('*').eq('account_id', id).order('created_at', { ascending: false }),
     sb.from('crm_opportunities').select('*, stage:stage_id(name, is_won, is_lost)').eq('account_id', id).order('created_at', { ascending: false }),
+    fetchOrgUsers(),
   ]);
+  const ownerLabel = account.owner_id ? ownerName(users, account.owner_id) : null;
 
   const infoRow = (label, val) => val ? `<div style="display:flex;justify-content:space-between;gap:var(--space-4);padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light)">
     <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(label)}</span>
@@ -42,7 +44,7 @@ export default async function crmAccountDetail(container) {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-3)">
       <div>
         <h1 class="page-title">${esc(account.name)}</h1>
-        <p class="page-subtitle">${esc(account.industry || 'Account')}${account.owner ? ' · Owner: ' + esc(account.owner.full_name || account.owner.email) : ''}</p>
+        <p class="page-subtitle">${esc(account.industry || 'Account')}${ownerLabel && ownerLabel !== '—' ? ' · Owner: ' + esc(ownerLabel) : ''}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
         <button class="btn btn-secondary" id="log-activity">Log activity</button>

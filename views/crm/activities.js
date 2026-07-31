@@ -3,19 +3,21 @@ import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
 import { esc, toast, timeAgo, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
-import { field } from './common.js';
+import { field, ownerName, fetchOrgUsers } from './common.js';
 
 const TYPE_ICON = { task: '✓', call: '\u{1F4DE}', meeting: '\u{1F4C5}', email: '✉', note: '\u{1F4DD}' };
 const TYPE_LABEL = { task: 'Task', call: 'Call', meeting: 'Meeting', email: 'Email', note: 'Note' };
 
 export async function renderTimeline(el, relatedType, relatedId) {
   el.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-  const { data } = await sb
-    .from('crm_activities')
-    .select('*, owner:owner_id(full_name, email)')
-    .eq('related_type', relatedType)
-    .eq('related_id', relatedId)
-    .order('created_at', { ascending: false });
+  const [{ data }, users] = await Promise.all([
+    sb.from('crm_activities')
+      .select('*')
+      .eq('related_type', relatedType)
+      .eq('related_id', relatedId)
+      .order('created_at', { ascending: false }),
+    fetchOrgUsers(),
+  ]);
 
   const acts = data || [];
   if (!acts.length) {
@@ -33,7 +35,7 @@ export async function renderTimeline(el, relatedType, relatedId) {
         </div>
         ${a.body ? `<div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-top:2px">${esc(a.body)}</div>` : ''}
         <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:2px">
-          ${esc(TYPE_LABEL[a.type] || a.type)}${a.owner?.full_name ? ' · ' + esc(a.owner.full_name) : ''}${a.due_date ? ' · due ' + new Date(a.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : ''}
+          ${esc(TYPE_LABEL[a.type] || a.type)}${(() => { const o = ownerName(users, a.owner_id); return o && o !== '—' ? ' · ' + esc(o) : ''; })()}${a.due_date ? ' · due ' + new Date(a.due_date).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : ''}
         </div>
       </div>
     </div>`).join('')}</div>`;

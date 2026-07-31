@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers, userOptions, leadName, field, RATING_BADGE, LEAD_STATUS_BADGE } from './common.js';
+import { fetchOrgUsers, userOptions, leadName, field, RATING_BADGE, LEAD_STATUS_BADGE, ownerName, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmLeads(container) {
   const org = getOrg();
@@ -14,6 +14,8 @@ export default async function crmLeads(container) {
   let leads = [];
   let users = [];
   let statusFilter = 'active';
+  let scope = defaultScope();
+  const showScope = canSeeOthers();
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
@@ -30,6 +32,7 @@ export default async function crmLeads(container) {
           <button class="tab" data-f="all">All</button>
           <button class="tab" data-f="converted">Converted</button>
         </div>
+        ${showScope ? scopeTabs(scope) : ''}
       </div>
       <div id="lead-list"></div>
     </div>
@@ -39,7 +42,7 @@ export default async function crmLeads(container) {
     if (!users.length) users = await fetchOrgUsers();
     const { data } = await sb
       .from('crm_leads')
-      .select('*, owner:owner_id(full_name, email)')
+      .select('*')
       .order('created_at', { ascending: false });
     leads = data || [];
     render();
@@ -47,7 +50,7 @@ export default async function crmLeads(container) {
 
   function render() {
     const el = document.getElementById('lead-list');
-    const rows = leads.filter(l =>
+    const rows = scopeFilter(leads, scope).filter(l =>
       statusFilter === 'all' ? true :
       statusFilter === 'converted' ? l.status === 'converted' :
       l.status !== 'converted');
@@ -68,7 +71,7 @@ export default async function crmLeads(container) {
           <td>${l.company ? esc(l.company) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td><span class="badge badge-${LEAD_STATUS_BADGE[l.status] || 'neutral'}"><span class="badge-dot"></span>${esc(l.status)}</span></td>
           <td>${l.rating ? `<span class="badge badge-${RATING_BADGE[l.rating] || 'neutral'}">${esc(l.rating)}</span>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
-          <td>${esc(l.owner?.full_name || l.owner?.email || '—')}</td>
+          <td>${esc(ownerName(users, l.owner_id))}</td>
           <td style="text-align:right;white-space:nowrap">
             ${l.status !== 'converted' ? `<button class="btn btn-secondary btn-sm" data-convert="${l.id}">Convert</button>` : ''}
             <button class="btn btn-ghost btn-sm" data-edit="${l.id}">Edit</button>
@@ -94,7 +97,7 @@ export default async function crmLeads(container) {
         ${field('Status', `<select class="form-input" name="status">${['new', 'working', 'qualified', 'unqualified'].map(s => `<option value="${s}" ${(l.status || 'new') === s ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
         ${field('Rating', `<select class="form-input" name="rating"><option value="">—</option>${['hot', 'warm', 'cold'].map(r => `<option value="${r}" ${l.rating === r ? 'selected' : ''}>${r}</option>`).join('')}</select>`)}
         ${field('Source', `<input class="form-input" name="source" value="${esc(l.source || '')}" placeholder="web, referral...">`)}
-        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, l.owner_id)}</select>`)}
+        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, existing ? l.owner_id : currentUserId())}</select>`)}
       </div>
       ${field('Notes', `<textarea class="form-input" name="description">${esc(l.description || '')}</textarea>`)}
       <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)">
@@ -234,6 +237,13 @@ export default async function crmLeads(container) {
     if (!btn) return;
     statusFilter = btn.dataset.f;
     document.querySelectorAll('#lead-filter .tab').forEach(t => t.classList.toggle('active', t === btn));
+    render();
+  });
+  container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    scope = btn.dataset.scope;
+    container.querySelectorAll('.crm-scope .tab').forEach(t => t.classList.toggle('active', t === btn));
     render();
   });
 
