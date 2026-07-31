@@ -13,10 +13,10 @@ export default async function settingsUsers(container) {
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
       <div>
-        <h1 class="page-title">User Management</h1>
-        <p class="page-subtitle">Manage team members and roles</p>
+        <h1 class="page-title">Staff & Access</h1>
+        <p class="page-subtitle">Add staff, set roles, and place them in the reporting hierarchy</p>
       </div>
-      ${isAdmin ? '<button class="btn btn-primary" id="invite-btn">+ Invite Member</button>' : ''}
+      ${isAdmin ? '<button class="btn btn-primary" id="invite-btn">+ Add Staff</button>' : ''}
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
@@ -157,37 +157,76 @@ export default async function settingsUsers(container) {
   document.getElementById('member-search')?.addEventListener('input', renderTable);
   document.getElementById('member-role-filter')?.addEventListener('change', renderTable);
 
-  // Invite member modal
+  // Add staff modal
   if (isAdmin) {
-    document.getElementById('invite-btn')?.addEventListener('click', () => {
+    document.getElementById('invite-btn')?.addEventListener('click', async () => {
+      const [{ data: depts }, { data: staff }] = await Promise.all([
+        sb.from('departments').select('id, name').order('name'),
+        sb.from('users').select('id, full_name, email').eq('status', 'active').order('full_name'),
+      ]);
+
       const f = document.createElement('div');
       f.innerHTML = `
         <div style="display:grid;gap:var(--space-4)">
-          <div class="form-group">
-            <label class="form-label">Email Address</label>
-            <input type="email" class="form-input" id="invite-email" placeholder="colleague@company.com" required>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Full name</label>
+              <input type="text" class="form-input" id="invite-name" placeholder="Jane Doe">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Email *</label>
+              <input type="email" class="form-input" id="invite-email" placeholder="jane@school.edu" required>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Role</label>
+              <select class="form-input" id="invite-role">
+                <option value="member">Member (staff)</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+                <option value="owner">Owner</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Designation</label>
+              <input type="text" class="form-input" id="invite-designation" placeholder="e.g. Teacher">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Department</label>
+              <select class="form-input" id="invite-dept">
+                <option value="">— None —</option>
+                ${(depts || []).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Reporting manager</label>
+              <select class="form-input" id="invite-manager">
+                <option value="">— None —</option>
+                ${(staff || []).map(s => `<option value="${s.id}">${esc(s.full_name || s.email)}</option>`).join('')}
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Role</label>
-            <select class="form-input" id="invite-role">
-              <option value="member">Member</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
-              <option value="owner">Owner</option>
-            </select>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Date of joining</label>
+            <input type="date" class="form-input" id="invite-doj" style="max-width:200px">
           </div>
-          <button class="btn btn-primary" id="invite-save">Send Invite</button>
+          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">A login is created immediately with a temporary password you can share — no email required.</div>
+          <button class="btn btn-primary" id="invite-save">Add staff member</button>
         </div>`;
-      openModal('Invite Member', f);
+      openModal('Add Staff Member', f);
 
       f.querySelector('#invite-save').addEventListener('click', async () => {
         const email = f.querySelector('#invite-email').value.trim();
         const role = f.querySelector('#invite-role').value;
+        const full_name = f.querySelector('#invite-name').value.trim();
+        const designation = f.querySelector('#invite-designation').value.trim();
+        const department_id = f.querySelector('#invite-dept').value || null;
+        const reporting_manager_id = f.querySelector('#invite-manager').value || null;
+        const date_of_joining = f.querySelector('#invite-doj').value || null;
         if (!email) return toast('Email is required');
 
         const btn = f.querySelector('#invite-save');
         btn.disabled = true;
-        btn.textContent = 'Inviting...';
+        btn.textContent = 'Adding...';
 
         try {
           const { data: { session } } = await sb.auth.getSession();
@@ -197,19 +236,19 @@ export default async function settingsUsers(container) {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({ action: 'invite', email, role }),
+            body: JSON.stringify({ action: 'invite', email, role, full_name, designation, department_id, reporting_manager_id, date_of_joining }),
           });
           const result = await resp.json();
 
           if (!resp.ok) {
-            toast(result.error || 'Invite failed');
+            toast(result.error || 'Failed to add staff');
             btn.disabled = false;
-            btn.textContent = 'Send Invite';
+            btn.textContent = 'Add staff member';
             return;
           }
 
-          await logAction('people', 'membership', null, 'invited', null, { email, role });
-          await publishEvent('people.member.invited', { email, role });
+          await logAction('people', 'employee', result.user_id || null, 'created', null, { email, role });
+          if (result.user_id) await publishEvent('people.employee.created', { employee_id: result.user_id, name: full_name || email });
           closeModal();
 
           if (result.new_account && result.temp_password) {
@@ -231,13 +270,13 @@ export default async function settingsUsers(container) {
             openModal('Member Invited', info);
             info.querySelector('#invite-done-btn').addEventListener('click', closeModal);
           } else {
-            toast('Invite sent to ' + email);
+            toast('Staff member added: ' + email);
           }
           loadMembers();
         } catch (err) {
-          toast('Invite failed: ' + err.message);
+          toast('Failed to add staff: ' + err.message);
           btn.disabled = false;
-          btn.textContent = 'Send Invite';
+          btn.textContent = 'Add staff member';
         }
       });
     });

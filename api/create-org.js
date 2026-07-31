@@ -173,7 +173,8 @@ async function handleInvite(req, res, db, user) {
 
   if (!membership) return res.status(403).json({ error: "Insufficient permissions" });
 
-  const { email: rawEmail, role, full_name, client_id } = req.body || {};
+  const { email: rawEmail, role, full_name, client_id,
+          department_id, reporting_manager_id, designation, date_of_joining } = req.body || {};
   if (!rawEmail?.trim()) return res.status(400).json({ error: "Email is required" });
 
   const allowedRoles = ["owner", "admin", "manager", "member"];
@@ -182,6 +183,7 @@ async function handleInvite(req, res, db, user) {
   }
 
   const email = rawEmail.trim().toLowerCase();
+  const orgId = membership.organization_id;
 
   const { data: existing } = await db
     .from("memberships")
@@ -199,7 +201,7 @@ async function handleInvite(req, res, db, user) {
 
   const { error: insertErr } = await db.from("memberships").insert({
     user_id: authUser.id,
-    organization_id: membership.organization_id,
+    organization_id: orgId,
     role,
     email,
     full_name: (full_name || "").trim() || null,
@@ -209,10 +211,40 @@ async function handleInvite(req, res, db, user) {
 
   if (insertErr) return res.status(500).json({ error: insertErr.message });
 
+  // Create the employee profile so the person occupies a place in the org
+  // hierarchy — this is what role-based HRMS/CRM (manager visibility, leave
+  // approvals, record ownership) keys off. department_id / reporting_manager
+  // are validated to belong to this org before use.
+  const profile = {
+    id: authUser.id,
+    org_id: orgId,
+    full_name: (full_name || "").trim() || email,
+    email,
+    role,
+    status: "active",
+    designation: (designation || "").trim() || null,
+    date_of_joining: date_of_joining || null,
+  };
+
+  if (department_id) {
+    const { data: dept } = await db.from("departments")
+      .select("id").eq("id", department_id).eq("org_id", orgId).maybeSingle();
+    if (dept) profile.department_id = department_id;
+  }
+  if (reporting_manager_id) {
+    const { data: mgr } = await db.from("users")
+      .select("id").eq("id", reporting_manager_id).eq("org_id", orgId).maybeSingle();
+    if (mgr) profile.reporting_manager_id = reporting_manager_id;
+  }
+
+  const { error: profErr } = await db.from("users").upsert(profile, { onConflict: "id" });
+  if (profErr) return res.status(500).json({ error: "Profile: " + profErr.message });
+
   return res.json({
     invited: true,
     email,
     role,
+    user_id: authUser.id,
     new_account: authUser.new_account,
     temp_password: authUser.temp_password || null,
   });
