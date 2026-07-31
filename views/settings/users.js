@@ -18,6 +18,14 @@ export default async function settingsUsers(container) {
       </div>
       ${isAdmin ? '<button class="btn btn-primary" id="invite-btn">+ Add Staff</button>' : ''}
     </div>
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <div class="card-header"><span class="card-title">Who sees what</span></div>
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3);font-size:var(--text-sm)">
+        <div style="display:flex;gap:var(--space-2)"><span class="badge badge-error" style="height:fit-content">Owner / Admin (HR)</span><span style="color:var(--color-text-secondary)">Sees & edits <strong>everyone</strong> in the school — all attendance, leave, and CRM records.</span></div>
+        <div style="display:flex;gap:var(--space-2)"><span class="badge badge-info" style="height:fit-content">Manager</span><span style="color:var(--color-text-secondary)">Sees their <strong>whole reporting line</strong> — direct reports and their reports, recursively.</span></div>
+        <div style="display:flex;gap:var(--space-2)"><span class="badge badge-neutral" style="height:fit-content">Member</span><span style="color:var(--color-text-secondary)">Sees <strong>only their own</strong> records; CRM records they own or created.</span></div>
+      </div>
+    </div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
         <input type="text" class="form-input" id="member-search" placeholder="Search by name or email..." style="max-width:300px;height:34px;flex:1">
@@ -41,20 +49,52 @@ export default async function settingsUsers(container) {
   }
 
   let allMembers = [];
+  let profileById = {};
+
+  // Membership roles can be broader (super_admin, etc.); map to the users
+  // enum (owner/admin/manager/member) when materialising an employee profile.
+  const roleMap = { super_admin: 'owner', agency_admin: 'admin', client_admin: 'admin', client_member: 'member' };
+  const toUserRole = (r) => roleMap[r] || (['owner', 'admin', 'manager', 'member'].includes(r) ? r : 'member');
 
   async function loadMembers() {
-    const { data: members, error } = await sb
-      .from('memberships')
-      .select('*')
-      .eq('organization_id', org.id)
-      .order('created_at', { ascending: true });
+    const [{ data: members, error }, { data: staff }] = await Promise.all([
+      sb.from('memberships').select('*').eq('organization_id', org.id).order('created_at', { ascending: true }),
+      sb.from('users').select('id, full_name, email, role, reporting_manager_id').eq('org_id', org.id),
+    ]);
 
     if (error) {
       toast('Failed to load members: ' + error.message);
       return;
     }
     allMembers = members || [];
+    profileById = Object.fromEntries((staff || []).map(p => [p.id, p]));
     renderTable();
+  }
+
+  // Ensure a person has an employee profile so they can sit in the hierarchy
+  // (as a reportee or a manager). Admin can insert/update org users via RLS.
+  async function ensureProfile(userId) {
+    if (profileById[userId]) return profileById[userId];
+    const mem = allMembers.find(a => a.user_id === userId);
+    if (!mem) return null;
+    const row = { id: userId, org_id: org.id, full_name: mem.full_name || mem.email, email: mem.email, role: toUserRole(mem.role), status: 'active' };
+    const { error } = await sb.from('users').upsert(row, { onConflict: 'id' });
+    if (error) { toast('Could not create profile: ' + error.message); return null; }
+    profileById[userId] = row;
+    return row;
+  }
+
+  // Everyone below `userId` in the tree — excluded as manager options to
+  // prevent cycles.
+  function descendantsOf(userId) {
+    const set = new Set();
+    const walk = (id) => {
+      Object.values(profileById).forEach(p => {
+        if (p.reporting_manager_id === id && !set.has(p.id)) { set.add(p.id); walk(p.id); }
+      });
+    };
+    walk(userId);
+    return set;
   }
 
   function renderTable() {
@@ -83,7 +123,7 @@ export default async function settingsUsers(container) {
     const roleColors = { owner: 'error', admin: 'warning', manager: 'info', member: 'neutral' };
 
     wrap.innerHTML = `<div class="table-wrap"><table class="table">
-      <thead><tr><th>Member</th><th>Role</th><th>Invited</th><th>Joined</th>${isAdmin ? '<th>Actions</th>' : ''}</tr></thead>
+      <thead><tr><th>Member</th><th>Role</th><th>Reports to</th><th>Joined</th>${isAdmin ? '<th>Actions</th>' : ''}</tr></thead>
       <tbody>${filtered.map(m => {
         const displayName = m.full_name || m.email || '—';
         const isSelf = m.user_id === user?.id;
@@ -98,7 +138,20 @@ export default async function settingsUsers(container) {
             </div>
           </td>
           <td><span class="badge badge-${roleColors[m.role] || 'neutral'}">${esc(m.role || 'member')}</span></td>
-          <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${m.invited_at ? formatDate(m.invited_at) : '—'}</td>
+          <td>${(() => {
+            const profile = profileById[m.user_id];
+            const managerId = profile?.reporting_manager_id || '';
+            if (!isAdmin) {
+              const mgr = allMembers.find(x => x.user_id === managerId);
+              return `<span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${mgr ? esc(mgr.full_name || mgr.email) : '—'}</span>`;
+            }
+            const desc = descendantsOf(m.user_id);
+            const opts = allMembers.filter(x => x.user_id !== m.user_id && !desc.has(x.user_id));
+            return `<select class="form-input" data-manager-change="${m.user_id}" style="height:30px;width:auto;max-width:170px;font-size:var(--text-xs);padding:0 var(--space-2)">
+              <option value="">— None —</option>
+              ${opts.map(x => `<option value="${x.user_id}" ${managerId === x.user_id ? 'selected' : ''}>${esc(x.full_name || x.email)}</option>`).join('')}
+            </select>`;
+          })()}</td>
           <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${m.created_at ? formatDate(m.created_at) : '—'}</td>
           ${isAdmin ? `<td>
             <div style="display:flex;gap:var(--space-2);align-items:center">
@@ -116,7 +169,7 @@ export default async function settingsUsers(container) {
     </table></div>`;
 
     if (isAdmin) {
-      // Role change handlers
+      // Role change handlers — keep membership (access) and profile in sync
       wrap.querySelectorAll('[data-role-change]').forEach(select => {
         select.addEventListener('change', async () => {
           const memberId = select.dataset.roleChange;
@@ -128,8 +181,32 @@ export default async function settingsUsers(container) {
             loadMembers();
             return;
           }
+          if (member) {
+            await ensureProfile(member.user_id);
+            await sb.from('users').update({ role: newRole, updated_at: new Date().toISOString() }).eq('id', member.user_id);
+          }
           await logAction('people', 'membership', memberId, 'role_changed', { role: member?.role }, { role: newRole });
           toast('Role updated');
+          loadMembers();
+        });
+      });
+
+      // Reporting-manager change — builds the hierarchy that drives access
+      wrap.querySelectorAll('[data-manager-change]').forEach(select => {
+        select.addEventListener('change', async () => {
+          const userId = select.dataset.managerChange;
+          const managerId = select.value || null;
+          await ensureProfile(userId);
+          if (managerId) await ensureProfile(managerId);
+          const { error } = await sb.from('users').update({ reporting_manager_id: managerId, updated_at: new Date().toISOString() }).eq('id', userId);
+          if (error) {
+            toast('Could not update reporting line: ' + error.message);
+            loadMembers();
+            return;
+          }
+          await logAction('people', 'employee', userId, 'manager_changed', null, { reporting_manager_id: managerId });
+          toast('Reporting line updated');
+          loadMembers();
         });
       });
 
