@@ -1,0 +1,132 @@
+import sb from '../../js/supabase.js';
+import { getOrg, getUser } from '../../js/auth.js';
+import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { logAction } from '../../js/audit.js';
+import { publishEvent } from '../../js/events.js';
+import { navigate } from '../../js/router.js';
+import { fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, contactName, field } from './common.js';
+
+export default async function crmContacts(container) {
+  const org = getOrg();
+  const user = getUser();
+  if (!org) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div></div>`; return; }
+
+  let contacts = [];
+  let users = [];
+  let accounts = [];
+  let search = '';
+
+  container.innerHTML = `
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
+      <div>
+        <h1 class="page-title">Contacts</h1>
+        <p class="page-subtitle">People at your accounts</p>
+      </div>
+      <button class="btn btn-primary" id="add-contact">+ Contact</button>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <input type="text" class="form-input" id="contact-search" placeholder="Search contacts..." style="max-width:280px;height:34px">
+      </div>
+      <div id="contact-list"></div>
+    </div>
+  `;
+
+  async function load() {
+    if (!users.length) users = await fetchOrgUsers();
+    if (!accounts.length) accounts = await fetchAccountsLite();
+    const { data } = await sb
+      .from('crm_contacts')
+      .select('*, account:account_id(id, name)')
+      .order('created_at', { ascending: false });
+    contacts = data || [];
+    render();
+  }
+
+  function render() {
+    const el = document.getElementById('contact-list');
+    const rows = contacts.filter(c => {
+      if (!search) return true;
+      return contactName(c).toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.account?.name?.toLowerCase().includes(search);
+    });
+
+    if (!rows.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:var(--space-8)">
+        <div class="empty-state-title">${contacts.length ? 'No matches' : 'No contacts yet'}</div>
+        <div class="empty-state-desc">${contacts.length ? 'Try a different search.' : 'Add the people you sell to.'}</div>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="table-wrap"><table class="table">
+      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th></th></tr></thead>
+      <tbody>${rows.map(c => `
+        <tr>
+          <td style="font-weight:var(--font-weight-medium)">${esc(contactName(c))}</td>
+          <td>${c.title ? esc(c.title) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td>${c.account ? `<a data-account="${c.account.id}" style="color:var(--color-accent);cursor:pointer">${esc(c.account.name)}</a>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--color-accent)">${esc(c.email)}</a>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td>${c.phone ? esc(c.phone) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td style="text-align:right"><button class="btn btn-ghost btn-sm" data-edit="${c.id}">Edit</button></td>
+        </tr>`).join('')}</tbody>
+    </table></div>`;
+
+    el.querySelectorAll('[data-account]').forEach(a => a.addEventListener('click', () => navigate(`crm/account?id=${a.dataset.account}`)));
+    el.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openForm(contacts.find(c => c.id === btn.dataset.edit))));
+  }
+
+  function openForm(existing) {
+    const c = existing || {};
+    const form = document.createElement('form');
+    form.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+        ${field('First name', `<input class="form-input" name="first_name" value="${esc(c.first_name || '')}">`)}
+        ${field('Last name', `<input class="form-input" name="last_name" value="${esc(c.last_name || '')}">`)}
+        ${field('Title', `<input class="form-input" name="title" value="${esc(c.title || '')}">`)}
+        ${field('Email', `<input class="form-input" type="email" name="email" value="${esc(c.email || '')}">`)}
+        ${field('Phone', `<input class="form-input" name="phone" value="${esc(c.phone || '')}">`)}
+        ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, c.owner_id)}</select>`)}
+      </div>
+      ${field('Account', `<select class="form-input" name="account_id">${accountOptions(accounts, c.account_id)}</select>`)}
+      <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)">
+        <button type="button" class="btn btn-secondary" id="cancel-c">Cancel</button>
+        <button type="submit" class="btn btn-primary">${existing ? 'Save' : 'Create contact'}</button>
+      </div>`;
+    form.querySelector('#cancel-c').addEventListener('click', closeModal);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = {
+        first_name: fd.get('first_name').trim() || null,
+        last_name: fd.get('last_name').trim() || null,
+        title: fd.get('title').trim() || null,
+        email: fd.get('email').trim() || null,
+        phone: fd.get('phone').trim() || null,
+        owner_id: fd.get('owner_id') || null,
+        account_id: fd.get('account_id') || null,
+      };
+      if (!payload.first_name && !payload.last_name && !payload.email) return toast('Enter a name or email');
+
+      if (existing) {
+        const { error } = await sb.from('crm_contacts').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', existing.id);
+        if (error) return toast('Could not save contact');
+        await logAction('crm', 'contact', existing.id, 'updated', existing, payload);
+        toast('Contact updated');
+      } else {
+        const { data, error } = await sb.from('crm_contacts').insert({ ...payload, org_id: org.id, created_by: user?.id }).select('id').single();
+        if (error) return toast('Could not create contact');
+        await logAction('crm', 'contact', data.id, 'created', null, payload);
+        await publishEvent('crm.contact.created', { contact_id: data.id, account_id: payload.account_id, org_id: org.id });
+        toast('Contact created');
+      }
+      closeModal();
+      load();
+    });
+    openModal(existing ? 'Edit contact' : 'New contact', form);
+  }
+
+  document.getElementById('add-contact').addEventListener('click', () => openForm(null));
+  document.getElementById('contact-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });
+
+  await load();
+}

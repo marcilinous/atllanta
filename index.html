@@ -52,6 +52,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span class="nav-tooltip">Finance</span>
       </button>
+      <button class="nav-btn" data-view="crm" aria-label="CRM">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M18 9l-5 5-3-3-4 4"/></svg>
+        <span class="nav-tooltip">CRM</span>
+      </button>
 
       <div class="sidebar-nav-bottom">
         <button class="nav-btn" data-view="settings" aria-label="Settings">
@@ -174,6 +178,12 @@ import orgChart from '/views/employees/orgchart.js';
 import approvalsInbox from '/views/approvals.js';
 import inboxView from '/views/inbox.js';
 import notificationsView from '/views/notifications.js';
+import crmHub from '/views/crm/index.js';
+import crmAccounts from '/views/crm/accounts.js';
+import crmAccountDetail from '/views/crm/account-detail.js';
+import crmContacts from '/views/crm/contacts.js';
+import crmOpportunities from '/views/crm/opportunities.js';
+import crmLeads from '/views/crm/leads.js';
 import onboarding from '/views/onboarding.js';
 import reportsView from '/views/reports/index.js';
 import documentsView from '/views/documents/index.js';
@@ -443,6 +453,12 @@ registerRoute('dashboard', dashboard);
 registerRoute('me', meView);
 registerRoute('inbox', inboxView);
 registerRoute('notifications', notificationsView);
+registerRoute('crm', crmHub);
+registerRoute('crm/accounts', crmAccounts);
+registerRoute('crm/account', crmAccountDetail);
+registerRoute('crm/contacts', crmContacts);
+registerRoute('crm/opportunities', crmOpportunities);
+registerRoute('crm/leads', crmLeads);
 registerRoute('people', peopleHub);
 registerRoute('employees', employeeList);
 registerRoute('attendance', attendanceDashboard);

@@ -584,6 +584,66 @@ select.form-input { cursor: pointer; }
 
 .notif-panel-footer .btn { width: 100%; }
 
+/* ── CRM Kanban board ─────────────────────── */
+.kanban {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding-bottom: var(--space-3);
+  min-height: 300px;
+}
+
+.kanban-col {
+  flex: 0 0 260px;
+  width: 260px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+}
+
+.kanban-col-header {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.kanban-body {
+  padding: var(--space-2);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 80px;
+  transition: background var(--transition-fast);
+}
+
+.kanban-body.drag-over {
+  background: var(--color-accent-light);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+  border-radius: var(--radius-md);
+}
+
+.kanban-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.kanban-card:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+
+.kanban-card:active { cursor: grabbing; }
+
 /* ── AI Panel ────────────────────────────── */
 .ai-panel {
   position: fixed;
