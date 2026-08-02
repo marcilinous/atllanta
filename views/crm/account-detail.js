@@ -99,7 +99,7 @@ export default async function crmAccountDetail(container) {
 
   function wireContactRows() {
     container.querySelectorAll('#contacts-body [data-contact]').forEach(row => {
-      row.addEventListener('click', () => navigate('crm/contacts'));
+      row.addEventListener('click', () => navigate(`crm/contact?id=${row.dataset.contact}`));
     });
   }
 

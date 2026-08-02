@@ -65,7 +65,7 @@ export default async function crmContacts(container) {
       <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th></th></tr></thead>
       <tbody>${rows.map(c => `
         <tr>
-          <td style="font-weight:var(--font-weight-medium)">${esc(contactName(c))}</td>
+          <td style="font-weight:var(--font-weight-medium)"><a data-contact="${c.id}" style="color:var(--color-accent);cursor:pointer">${esc(contactName(c))}</a></td>
           <td>${c.title ? esc(c.title) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td>${c.account ? `<a data-account="${c.account.id}" style="color:var(--color-accent);cursor:pointer">${esc(c.account.name)}</a>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--color-accent)">${esc(c.email)}</a>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
@@ -75,6 +75,7 @@ export default async function crmContacts(container) {
     </table></div>`;
 
     el.querySelectorAll('[data-account]').forEach(a => a.addEventListener('click', () => navigate(`crm/account?id=${a.dataset.account}`)));
+    el.querySelectorAll('[data-contact]').forEach(a => a.addEventListener('click', () => navigate(`crm/contact?id=${a.dataset.contact}`)));
     el.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openForm(contacts.find(c => c.id === btn.dataset.edit))));
   }
 
