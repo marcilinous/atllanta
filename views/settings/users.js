@@ -26,6 +26,7 @@ export default async function settingsUsers(container) {
         <div style="display:flex;gap:var(--space-2)"><span class="badge badge-neutral" style="height:fit-content">Member</span><span style="color:var(--color-text-secondary)">Sees <strong>only their own</strong> records; CRM records they own or created.</span></div>
       </div>
     </div>
+    <div id="self-profile-banner"></div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
         <input type="text" class="form-input" id="member-search" placeholder="Search by name or email..." style="max-width:300px;height:34px;flex:1">
@@ -69,6 +70,26 @@ export default async function settingsUsers(container) {
     allMembers = members || [];
     profileById = Object.fromEntries((staff || []).map(p => [p.id, p]));
     renderTable();
+    renderSelfBanner();
+  }
+
+  // The founding admin often has a login but no employee profile, so they
+  // can't appear in the org chart or be assigned as a manager. Offer a
+  // one-click fix.
+  function renderSelfBanner() {
+    const el = document.getElementById('self-profile-banner');
+    if (!el) return;
+    if (!isAdmin || !user || profileById[user.id]) { el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="card" style="margin-bottom:var(--space-4);border-color:var(--color-accent)">
+      <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+        <div style="font-size:var(--text-sm)">You're not in the staff directory yet — add yourself so you appear in the org chart and can manage a reporting line.</div>
+        <button class="btn btn-primary btn-sm" id="add-self">Add me to the directory</button>
+      </div>
+    </div>`;
+    el.querySelector('#add-self').addEventListener('click', async () => {
+      const created = await ensureProfile(user.id);
+      if (created) { toast('Added to directory'); loadMembers(); }
+    });
   }
 
   // Ensure a person has an employee profile so they can sit in the hierarchy
