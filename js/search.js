@@ -61,7 +61,7 @@ async function runSearch(query) {
 
   const q = `%${query}%`;
 
-  const [{ data: users }, { data: candidates }, { data: jobs }] = await Promise.all([
+  const [{ data: users }, { data: candidates }, { data: jobs }, { data: accounts }, { data: contacts }, { data: opps }, { data: leads }] = await Promise.all([
     sb.from('users').select('id, full_name, email, designation, department:department_id(name)')
       .or(`full_name.ilike.${q},email.ilike.${q},designation.ilike.${q}`)
       .limit(5),
@@ -70,6 +70,18 @@ async function runSearch(query) {
       .limit(5),
     sb.from('jobs').select('id, title, status, department:department_id(name)')
       .or(`title.ilike.${q}`)
+      .limit(5),
+    sb.from('crm_accounts').select('id, name, industry')
+      .or(`name.ilike.${q},industry.ilike.${q}`)
+      .limit(5),
+    sb.from('crm_contacts').select('id, first_name, last_name, email, account:account_id(name)')
+      .or(`first_name.ilike.${q},last_name.ilike.${q},email.ilike.${q}`)
+      .limit(5),
+    sb.from('crm_opportunities').select('id, name, status, account:account_id(name)')
+      .or(`name.ilike.${q}`)
+      .limit(5),
+    sb.from('crm_leads').select('id, first_name, last_name, company, email, status')
+      .or(`first_name.ilike.${q},last_name.ilike.${q},company.ilike.${q},email.ilike.${q}`)
       .limit(5),
   ]);
 
@@ -96,6 +108,38 @@ async function runSearch(query) {
       ${jobs.map(j => `<div class="search-item" data-nav="recruitment/job?id=${j.id}" data-id="${j.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         <div><div class="search-item-title">${esc(j.title)}</div><div class="search-item-sub">${esc(j.status)} ${j.department?.name ? '· ' + esc(j.department.name) : ''}</div></div>
+      </div>`).join('')}</div>`);
+  }
+
+  if (accounts?.length) {
+    sections.push(`<div class="search-section"><div class="search-section-title">Accounts</div>
+      ${accounts.map(a => `<div class="search-item" data-nav="crm/account?id=${a.id}" data-id="${a.id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3"/></svg>
+        <div><div class="search-item-title">${esc(a.name)}</div><div class="search-item-sub">${a.industry ? esc(a.industry) : 'Account'}</div></div>
+      </div>`).join('')}</div>`);
+  }
+
+  if (contacts?.length) {
+    sections.push(`<div class="search-section"><div class="search-section-title">Contacts</div>
+      ${contacts.map(c => `<div class="search-item" data-nav="crm/contact?id=${c.id}" data-id="${c.id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div><div class="search-item-title">${esc([c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || 'Contact')}</div><div class="search-item-sub">${esc(c.account?.name || c.email || '')}</div></div>
+      </div>`).join('')}</div>`);
+  }
+
+  if (opps?.length) {
+    sections.push(`<div class="search-section"><div class="search-section-title">Deals</div>
+      ${opps.map(o => `<div class="search-item" data-nav="crm/opportunities" data-id="${o.id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 3v18h18M18 9l-5 5-3-3-4 4"/></svg>
+        <div><div class="search-item-title">${esc(o.name)}</div><div class="search-item-sub">${esc(o.status)} ${o.account?.name ? '· ' + esc(o.account.name) : ''}</div></div>
+      </div>`).join('')}</div>`);
+  }
+
+  if (leads?.length) {
+    sections.push(`<div class="search-section"><div class="search-section-title">Leads</div>
+      ${leads.map(l => `<div class="search-item" data-nav="crm/leads" data-id="${l.id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .01"/></svg>
+        <div><div class="search-item-title">${esc([l.first_name, l.last_name].filter(Boolean).join(' ') || l.company || l.email || 'Lead')}</div><div class="search-item-sub">${esc(l.company || l.status || '')}</div></div>
       </div>`).join('')}</div>`);
   }
 
