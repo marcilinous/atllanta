@@ -1,9 +1,9 @@
 import sb from '../../js/supabase.js';
-import { getOrg, getUser } from '../../js/auth.js';
+import { getOrg, getUser, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
-import { routeParams } from '../../js/router.js';
+import { routeParams, navigate } from '../../js/router.js';
 import { money, contactName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmOpportunities(container) {
@@ -28,6 +28,7 @@ export default async function crmOpportunities(container) {
       </div>
       <div style="display:flex;gap:var(--space-3);align-items:center">
         ${showScope ? scopeTabs(scope) : ''}
+        ${['owner', 'admin'].includes(getMembership()?.role) ? '<button class="btn btn-secondary" id="edit-stages">Edit stages</button>' : ''}
         <button class="btn btn-primary" id="add-deal">+ Deal</button>
       </div>
     </div>
@@ -217,6 +218,7 @@ export default async function crmOpportunities(container) {
   }
 
   document.getElementById('add-deal').addEventListener('click', () => openForm(null));
+  document.getElementById('edit-stages')?.addEventListener('click', () => navigate('crm/settings'));
   container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;
