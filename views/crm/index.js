@@ -1,11 +1,12 @@
 import sb from '../../js/supabase.js';
-import { getOrg } from '../../js/auth.js';
-import { esc } from '../../js/ui.js';
+import { getOrg, getUser } from '../../js/auth.js';
+import { esc, toast, timeAgo } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { money } from './common.js';
 
 export default async function crmHub(container) {
   const org = getOrg();
+  const user = getUser();
   if (!org) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div></div>`;
     return;
@@ -18,6 +19,7 @@ export default async function crmHub(container) {
     </div>
     <div id="crm-stats" class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3);margin-bottom:var(--space-6)"></div>
     <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))" id="crm-nav"></div>
+    <div id="crm-tasks" style="margin-top:var(--space-6)"></div>
   `;
 
   const sections = [
@@ -81,4 +83,48 @@ export default async function crmHub(container) {
     stat('Active leads', String(leadCount.count || 0), 'var(--color-warning)'),
     stat('Accounts', String(accountCount.count || 0)),
   ].join('');
+
+  await loadTasks();
+
+  async function loadTasks() {
+    const el = container.querySelector('#crm-tasks');
+    const { data: tasks } = await sb
+      .from('crm_activities')
+      .select('*')
+      .eq('owner_id', user?.id)
+      .eq('completed', false)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(15);
+
+    if (!tasks?.length) { el.innerHTML = ''; return; }
+
+    const TYPE_ICON = { task: '✓', call: '\u{1F4DE}', meeting: '\u{1F4C5}', email: '✉', note: '\u{1F4DD}' };
+    const routeFor = { account: 'crm/account', contact: 'crm/contact', lead: 'crm/leads', opportunity: 'crm/opportunities' };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    el.innerHTML = `<div class="card">
+      <div class="card-header"><span class="card-title">My open tasks (${tasks.length})</span></div>
+      <div>${tasks.map(t => {
+        const due = t.due_date ? new Date(t.due_date) : null;
+        const overdue = due && due < today;
+        return `<div class="crm-task" data-id="${t.id}" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border-light)">
+          <button class="btn btn-ghost btn-sm crm-task-done" data-done="${t.id}" title="Mark done" style="padding:2px 8px">Done</button>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${TYPE_ICON[t.type] || '•'} ${esc(t.subject)}</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${t.related_type ? esc(t.related_type) : 'general'}${due ? ` · <span style="color:${overdue ? 'var(--color-error)' : 'var(--color-text-tertiary)'}">${overdue ? 'overdue · ' : ''}due ${due.toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>` : ''}</div>
+          </div>
+          ${t.related_type && t.related_id && routeFor[t.related_type] ? `<button class="btn btn-ghost btn-sm crm-task-open" data-route="${routeFor[t.related_type]}${['account', 'contact'].includes(t.related_type) ? '?id=' + t.related_id : ''}">Open</button>` : ''}
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+
+    el.querySelectorAll('[data-done]').forEach(b => b.addEventListener('click', async () => {
+      const id = b.dataset.done;
+      const { error } = await sb.from('crm_activities').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', id);
+      if (error) return toast('Could not update');
+      toast('Task completed');
+      loadTasks();
+    }));
+    el.querySelectorAll('[data-route]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.route)));
+  }
 }
