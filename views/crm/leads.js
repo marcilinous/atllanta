@@ -132,7 +132,7 @@ export default async function crmLeads(container) {
         const { data, error } = await sb.from('crm_leads').insert({ ...payload, org_id: org.id, created_by: user?.id }).select('id').single();
         if (error) return toast('Could not create lead');
         await logAction('crm', 'lead', data.id, 'created', null, payload);
-        await publishEvent('crm.lead.created', { lead_id: data.id, name: leadName(payload), org_id: org.id });
+        await publishEvent('crm.lead.created', { lead_id: data.id, name: leadName(payload), owner_id: payload.owner_id, org_id: org.id });
         toast('Lead created');
       }
       closeModal();
@@ -217,7 +217,7 @@ export default async function crmLeads(container) {
         if (lErr) throw lErr;
 
         await logAction('crm', 'lead', lead.id, 'converted', null, { account_id: accountId, contact_id: contact.id, opportunity_id: oppId });
-        await publishEvent('crm.lead.converted', { lead_id: lead.id, account_id: accountId, contact_id: contact.id, opportunity_id: oppId, org_id: org.id });
+        await publishEvent('crm.lead.converted', { lead_id: lead.id, account_id: accountId, contact_id: contact.id, opportunity_id: oppId, owner_id: lead.owner_id, org_id: org.id });
         toast('Lead converted');
         closeModal();
         if (accountId) navigate(`crm/account?id=${accountId}`);

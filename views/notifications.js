@@ -6,13 +6,13 @@ import { notifTarget, markRead, markAllRead } from '../js/notifications.js';
 
 const MODULE_ICONS = {
   leave: '\u{1F333}', attendance: '\u{1F551}', recruitment: '\u{1F4BC}', people: '\u{1F465}',
-  helpdesk: '\u{1F3AB}', finance: '\u{1F4B0}', platform: '\u{1F4E2}', system: '\u{2699}',
+  helpdesk: '\u{1F3AB}', finance: '\u{1F4B0}', platform: '\u{1F4E2}', system: '\u{2699}', crm: '\u{1F3AF}',
 };
 const MODULE_COLORS = {
   leave: 'var(--color-success-light)', attendance: 'var(--color-info-light)',
   recruitment: 'var(--color-warning-light)', people: 'var(--color-accent-light)',
   helpdesk: 'var(--color-info-light)', finance: 'var(--color-warning-light)',
-  platform: 'var(--color-accent-light)', system: 'var(--color-bg-tertiary)',
+  platform: 'var(--color-accent-light)', system: 'var(--color-bg-tertiary)', crm: 'var(--color-accent-light)',
 };
 
 export default async function notificationsView(container) {
@@ -51,6 +51,7 @@ export default async function notificationsView(container) {
           <option value="people">People</option>
           <option value="helpdesk">Helpdesk</option>
           <option value="finance">Finance</option>
+          <option value="crm">CRM</option>
           <option value="platform">Announcements</option>
         </select>
       </div>

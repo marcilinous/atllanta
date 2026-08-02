@@ -347,5 +347,44 @@ const HANDLERS = {
 
   'recruitment.candidates.bulk_uploaded': async (p, org) => {
     await notifyByRole(org.id, ['admin', 'owner'], 'Resumes uploaded', `${p.count || 0} candidate resumes were uploaded`, 'recruitment', null, null);
+  },
+
+  // ── CRM ──────────────────────────────────────────────
+  // owner_id is carried in the payload so the recipe never depends on the
+  // processing browser being able to read the (role-restricted) CRM record.
+  'crm.lead.created': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'New lead assigned', `${p.name || 'A lead'} was assigned to you`, 'crm', 'lead', p.lead_id, true);
+    }
+  },
+
+  'crm.lead.converted': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'Lead converted', 'A lead you own was converted to an account', 'crm', 'account', p.account_id || null);
+    }
+  },
+
+  'crm.opportunity.created': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'New deal assigned', `${p.name || 'A deal'} was assigned to you`, 'crm', 'opportunity', p.opportunity_id, true);
+    }
+  },
+
+  'crm.opportunity.won': async (p, org, actorId) => {
+    const ownerId = p.owner_id;
+    const body = `${p.name || 'A deal'} was marked won`;
+    if (ownerId && ownerId !== actorId) {
+      await notify(org.id, ownerId, 'Deal won 🎉', body, 'crm', 'opportunity', p.opportunity_id, true);
+    }
+    const mgr = ownerId ? await getManager(ownerId) : null;
+    if (mgr && mgr !== actorId && mgr !== ownerId) {
+      await notify(org.id, mgr, 'Deal won 🎉', body, 'crm', 'opportunity', p.opportunity_id, true);
+    }
+  },
+
+  'crm.opportunity.lost': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'Deal lost', `${p.name || 'A deal'} was marked lost`, 'crm', 'opportunity', p.opportunity_id);
+    }
   }
 };

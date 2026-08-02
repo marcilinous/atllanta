@@ -139,8 +139,8 @@ export default async function crmOpportunities(container) {
     const { error } = await sb.from('crm_opportunities').update(update).eq('id', oppId);
     if (error) { toast('Could not move deal'); return load(); }
     await logAction('crm', 'opportunity', oppId, status === 'open' ? 'updated' : status, null, { stage: stage.name });
-    if (status === 'won') await publishEvent('crm.opportunity.won', { opportunity_id: oppId, amount: opp.amount, name: opp.name, org_id: org.id });
-    else if (status === 'lost') await publishEvent('crm.opportunity.lost', { opportunity_id: oppId, name: opp.name, org_id: org.id });
+    if (status === 'won') await publishEvent('crm.opportunity.won', { opportunity_id: oppId, amount: opp.amount, name: opp.name, owner_id: opp.owner_id, org_id: org.id });
+    else if (status === 'lost') await publishEvent('crm.opportunity.lost', { opportunity_id: oppId, name: opp.name, owner_id: opp.owner_id, org_id: org.id });
     else await publishEvent('crm.opportunity.stage_changed', { opportunity_id: oppId, stage: stage.name, org_id: org.id });
   }
 
@@ -207,7 +207,7 @@ export default async function crmOpportunities(container) {
         const { data, error } = await sb.from('crm_opportunities').insert({ ...payload, org_id: org.id, created_by: user?.id }).select('id').single();
         if (error) return toast('Could not create deal');
         await logAction('crm', 'opportunity', data.id, 'created', null, payload);
-        await publishEvent('crm.opportunity.created', { opportunity_id: data.id, name: payload.name, amount: payload.amount, org_id: org.id });
+        await publishEvent('crm.opportunity.created', { opportunity_id: data.id, name: payload.name, amount: payload.amount, owner_id: payload.owner_id, org_id: org.id });
         toast('Deal created');
       }
       closeModal();
