@@ -27,6 +27,7 @@ export default async function crmHub(container) {
     { title: 'Leads', desc: 'Capture and qualify new prospects', route: 'crm/leads', color: 'var(--color-warning)', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
     { title: 'Accounts', desc: 'Companies you do business with', route: 'crm/accounts', color: 'var(--color-info)', icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01' },
     { title: 'Contacts', desc: 'People at your accounts', route: 'crm/contacts', color: 'var(--color-success)', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
+    { title: 'Coverage', desc: 'Who\'s called/visited/sold vs untouched, by territory', route: 'crm/coverage', color: 'var(--color-accent)', icon: 'M22 12h-4l-3 9L9 3l-3 9H2' },
     { title: 'Reports', desc: 'Import partner reports keyed on Site ID', route: 'crm/reports', color: 'var(--color-text-secondary)', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
   ];
 
