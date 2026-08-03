@@ -169,6 +169,7 @@ export default async function dashboard(container) {
     </div>
 
     <div id="dash-kpis"></div>
+    <div id="dash-setup"></div>
 
     <div class="dash-two-col">
       <div>
@@ -206,6 +207,55 @@ export default async function dashboard(container) {
   // Business-at-a-glance KPIs (managers + admins). All queries pass through
   // RLS, so a manager sees their team's numbers and an admin the whole org.
   if (isManager) renderKpis();
+  if (isAdmin) renderSetupChecklist();
+
+  async function renderSetupChecklist() {
+    const el = document.getElementById('dash-setup');
+    if (!el) return;
+    if (localStorage.getItem('atllanta_setup_dismissed_' + org.id)) return;
+
+    const year = new Date().getFullYear();
+    const [members, depts, leaveTypes, holidays, crm] = await Promise.all([
+      sb.from('memberships').select('*', { count: 'exact', head: true }).eq('organization_id', org.id),
+      sb.from('departments').select('*', { count: 'exact', head: true }).eq('org_id', org.id),
+      sb.from('leave_types').select('*', { count: 'exact', head: true }).eq('org_id', org.id),
+      sb.from('holidays').select('*', { count: 'exact', head: true }).eq('org_id', org.id).eq('year', year),
+      sb.from('crm_accounts').select('*', { count: 'exact', head: true }),
+    ]);
+
+    const steps = [
+      { done: (members.count || 0) > 1, label: 'Add your team', desc: 'Invite staff, set roles and the reporting line', route: 'settings/users' },
+      { done: (depts.count || 0) > 0, label: 'Set up departments', desc: 'Organize staff into departments and teams', route: 'settings/departments' },
+      { done: (leaveTypes.count || 0) > 0, label: 'Configure leave types', desc: 'Define casual, sick, and earned leave', route: 'leave/settings' },
+      { done: (holidays.count || 0) > 0, label: 'Add holidays', desc: "Set this year's holiday calendar", route: 'leave/settings' },
+      { done: (crm.count || 0) > 0, label: 'Start your pipeline', desc: 'Add your first account or deal in CRM', route: 'crm' },
+    ];
+
+    if (steps.slice(0, 3).every(s => s.done)) return; // core setup complete
+
+    const doneCount = steps.filter(s => s.done).length;
+    el.innerHTML = `<div class="card" style="margin-bottom:var(--space-6);border-color:var(--color-accent)">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+        <span class="card-title">Get your workspace ready · ${doneCount}/${steps.length}</span>
+        <button class="btn btn-ghost btn-sm" id="setup-dismiss">Dismiss</button>
+      </div>
+      <div class="card-body" style="display:grid;gap:var(--space-1)">
+        ${steps.map(s => `<a href="#/${s.route}" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2);border-radius:var(--radius-md);text-decoration:none;color:inherit;${s.done ? 'opacity:0.55' : ''}">
+          <div style="width:22px;height:22px;border-radius:var(--radius-full);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;background:${s.done ? 'var(--color-success-light)' : 'var(--color-bg-tertiary)'};color:${s.done ? 'var(--color-success)' : 'var(--color-text-tertiary)'}">${s.done ? '✓' : ''}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);${s.done ? 'text-decoration:line-through' : ''}">${esc(s.label)}</div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(s.desc)}</div>
+          </div>
+          ${s.done ? '' : '<span style="color:var(--color-accent);font-size:var(--text-sm)">→</span>'}
+        </a>`).join('')}
+      </div>
+    </div>`;
+
+    el.querySelector('#setup-dismiss').addEventListener('click', () => {
+      localStorage.setItem('atllanta_setup_dismissed_' + org.id, '1');
+      el.innerHTML = '';
+    });
+  }
 
   async function renderKpis() {
     const el = document.getElementById('dash-kpis');
