@@ -32,7 +32,7 @@ export default async function crmAccounts(container) {
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
         ${showScope ? scopeTabs(scope) : ''}
-        <input type="text" class="form-input" id="account-search" placeholder="Search accounts..." style="max-width:280px;height:34px">
+        <input type="text" class="form-input" id="account-search" placeholder="Search name, Site ID, city, state..." style="max-width:320px;height:34px">
       </div>
       <div id="account-list">${loadingSkeleton()}</div>
     </div>
@@ -50,10 +50,15 @@ export default async function crmAccounts(container) {
 
   function render() {
     const el = document.getElementById('account-list');
-    const rows = scopeFilter(accounts, scope)
-      .filter(a => !search || a.name?.toLowerCase().includes(search) || a.industry?.toLowerCase().includes(search));
+    const matched = scopeFilter(accounts, scope)
+      .filter(a => !search
+        || a.name?.toLowerCase().includes(search)
+        || a.external_id?.toLowerCase().includes(search)
+        || a.billing_city?.toLowerCase().includes(search)
+        || a.state?.toLowerCase().includes(search)
+        || a.industry?.toLowerCase().includes(search));
 
-    if (!rows.length) {
+    if (!matched.length) {
       el.innerHTML = `<div class="empty-state" style="padding:var(--space-8)">
         <div class="empty-state-title">${accounts.length ? 'No matches' : 'No accounts yet'}</div>
         <div class="empty-state-desc">${accounts.length ? 'Try a different search.' : 'Add your first company to start tracking deals.'}</div>
@@ -61,17 +66,26 @@ export default async function crmAccounts(container) {
       return;
     }
 
+    const CAP = 200;
+    const rows = matched.slice(0, CAP);
+    const more = matched.length - rows.length;
+
     el.innerHTML = `<div class="table-wrap"><table class="table">
-      <thead><tr><th>Name</th><th>Industry</th><th>Website</th><th>Owner</th><th></th></tr></thead>
+      <thead><tr><th>Site ID</th><th>Name</th><th>Owner (BDE)</th><th>City</th><th>State</th><th>Status</th><th></th></tr></thead>
       <tbody>${rows.map(a => `
         <tr data-id="${a.id}" style="cursor:pointer">
+          <td style="font-family:var(--font-mono);font-size:var(--text-sm)">${a.external_id ? esc(a.external_id) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td style="font-weight:var(--font-weight-medium)">${esc(a.name)}</td>
-          <td>${a.industry ? esc(a.industry) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
-          <td>${a.website ? `<a href="${esc(a.website.startsWith('http') ? a.website : 'https://' + a.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--color-accent)">${esc(a.website)}</a>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td>${esc(ownerName(users, a.owner_id))}</td>
+          <td>${a.billing_city ? esc(a.billing_city) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td>${a.state ? esc(a.state) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td>${a.partner_status ? esc(a.partner_status) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td style="text-align:right"><button class="btn btn-ghost btn-sm" data-edit="${a.id}" onclick="event.stopPropagation()">Edit</button></td>
         </tr>`).join('')}</tbody>
-    </table></div>`;
+    </table></div>
+    <div style="padding:var(--space-3) var(--space-4);font-size:var(--text-sm);color:var(--color-text-secondary)">
+      Showing ${rows.length.toLocaleString('en-IN')} of ${matched.length.toLocaleString('en-IN')}${more ? ` — refine your search to see the rest` : ''}.
+    </div>`;
 
     el.querySelectorAll('tr[data-id]').forEach(tr => {
       tr.addEventListener('click', () => navigate(`crm/account?id=${tr.dataset.id}`));
@@ -87,6 +101,7 @@ export default async function crmAccounts(container) {
     form.innerHTML = `
       ${field('Company name *', `<input class="form-input" name="name" required value="${esc(a.name || '')}">`)}
       <div class="crm-cols-2">
+        ${field('Site ID', `<input class="form-input" name="external_id" value="${esc(a.external_id || '')}" placeholder="Tally report mapping key">`)}
         ${field('Industry', `<input class="form-input" name="industry" value="${esc(a.industry || '')}">`)}
         ${field('Website', `<input class="form-input" name="website" value="${esc(a.website || '')}">`)}
         ${field('Phone', `<input class="form-input" name="phone" value="${esc(a.phone || '')}">`)}
@@ -108,6 +123,7 @@ export default async function crmAccounts(container) {
       const fd = new FormData(form);
       const payload = {
         name: fd.get('name').trim(),
+        external_id: fd.get('external_id').trim() || null,
         industry: fd.get('industry').trim() || null,
         website: fd.get('website').trim() || null,
         phone: fd.get('phone').trim() || null,
@@ -120,14 +136,18 @@ export default async function crmAccounts(container) {
       };
       if (!payload.name) return;
 
+      const siteIdError = (error) => error.code === '23505'
+        ? 'That Site ID is already used by another account'
+        : null;
+
       if (existing) {
         const { error } = await sb.from('crm_accounts').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        if (error) return toast('Could not save account');
+        if (error) return toast(siteIdError(error) || 'Could not save account');
         await logAction('crm', 'account', existing.id, 'updated', existing, payload);
         toast('Account updated');
       } else {
         const { data, error } = await sb.from('crm_accounts').insert({ ...payload, org_id: org.id, created_by: user?.id }).select('id').single();
-        if (error) return toast('Could not create account');
+        if (error) return toast(siteIdError(error) || 'Could not create account');
         await logAction('crm', 'account', data.id, 'created', null, payload);
         await publishEvent('crm.account.created', { account_id: data.id, name: payload.name, org_id: org.id });
         toast('Account created');
@@ -234,8 +254,13 @@ export default async function crmAccounts(container) {
 
   document.getElementById('export-accounts').addEventListener('click', () => {
     const rows = scopeFilter(accounts, scope)
-      .filter(a => !search || a.name?.toLowerCase().includes(search) || a.industry?.toLowerCase().includes(search))
-      .map(a => ({ Name: a.name, Industry: a.industry || '', Website: a.website || '', Phone: a.phone || '', Employees: a.employees_count ?? '', 'Annual revenue': a.annual_revenue ?? '', City: a.billing_city || '', Country: a.billing_country || '', Owner: ownerName(users, a.owner_id) }));
+      .filter(a => !search
+        || a.name?.toLowerCase().includes(search)
+        || a.external_id?.toLowerCase().includes(search)
+        || a.billing_city?.toLowerCase().includes(search)
+        || a.state?.toLowerCase().includes(search)
+        || a.industry?.toLowerCase().includes(search))
+      .map(a => ({ 'Site ID': a.external_id || '', Name: a.name, Owner: ownerName(users, a.owner_id), Role: a.tier || '', 'Role Status': a.partner_status || '', City: a.billing_city || '', District: a.district || '', State: a.state || '', Region: a.region || '', Hub: a.hub || '', Telecaller: a.telecaller || '', Notes: a.description || '' }));
     downloadCsv('accounts.csv', rows);
   });
   document.getElementById('account-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });

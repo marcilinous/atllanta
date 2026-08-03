@@ -58,11 +58,19 @@ export default async function crmAccountDetail(container) {
       <div class="card">
         <div class="card-header"><span class="card-title">Details</span></div>
         <div class="card-body">
+          ${infoRow('Site ID', account.external_id ? `<span style="font-family:var(--font-mono)">${esc(account.external_id)}</span>` : '')}
+          ${infoRow('Role', account.tier ? esc(account.tier) : '')}
+          ${infoRow('Status', account.partner_status ? esc(account.partner_status) : '')}
+          ${infoRow('Telecaller', account.telecaller ? esc(account.telecaller) : '')}
           ${infoRow('Website', account.website ? `<a href="${esc(account.website.startsWith('http') ? account.website : 'https://' + account.website)}" target="_blank" rel="noopener" style="color:var(--color-accent)">${esc(account.website)}</a>` : '')}
           ${infoRow('Phone', account.phone ? esc(account.phone) : '')}
           ${infoRow('Employees', account.employees_count ? esc(String(account.employees_count)) : '')}
           ${infoRow('Annual revenue', account.annual_revenue ? money(account.annual_revenue) : '')}
-          ${infoRow('Location', [account.billing_city, account.billing_country].filter(Boolean).map(esc).join(', '))}
+          ${infoRow('City', account.billing_city ? esc(account.billing_city) : '')}
+          ${infoRow('District', account.district ? esc(account.district) : '')}
+          ${infoRow('State', account.state ? esc(account.state) : '')}
+          ${infoRow('Region', account.region ? esc(account.region) : '')}
+          ${infoRow('Hub', account.hub ? esc(account.hub) : '')}
           ${account.description ? `<div style="margin-top:var(--space-3);font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(account.description)}</div>` : ''}
         </div>
       </div>

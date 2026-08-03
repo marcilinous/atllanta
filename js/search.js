@@ -71,8 +71,8 @@ async function runSearch(query) {
     sb.from('jobs').select('id, title, status, department:department_id(name)')
       .or(`title.ilike.${q}`)
       .limit(5),
-    sb.from('crm_accounts').select('id, name, industry')
-      .or(`name.ilike.${q},industry.ilike.${q}`)
+    sb.from('crm_accounts').select('id, name, industry, external_id')
+      .or(`name.ilike.${q},industry.ilike.${q},external_id.ilike.${q}`)
       .limit(5),
     sb.from('crm_contacts').select('id, first_name, last_name, email, account:account_id(name)')
       .or(`first_name.ilike.${q},last_name.ilike.${q},email.ilike.${q}`)
@@ -115,7 +115,7 @@ async function runSearch(query) {
     sections.push(`<div class="search-section"><div class="search-section-title">Accounts</div>
       ${accounts.map(a => `<div class="search-item" data-nav="crm/account?id=${a.id}" data-id="${a.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3"/></svg>
-        <div><div class="search-item-title">${esc(a.name)}</div><div class="search-item-sub">${a.industry ? esc(a.industry) : 'Account'}</div></div>
+        <div><div class="search-item-title">${esc(a.name)}</div><div class="search-item-sub">${a.external_id ? 'Site ID ' + esc(a.external_id) : (a.industry ? esc(a.industry) : 'Account')}</div></div>
       </div>`).join('')}</div>`);
   }
 
