@@ -7,6 +7,65 @@ import { navigate } from '../../js/router.js';
 const REPORT_TYPES = ['Renewals (TSS)', 'Sales', 'Licenses', 'Payments', 'Support', 'Other'];
 const SITE_ID_RE = /^(site[\s_-]*id|siteid|external[\s_-]*id|site)$/i;
 
+// Canonical columns for the Tally TSS AP scorecard (matches the flatten below).
+const TSS_COLS = ['account_id_tally', 'site_id', 'partner_name', 'role', 'district', 'region', 'state', 'yau_cb',
+  'old_cb', 'old_ach', 'lfy_cb', 'lfy_ach', 'tfy_cb', 'tfy_ach', 'cm_cb', 'cm_ach',
+  'te9_cb', 'te9_ach', 'tpca_cb', 'tpca_ach', 'waba_cb', 'waba_ach'];
+
+// SheetJS is only needed for Excel uploads — load it lazily from CDN.
+let _xlsxLib = null;
+async function loadXlsx() {
+  if (!_xlsxLib) _xlsxLib = await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+  return _xlsxLib;
+}
+
+const cell = (v) => (v === undefined || v === null || v === '') ? '' : v;
+const idStr = (v) => (v === undefined || v === null || v === '') ? '' : (typeof v === 'number' ? String(Math.round(v)) : String(v).trim());
+
+// Flatten the Tally TSS "AP" sheet (two-row grouped header + totals band) into
+// clean canonical rows keyed on site_id. Returns null if it isn't that shape.
+function flattenTssAP(XLSX, wb) {
+  const ws = wb.Sheets['AP'];
+  if (!ws) return null;
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false });
+  let h = -1;
+  for (let i = 0; i < Math.min(aoa.length, 12); i++) {
+    if ((aoa[i] || []).some(c => String(c).trim().toLowerCase() === 'site id')) { h = i; break; }
+  }
+  if (h < 0) return null;
+  const out = [];
+  for (let i = h + 1; i < aoa.length; i++) {
+    const r = aoa[i] || [];
+    if (r[1] === undefined || r[1] === null || r[1] === '') continue; // needs a Site ID
+    out.push({
+      account_id_tally: idStr(r[0]), site_id: idStr(r[1]), partner_name: cell(r[2]),
+      role: cell(r[3]), district: cell(r[4]), region: cell(r[5]), state: cell(r[6]),
+      yau_cb: cell(r[7]),
+      old_cb: cell(r[8]), old_ach: cell(r[9]), lfy_cb: cell(r[11]), lfy_ach: cell(r[12]),
+      tfy_cb: cell(r[14]), tfy_ach: cell(r[15]), cm_cb: cell(r[17]), cm_ach: cell(r[18]),
+      te9_cb: cell(r[20]), te9_ach: cell(r[21]), tpca_cb: cell(r[23]), tpca_ach: cell(r[24]),
+      waba_cb: cell(r[26]), waba_ach: cell(r[27]),
+    });
+  }
+  return out.length ? out : null;
+}
+
+// Read any supported file into { rows, cols, forcedSite, tss }.
+async function readReportFile(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'csv' || file.type === 'text/csv') {
+    const rows = parseCsv(await file.text());
+    return { rows, cols: rows.length ? Object.keys(rows[0]) : [], forcedSite: null, tss: false };
+  }
+  const XLSX = await loadXlsx();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const tss = flattenTssAP(XLSX, wb);
+  if (tss) return { rows: tss, cols: TSS_COLS, forcedSite: 'site_id', tss: true };
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  return { rows, cols: rows.length ? Object.keys(rows[0]) : [], forcedSite: null, tss: false };
+}
+
 export default async function crmReports(container) {
   const org = getOrg();
   const user = getUser();
@@ -98,18 +157,21 @@ export default async function crmReports(container) {
     wrap.innerHTML = `
       <div style="display:grid;gap:var(--space-3)">
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
-          Upload a report CSV. Every row is stored as-is; we just need to know which column is the <strong>Site ID</strong> so it can link to a partner.
+          Drop the raw Tally file (<strong>.xlsb</strong> / <strong>.xlsx</strong>) or a CSV. A TSS report's <strong>AP</strong> sheet is decoded automatically; every row is stored as-is and linked to a partner by <strong>Site ID</strong>.
         </div>
         <div class="crm-cols-2">
           <div><label class="form-label">Report name</label><input class="form-input" id="rep-name" placeholder="e.g. TSS Renewals — Aug 2026"></div>
           <div><label class="form-label">Type</label><input class="form-input" id="rep-type" list="rep-types" placeholder="Renewals (TSS)">
             <datalist id="rep-types">${REPORT_TYPES.map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
         </div>
-        <input type="file" accept=".csv,text/csv" class="form-input" id="rep-file">
+        <input type="file" accept=".csv,.xlsx,.xlsb,text/csv" class="form-input" id="rep-file">
         <div id="rep-sitecol-wrap" style="display:none">
           <label class="form-label">Site ID column</label>
           <select class="form-input" id="rep-sitecol"></select>
         </div>
+        <label style="display:flex;gap:var(--space-2);align-items:center;font-size:var(--text-sm);color:var(--color-text-secondary)">
+          <input type="checkbox" id="rep-snapshot"> Replace the previous import of this type (daily snapshot)
+        </label>
         <div id="rep-preview" style="font-size:var(--text-sm);color:var(--color-text-secondary)"></div>
         <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
           <button type="button" class="btn btn-secondary" id="rep-cancel">Cancel</button>
@@ -123,6 +185,7 @@ export default async function crmReports(container) {
     const typeEl = wrap.querySelector('#rep-type');
     const siteWrap = wrap.querySelector('#rep-sitecol-wrap');
     const siteSel = wrap.querySelector('#rep-sitecol');
+    const snapshotEl = wrap.querySelector('#rep-snapshot');
     const preview = wrap.querySelector('#rep-preview');
     const go = wrap.querySelector('#rep-go');
     let fileName = '';
@@ -146,12 +209,20 @@ export default async function crmReports(container) {
       const file = e.target.files?.[0];
       if (!file) return;
       fileName = file.name;
-      if (!nameEl.value.trim()) nameEl.value = file.name.replace(/\.csv$/i, '');
-      const text = await file.text();
-      rows = parseCsv(text);
-      cols = rows.length ? Object.keys(rows[0]) : [];
-      if (!rows.length) { preview.innerHTML = `<span style="color:var(--color-error)">No rows found. Check the file.</span>`; go.disabled = true; siteWrap.style.display = 'none'; return; }
-      const detected = detectSiteCol(cols);
+      if (!nameEl.value.trim()) nameEl.value = file.name.replace(/\.(csv|xlsx|xlsb)$/i, '');
+      preview.textContent = 'Reading file…';
+      go.disabled = true;
+      let parsedFile;
+      try { parsedFile = await readReportFile(file); }
+      catch (err) { preview.innerHTML = `<span style="color:var(--color-error)">Could not read that file. Try exporting it as CSV.</span>`; siteWrap.style.display = 'none'; return; }
+      rows = parsedFile.rows || [];
+      cols = parsedFile.cols || [];
+      if (!rows.length) { preview.innerHTML = `<span style="color:var(--color-error)">No rows found. Check the file.</span>`; siteWrap.style.display = 'none'; return; }
+      if (parsedFile.tss) {
+        if (!typeEl.value.trim()) typeEl.value = 'Renewals (TSS)';
+        snapshotEl.checked = true;
+      }
+      const detected = parsedFile.forcedSite || detectSiteCol(cols);
       siteSel.innerHTML = `<option value="">— none —</option>` + cols.map(c => `<option value="${esc(c)}"${c === detected ? ' selected' : ''}>${esc(c)}</option>`).join('');
       siteWrap.style.display = '';
       await refreshPreview();
@@ -190,6 +261,11 @@ export default async function crmReports(container) {
       }
       await sb.from('crm_report_imports').update({ row_count: done, matched_count: matched }).eq('id', imp.id);
       await logAction('crm', 'report_import', imp.id, 'imported', null, { name, rows: done, matched });
+
+      // Daily snapshot: drop older imports of the same type (rows cascade).
+      if (snapshotEl.checked && reportType) {
+        await sb.from('crm_report_imports').delete().eq('org_id', org.id).eq('report_type', reportType).neq('id', imp.id);
+      }
       toast(`Imported ${done.toLocaleString('en-IN')} rows${failed ? ` · ${failed} failed` : ''} · ${matched.toLocaleString('en-IN')} matched`);
       closeModal();
       load();
