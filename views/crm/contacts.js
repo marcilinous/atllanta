@@ -86,7 +86,7 @@ export default async function crmContacts(container) {
     const c = existing || {};
     const form = document.createElement('form');
     form.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+      <div class="crm-cols-2">
         ${field('First name', `<input class="form-input" name="first_name" value="${esc(c.first_name || '')}">`)}
         ${field('Last name', `<input class="form-input" name="last_name" value="${esc(c.last_name || '')}">`)}
         ${field('Title', `<input class="form-input" name="title" value="${esc(c.title || '')}">`)}

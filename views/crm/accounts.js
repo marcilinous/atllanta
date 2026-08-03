@@ -85,7 +85,7 @@ export default async function crmAccounts(container) {
     const form = document.createElement('form');
     form.innerHTML = `
       ${field('Company name *', `<input class="form-input" name="name" required value="${esc(a.name || '')}">`)}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+      <div class="crm-cols-2">
         ${field('Industry', `<input class="form-input" name="industry" value="${esc(a.industry || '')}">`)}
         ${field('Website', `<input class="form-input" name="website" value="${esc(a.website || '')}">`)}
         ${field('Phone', `<input class="form-input" name="phone" value="${esc(a.phone || '')}">`)}

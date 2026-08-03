@@ -152,7 +152,7 @@ export default async function crmOpportunities(container) {
     const form = document.createElement('form');
     form.innerHTML = `
       ${field('Deal name *', `<input class="form-input" name="name" required value="${esc(o.name || '')}">`)}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+      <div class="crm-cols-2">
         ${field('Account', `<select class="form-input" name="account_id">${accountOptions(accounts, o.account_id ?? params.account)}</select>`)}
         ${field('Primary contact', `<select class="form-input" name="primary_contact_id"><option value="">— None —</option>${contacts.map(c => `<option value="${c.id}" ${c.id === o.primary_contact_id ? 'selected' : ''}>${esc(contactName(c))}</option>`).join('')}</select>`)}
         ${field('Stage', `<select class="form-input" name="stage_id">${stages.map(s => `<option value="${s.id}" ${(o.stage_id || defaultStage) === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>`)}

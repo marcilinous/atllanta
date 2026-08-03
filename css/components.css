@@ -644,6 +644,26 @@ select.form-input { cursor: pointer; }
 
 .kanban-card:active { cursor: grabbing; }
 
+/* Responsive CRM grids — collapse to one column on small screens */
+.crm-detail-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .crm-detail-cols { grid-template-columns: 1fr; }
+}
+
+.crm-cols-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+@media (max-width: 640px) {
+  .crm-cols-2 { grid-template-columns: 1fr; }
+}
+
 /* ── AI Panel ────────────────────────────── */
 .ai-panel {
   position: fixed;

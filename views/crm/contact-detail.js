@@ -50,7 +50,7 @@ export default async function crmContactDetail(container) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);align-items:start">
+    <div class="crm-detail-cols">
       <div class="card">
         <div class="card-header"><span class="card-title">Details</span></div>
         <div class="card-body">
@@ -105,7 +105,7 @@ export default async function crmContactDetail(container) {
     const accounts = await fetchAccountsLite();
     const form = document.createElement('form');
     form.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+      <div class="crm-cols-2">
         ${field('First name', `<input class="form-input" name="first_name" value="${esc(contact.first_name || '')}">`)}
         ${field('Last name', `<input class="form-input" name="last_name" value="${esc(contact.last_name || '')}">`)}
         ${field('Title', `<input class="form-input" name="title" value="${esc(contact.title || '')}">`)}

@@ -90,7 +90,7 @@ export default async function crmLeads(container) {
     const l = existing || {};
     const form = document.createElement('form');
     form.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+      <div class="crm-cols-2">
         ${field('First name', `<input class="form-input" name="first_name" value="${esc(l.first_name || '')}">`)}
         ${field('Last name', `<input class="form-input" name="last_name" value="${esc(l.last_name || '')}">`)}
         ${field('Company', `<input class="form-input" name="company" value="${esc(l.company || '')}">`)}
@@ -156,7 +156,7 @@ export default async function crmLeads(container) {
         <input type="checkbox" name="make_opp" checked> Create an opportunity
       </label>
       <div id="opp-fields">
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-3)">
+        <div class="crm-cols-2">
           ${field('Deal name', `<input class="form-input" name="opp_name" value="${esc((lead.company || leadName(lead)) + ' — New deal')}">`)}
           ${field('Amount', `<input class="form-input" type="number" name="opp_amount">`)}
         </div>

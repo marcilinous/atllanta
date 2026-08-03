@@ -266,7 +266,7 @@ export default async function settingsUsers(container) {
       const f = document.createElement('div');
       f.innerHTML = `
         <div style="display:grid;gap:var(--space-4)">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="crm-cols-2">
             <div class="form-group" style="margin:0">
               <label class="form-label">Full name</label>
               <input type="text" class="form-input" id="invite-name" placeholder="Jane Doe">
