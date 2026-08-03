@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -24,7 +24,10 @@ export default async function crmContacts(container) {
         <h1 class="page-title">Contacts</h1>
         <p class="page-subtitle">People at your accounts</p>
       </div>
-      <button class="btn btn-primary" id="add-contact">+ Contact</button>
+      <div style="display:flex;gap:var(--space-2)">
+        <button class="btn btn-secondary" id="export-contacts">Export</button>
+        <button class="btn btn-primary" id="add-contact">+ Contact</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
@@ -130,6 +133,12 @@ export default async function crmContacts(container) {
   }
 
   document.getElementById('add-contact').addEventListener('click', () => openForm(null));
+  document.getElementById('export-contacts').addEventListener('click', () => {
+    const rows = scopeFilter(contacts, scope)
+      .filter(c => !search || contactName(c).toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.account?.name?.toLowerCase().includes(search))
+      .map(c => ({ Name: contactName(c), Title: c.title || '', Account: c.account?.name || '', Email: c.email || '', Phone: c.phone || '' }));
+    downloadCsv('contacts.csv', rows);
+  });
   document.getElementById('contact-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });
   container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');

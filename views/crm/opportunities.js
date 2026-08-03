@@ -1,10 +1,10 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser, getMembership } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { routeParams, navigate } from '../../js/router.js';
-import { money, contactName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
+import { money, contactName, ownerName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmOpportunities(container) {
   const org = getOrg();
@@ -29,6 +29,7 @@ export default async function crmOpportunities(container) {
       <div style="display:flex;gap:var(--space-3);align-items:center">
         ${showScope ? scopeTabs(scope) : ''}
         ${['owner', 'admin'].includes(getMembership()?.role) ? '<button class="btn btn-secondary" id="edit-stages">Edit stages</button>' : ''}
+        <button class="btn btn-secondary" id="export-deals">Export</button>
         <button class="btn btn-primary" id="add-deal">+ Deal</button>
       </div>
     </div>
@@ -219,6 +220,19 @@ export default async function crmOpportunities(container) {
 
   document.getElementById('add-deal').addEventListener('click', () => openForm(null));
   document.getElementById('edit-stages')?.addEventListener('click', () => navigate('crm/settings'));
+  document.getElementById('export-deals').addEventListener('click', () => {
+    const rows = scopeFilter(opps, scope).map(o => ({
+      Deal: o.name,
+      Account: o.account?.name || '',
+      Contact: contactName(o.contact) || '',
+      Stage: stages.find(s => s.id === o.stage_id)?.name || '',
+      Amount: o.amount ?? '',
+      Status: o.status,
+      'Close date': o.close_date || '',
+      Owner: ownerName(users, o.owner_id),
+    }));
+    downloadCsv('deals.csv', rows);
+  });
   container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;

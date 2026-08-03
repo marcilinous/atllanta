@@ -185,3 +185,25 @@ export function loadingSkeleton(rows = 5) {
     ${Array.from({ length: rows }, () => `<div class="skeleton skeleton-text" style="width:${60 + Math.random() * 30}%;margin-bottom:var(--space-3)"></div>`).join('')}
   </div>`;
 }
+
+// Download an array of flat objects as a CSV file. Keys of the first row
+// become the header. Values are CSV-escaped.
+export function downloadCsv(filename, rows) {
+  if (!rows?.length) { toast('Nothing to export'); return; }
+  const headers = Object.keys(rows[0]);
+  const cell = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => cell(r[h])).join(','))].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

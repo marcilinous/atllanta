@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -23,7 +23,10 @@ export default async function crmLeads(container) {
         <h1 class="page-title">Leads</h1>
         <p class="page-subtitle">Capture and qualify new prospects</p>
       </div>
-      <button class="btn btn-primary" id="add-lead">+ Lead</button>
+      <div style="display:flex;gap:var(--space-2)">
+        <button class="btn btn-secondary" id="export-leads">Export</button>
+        <button class="btn btn-primary" id="add-lead">+ Lead</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
@@ -232,6 +235,12 @@ export default async function crmLeads(container) {
   }
 
   document.getElementById('add-lead').addEventListener('click', () => openForm(null));
+  document.getElementById('export-leads').addEventListener('click', () => {
+    const rows = scopeFilter(leads, scope)
+      .filter(l => statusFilter === 'all' ? true : statusFilter === 'converted' ? l.status === 'converted' : l.status !== 'converted')
+      .map(l => ({ Name: leadName(l), Company: l.company || '', Title: l.title || '', Email: l.email || '', Phone: l.phone || '', Status: l.status, Rating: l.rating || '', Source: l.source || '', Owner: ownerName(users, l.owner_id) }));
+    downloadCsv('leads.csv', rows);
+  });
   document.getElementById('lead-filter').addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;

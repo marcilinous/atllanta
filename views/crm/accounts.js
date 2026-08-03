@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -23,7 +23,10 @@ export default async function crmAccounts(container) {
         <h1 class="page-title">Accounts</h1>
         <p class="page-subtitle">Companies you do business with</p>
       </div>
-      <button class="btn btn-primary" id="add-account">+ Account</button>
+      <div style="display:flex;gap:var(--space-2)">
+        <button class="btn btn-secondary" id="export-accounts">Export</button>
+        <button class="btn btn-primary" id="add-account">+ Account</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
@@ -135,6 +138,12 @@ export default async function crmAccounts(container) {
   }
 
   document.getElementById('add-account').addEventListener('click', () => openForm(null));
+  document.getElementById('export-accounts').addEventListener('click', () => {
+    const rows = scopeFilter(accounts, scope)
+      .filter(a => !search || a.name?.toLowerCase().includes(search) || a.industry?.toLowerCase().includes(search))
+      .map(a => ({ Name: a.name, Industry: a.industry || '', Website: a.website || '', Phone: a.phone || '', Employees: a.employees_count ?? '', 'Annual revenue': a.annual_revenue ?? '', City: a.billing_city || '', Country: a.billing_country || '', Owner: ownerName(users, a.owner_id) }));
+    downloadCsv('accounts.csv', rows);
+  });
   document.getElementById('account-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });
   container.querySelector('.crm-scope')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
