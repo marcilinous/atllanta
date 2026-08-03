@@ -3,9 +3,12 @@ import { getOrg, getUser } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv, formatDate } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { navigate } from '../../js/router.js';
+import { fetchOrgUsers } from './common.js';
 
 const REPORT_TYPES = ['Renewals (TSS)', 'Sales', 'Licenses', 'Payments', 'Support', 'Other'];
 const SITE_ID_RE = /^(site[\s_-]*id|siteid|external[\s_-]*id|site)$/i;
+// Columns that name the staff member who did the activity (not the partner's own contact).
+const PERSON_RE = /(allocated employee|visited by|created by|called by|caller|executive name|salesperson|\bbde\b|\btl\b|\bcm\b|telecaller|employee name)/i;
 
 // Canonical columns for the Tally TSS AP scorecard (matches the flatten below).
 const TSS_COLS = ['account_id_tally', 'site_id', 'partner_name', 'role', 'district', 'region', 'state', 'yau_cb',
@@ -72,7 +75,8 @@ export default async function crmReports(container) {
   if (!org) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div></div>`; return; }
 
   let imports = [];
-  let siteMap = null; // Site ID -> account_id, built lazily (7k+ accounts)
+  let siteMap = null;   // Site ID -> account_id, built lazily (7k+ accounts)
+  let peopleMap = null; // lower(full_name) -> user id
 
   container.innerHTML = `
     <div style="margin-bottom:var(--space-4)"><button class="btn btn-ghost btn-sm" id="back">← CRM</button></div>
@@ -148,8 +152,19 @@ export default async function crmReports(container) {
     return siteMap;
   }
 
+  async function ensurePeopleMap() {
+    if (peopleMap) return peopleMap;
+    peopleMap = new Map();
+    const users = await fetchOrgUsers();
+    (users || []).forEach(u => { if (u.full_name) peopleMap.set(u.full_name.toLowerCase(), u.id); });
+    return peopleMap;
+  }
+
   function detectSiteCol(cols) {
     return cols.find(c => SITE_ID_RE.test(c)) || cols.find(c => /site/i.test(c)) || '';
+  }
+  function detectPersonCol(cols) {
+    return cols.find(c => PERSON_RE.test(c)) || '';
   }
 
   function openImport() {
@@ -157,7 +172,7 @@ export default async function crmReports(container) {
     wrap.innerHTML = `
       <div style="display:grid;gap:var(--space-3)">
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
-          Drop the raw Tally file (<strong>.xlsb</strong> / <strong>.xlsx</strong>) or a CSV. A TSS report's <strong>AP</strong> sheet is decoded automatically; every row is stored as-is and linked to a partner by <strong>Site ID</strong>.
+          Drop the raw Tally file (<strong>.xlsb</strong> / <strong>.xlsx</strong>) or a CSV. Rows link to a partner by <strong>Site ID</strong> and/or to a staff member by <strong>person name</strong> (BDE/TL/CM/Telecaller) — pick whichever columns apply below.
         </div>
         <div class="crm-cols-2">
           <div><label class="form-label">Report name</label><input class="form-input" id="rep-name" placeholder="e.g. TSS Renewals — Aug 2026"></div>
@@ -165,9 +180,15 @@ export default async function crmReports(container) {
             <datalist id="rep-types">${REPORT_TYPES.map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
         </div>
         <input type="file" accept=".csv,.xlsx,.xlsb,text/csv" class="form-input" id="rep-file">
-        <div id="rep-sitecol-wrap" style="display:none">
-          <label class="form-label">Site ID column</label>
-          <select class="form-input" id="rep-sitecol"></select>
+        <div class="crm-cols-2" id="rep-cols-wrap" style="display:none">
+          <div>
+            <label class="form-label">Site ID column <span style="color:var(--color-text-tertiary)">(partner)</span></label>
+            <select class="form-input" id="rep-sitecol"></select>
+          </div>
+          <div>
+            <label class="form-label">Person column <span style="color:var(--color-text-tertiary)">(staff)</span></label>
+            <select class="form-input" id="rep-personcol"></select>
+          </div>
         </div>
         <label style="display:flex;gap:var(--space-2);align-items:center;font-size:var(--text-sm);color:var(--color-text-secondary)">
           <input type="checkbox" id="rep-snapshot"> Replace the previous import of this type (daily snapshot)
@@ -183,8 +204,9 @@ export default async function crmReports(container) {
     let cols = [];       // column keys
     const nameEl = wrap.querySelector('#rep-name');
     const typeEl = wrap.querySelector('#rep-type');
-    const siteWrap = wrap.querySelector('#rep-sitecol-wrap');
+    const colsWrap = wrap.querySelector('#rep-cols-wrap');
     const siteSel = wrap.querySelector('#rep-sitecol');
+    const personSel = wrap.querySelector('#rep-personcol');
     const snapshotEl = wrap.querySelector('#rep-snapshot');
     const preview = wrap.querySelector('#rep-preview');
     const go = wrap.querySelector('#rep-go');
@@ -195,13 +217,19 @@ export default async function crmReports(container) {
     async function refreshPreview() {
       if (!rows.length) { preview.textContent = ''; go.disabled = true; return; }
       const siteCol = siteSel.value;
-      const map = await ensureSiteMap();
-      let matched = 0;
-      for (const r of rows) { const sid = siteCol ? String(r[siteCol] ?? '').trim() : ''; if (sid && map.has(sid)) matched++; }
-      const unmatched = rows.length - matched;
-      preview.innerHTML = `Ready to import <strong>${rows.length.toLocaleString('en-IN')}</strong> rows across ${cols.length} columns — `
-        + `${matched.toLocaleString('en-IN')} matched to a partner`
-        + `${unmatched ? `, <span style="color:var(--color-warning)">${unmatched.toLocaleString('en-IN')} unmatched</span>` : ''}.`;
+      const personCol = personSel.value;
+      const map = siteCol ? await ensureSiteMap() : null;
+      const pmap = personCol ? await ensurePeopleMap() : null;
+      let partner = 0, person = 0;
+      for (const r of rows) {
+        if (map) { const sid = String(r[siteCol] ?? '').trim(); if (sid && map.has(sid)) partner++; }
+        if (pmap) { const nm = String(r[personCol] ?? '').trim().toLowerCase(); if (nm && pmap.has(nm)) person++; }
+      }
+      const parts = [];
+      if (siteCol) parts.push(`${partner.toLocaleString('en-IN')} linked to a partner`);
+      if (personCol) parts.push(`${person.toLocaleString('en-IN')} linked to staff`);
+      preview.innerHTML = `Ready to import <strong>${rows.length.toLocaleString('en-IN')}</strong> rows across ${cols.length} columns`
+        + (parts.length ? ` — ${parts.join(', ')}.` : `. <span style="color:var(--color-warning)">Pick a Site ID or Person column so rows can be linked.</span>`);
       go.disabled = false;
     }
 
@@ -214,39 +242,48 @@ export default async function crmReports(container) {
       go.disabled = true;
       let parsedFile;
       try { parsedFile = await readReportFile(file); }
-      catch (err) { preview.innerHTML = `<span style="color:var(--color-error)">Could not read that file. Try exporting it as CSV.</span>`; siteWrap.style.display = 'none'; return; }
+      catch (err) { preview.innerHTML = `<span style="color:var(--color-error)">Could not read that file. Try exporting it as CSV.</span>`; colsWrap.style.display = 'none'; return; }
       rows = parsedFile.rows || [];
       cols = parsedFile.cols || [];
-      if (!rows.length) { preview.innerHTML = `<span style="color:var(--color-error)">No rows found. Check the file.</span>`; siteWrap.style.display = 'none'; return; }
+      if (!rows.length) { preview.innerHTML = `<span style="color:var(--color-error)">No rows found. Check the file.</span>`; colsWrap.style.display = 'none'; return; }
       if (parsedFile.tss) {
         if (!typeEl.value.trim()) typeEl.value = 'Renewals (TSS)';
         snapshotEl.checked = true;
       }
-      const detected = parsedFile.forcedSite || detectSiteCol(cols);
-      siteSel.innerHTML = `<option value="">— none —</option>` + cols.map(c => `<option value="${esc(c)}"${c === detected ? ' selected' : ''}>${esc(c)}</option>`).join('');
-      siteWrap.style.display = '';
+      const detectedSite = parsedFile.forcedSite || detectSiteCol(cols);
+      const detectedPerson = detectPersonCol(cols);
+      const opts = (sel) => `<option value="">— none —</option>` + cols.map(c => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
+      siteSel.innerHTML = opts(detectedSite);
+      personSel.innerHTML = opts(detectedPerson);
+      colsWrap.style.display = '';
       await refreshPreview();
     });
     siteSel.addEventListener('change', refreshPreview);
+    personSel.addEventListener('change', refreshPreview);
 
     go.addEventListener('click', async () => {
       const name = nameEl.value.trim() || fileName || 'Report';
       const reportType = typeEl.value.trim() || null;
       const siteCol = siteSel.value;
+      const personCol = personSel.value;
       go.disabled = true;
-      const map = await ensureSiteMap();
+      const map = siteCol ? await ensureSiteMap() : null;
+      const pmap = personCol ? await ensurePeopleMap() : null;
 
       const { data: imp, error: impErr } = await sb.from('crm_report_imports').insert({
         org_id: org.id, name, report_type: reportType, source_filename: fileName || null,
-        columns: cols, site_id_column: siteCol || null, imported_by: user?.id || null,
+        columns: cols, site_id_column: siteCol || null, person_column: personCol || null, imported_by: user?.id || null,
       }).select('id').single();
       if (impErr || !imp) { toast('Could not start import'); go.disabled = false; return; }
 
       const payload = rows.map(r => {
         const sid = siteCol ? String(r[siteCol] ?? '').trim() : '';
+        const pnm = personCol ? String(r[personCol] ?? '').trim() : '';
         return {
           org_id: org.id, import_id: imp.id, report_type: reportType,
-          site_id: sid || null, account_id: (sid && map.get(sid)) || null, data: r,
+          site_id: sid || null, account_id: (map && sid && map.get(sid)) || null,
+          person_name: pnm || null, person_user_id: (pmap && pnm && pmap.get(pnm.toLowerCase())) || null,
+          data: r,
         };
       });
 
@@ -257,7 +294,7 @@ export default async function crmReports(container) {
         const slice = payload.slice(i, i + CHUNK);
         const { error } = await sb.from('crm_report_rows').insert(slice);
         if (error) { failed += slice.length; }
-        else { done += slice.length; matched += slice.filter(r => r.account_id).length; }
+        else { done += slice.length; matched += slice.filter(r => r.account_id || r.person_user_id).length; }
       }
       await sb.from('crm_report_imports').update({ row_count: done, matched_count: matched }).eq('id', imp.id);
       await logAction('crm', 'report_import', imp.id, 'imported', null, { name, rows: done, matched });
