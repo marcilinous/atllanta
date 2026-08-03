@@ -68,6 +68,7 @@ export default async function crmAccountDetail(container) {
           ${infoRow('Annual revenue', account.annual_revenue ? money(account.annual_revenue) : '')}
           ${infoRow('City', account.billing_city ? esc(account.billing_city) : '')}
           ${infoRow('District', account.district ? esc(account.district) : '')}
+          ${infoRow('District (New)', account.district_new ? esc(account.district_new) : '')}
           ${infoRow('State', account.state ? esc(account.state) : '')}
           ${infoRow('Region', account.region ? esc(account.region) : '')}
           ${infoRow('Hub', account.hub ? esc(account.hub) : '')}
