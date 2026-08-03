@@ -129,7 +129,7 @@ async function runSearch(query) {
 
   if (opps?.length) {
     sections.push(`<div class="search-section"><div class="search-section-title">Deals</div>
-      ${opps.map(o => `<div class="search-item" data-nav="crm/opportunities" data-id="${o.id}">
+      ${opps.map(o => `<div class="search-item" data-nav="crm/opportunity?id=${o.id}" data-id="${o.id}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 3v18h18M18 9l-5 5-3-3-4 4"/></svg>
         <div><div class="search-item-title">${esc(o.name)}</div><div class="search-item-sub">${esc(o.status)} ${o.account?.name ? '· ' + esc(o.account.name) : ''}</div></div>
       </div>`).join('')}</div>`);

@@ -58,7 +58,7 @@ export default async function crmLeadDetail(container) {
         <span style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);color:var(--color-success)">✓ Converted</span>
         ${lead.converted_account_id ? `<a data-nav="crm/account?id=${lead.converted_account_id}" style="color:var(--color-accent);cursor:pointer;font-size:var(--text-sm)">View account →</a>` : ''}
         ${lead.converted_contact_id ? `<a data-nav="crm/contact?id=${lead.converted_contact_id}" style="color:var(--color-accent);cursor:pointer;font-size:var(--text-sm)">View contact →</a>` : ''}
-        ${lead.converted_opportunity_id ? `<a data-nav="crm/opportunities" style="color:var(--color-accent);cursor:pointer;font-size:var(--text-sm)">View deal →</a>` : ''}
+        ${lead.converted_opportunity_id ? `<a data-nav="crm/opportunity?id=${lead.converted_opportunity_id}" style="color:var(--color-accent);cursor:pointer;font-size:var(--text-sm)">View deal →</a>` : ''}
       </div>
     </div>` : ''}
 

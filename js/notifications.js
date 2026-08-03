@@ -34,7 +34,7 @@ export function notifTarget(n) {
     case 'expense': return 'finance';
     case 'helpdesk_ticket': return 'helpdesk';
     case 'announcement': return 'announcements';
-    case 'opportunity': return 'crm/opportunities';
+    case 'opportunity': return id ? `crm/opportunity?id=${id}` : 'crm/opportunities';
     case 'lead': return 'crm/leads';
     case 'account': return id ? `crm/account?id=${id}` : 'crm/accounts';
     case 'contact': return 'crm/contacts';

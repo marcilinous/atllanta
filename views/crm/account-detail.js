@@ -94,7 +94,7 @@ export default async function crmAccountDetail(container) {
 
   wireContactRows();
   container.querySelectorAll('[data-opp]').forEach(row => {
-    row.addEventListener('click', () => navigate('crm/opportunities'));
+    row.addEventListener('click', () => navigate(`crm/opportunity?id=${row.dataset.opp}`));
   });
 
   function wireContactRows() {

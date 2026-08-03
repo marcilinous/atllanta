@@ -88,7 +88,7 @@ export default async function crmOpportunities(container) {
 
     wireDnD();
     board.querySelectorAll('.kanban-card').forEach(card => {
-      card.addEventListener('click', () => openForm(opps.find(o => o.id === card.dataset.id)));
+      card.addEventListener('click', () => navigate(`crm/opportunity?id=${card.dataset.id}`));
     });
   }
 

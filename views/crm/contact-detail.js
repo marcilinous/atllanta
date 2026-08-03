@@ -78,7 +78,7 @@ export default async function crmContactDetail(container) {
   container.querySelector('#log-activity').addEventListener('click', () => openActivityModal('contact', id, refreshTimeline));
   container.querySelector('#edit-contact').addEventListener('click', openEdit);
   container.querySelectorAll('[data-account]').forEach(a => a.addEventListener('click', () => navigate(`crm/account?id=${a.dataset.account}`)));
-  container.querySelectorAll('[data-opp]').forEach(row => row.addEventListener('click', () => navigate('crm/opportunities')));
+  container.querySelectorAll('[data-opp]').forEach(row => row.addEventListener('click', () => navigate(`crm/opportunity?id=${row.dataset.opp}`)));
 
   const timelineEl = container.querySelector('#activity-timeline');
   function refreshTimeline() { renderTimeline(timelineEl, 'contact', id); }
