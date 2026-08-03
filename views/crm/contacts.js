@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -25,6 +25,7 @@ export default async function crmContacts(container) {
         <p class="page-subtitle">People at your accounts</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
+        <button class="btn btn-secondary" id="import-contacts">Import</button>
         <button class="btn btn-secondary" id="export-contacts">Export</button>
         <button class="btn btn-primary" id="add-contact">+ Contact</button>
       </div>
@@ -133,6 +134,78 @@ export default async function crmContacts(container) {
   }
 
   document.getElementById('add-contact').addEventListener('click', () => openForm(null));
+  document.getElementById('import-contacts').addEventListener('click', openImport);
+
+  function pick(row, ...keys) {
+    for (const k of keys) { if (row[k]?.trim()) return row[k].trim(); }
+    return '';
+  }
+
+  function rowToContact(r) {
+    let first = pick(r, 'first_name', 'first name', 'firstname');
+    let last = pick(r, 'last_name', 'last name', 'lastname');
+    const full = pick(r, 'name', 'full name', 'fullname');
+    if (!first && !last && full) { const p = full.split(' '); first = p[0]; last = p.slice(1).join(' '); }
+    const accName = pick(r, 'account', 'company', 'organization', 'organisation').toLowerCase();
+    const account = accName ? accounts.find(a => a.name?.toLowerCase() === accName) : null;
+    return {
+      org_id: org.id,
+      first_name: first || null,
+      last_name: last || null,
+      title: pick(r, 'title', 'designation', 'job title') || null,
+      email: pick(r, 'email', 'email address', 'e-mail') || null,
+      phone: pick(r, 'phone', 'mobile', 'phone number', 'contact number') || null,
+      account_id: account?.id || null,
+      owner_id: user?.id || null,
+      created_by: user?.id || null,
+    };
+  }
+
+  function openImport() {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div style="display:grid;gap:var(--space-3)">
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
+          Upload a CSV with columns like <strong>first_name, last_name, title, email, phone, account</strong>.
+          A single <strong>name</strong> column works too. An <strong>account</strong>/<strong>company</strong> value is linked to a matching account if one exists.
+        </div>
+        <input type="file" accept=".csv,text/csv" class="form-input" id="import-file">
+        <div id="import-preview" style="font-size:var(--text-sm);color:var(--color-text-secondary)"></div>
+        <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
+          <button type="button" class="btn btn-secondary" id="import-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="import-go" disabled>Import</button>
+        </div>
+      </div>`;
+    let parsed = [];
+    wrap.querySelector('#import-cancel').addEventListener('click', closeModal);
+    wrap.querySelector('#import-file').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      parsed = parseCsv(text).map(rowToContact).filter(c => c.first_name || c.last_name || c.email);
+      const preview = wrap.querySelector('#import-preview');
+      const go = wrap.querySelector('#import-go');
+      if (!parsed.length) {
+        preview.innerHTML = `<span style="color:var(--color-error)">No valid rows found. Check your headers.</span>`;
+        go.disabled = true;
+      } else {
+        const linked = parsed.filter(c => c.account_id).length;
+        preview.innerHTML = `Ready to import <strong>${parsed.length}</strong> contact${parsed.length !== 1 ? 's' : ''}${linked ? ` (${linked} linked to accounts)` : ''}.`;
+        go.disabled = false;
+      }
+    });
+    wrap.querySelector('#import-go').addEventListener('click', async () => {
+      const go = wrap.querySelector('#import-go');
+      go.disabled = true; go.textContent = 'Importing...';
+      const { error } = await sb.from('crm_contacts').insert(parsed);
+      if (error) { toast('Import failed: ' + error.message); go.disabled = false; go.textContent = 'Import'; return; }
+      await logAction('crm', 'contact', null, 'imported', null, { count: parsed.length });
+      toast(`Imported ${parsed.length} contact${parsed.length !== 1 ? 's' : ''}`);
+      closeModal();
+      load();
+    });
+    openModal('Import contacts', wrap);
+  }
   document.getElementById('export-contacts').addEventListener('click', () => {
     const rows = scopeFilter(contacts, scope)
       .filter(c => !search || contactName(c).toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.account?.name?.toLowerCase().includes(search))
