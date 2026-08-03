@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, parseCsv } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv, parseCsv, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -39,7 +39,7 @@ export default async function crmLeads(container) {
         </div>
         ${showScope ? scopeTabs(scope) : ''}
       </div>
-      <div id="lead-list"></div>
+      <div id="lead-list">${loadingSkeleton()}</div>
     </div>
   `;
 

@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { navigate, routeParams } from '../../js/router.js';
 import { money, contactName, ownerName, field, fetchOrgUsers, fetchAccountsLite, accountOptions, userOptions, currentUserId } from './common.js';
@@ -11,6 +11,8 @@ export default async function crmContactDetail(container) {
   const user = getUser();
   const { id } = routeParams();
   if (!org || !id) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Contact not found</div></div>`; return; }
+
+  container.innerHTML = loadingSkeleton(8);
 
   const { data: contact, error } = await sb
     .from('crm_contacts')

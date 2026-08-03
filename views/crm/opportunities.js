@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser, getMembership } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { routeParams, navigate } from '../../js/router.js';
@@ -33,7 +33,7 @@ export default async function crmOpportunities(container) {
         <button class="btn btn-primary" id="add-deal">+ Deal</button>
       </div>
     </div>
-    <div id="board" style="overflow-x:auto"></div>
+    <div id="board" style="overflow-x:auto">${loadingSkeleton()}</div>
   `;
 
   async function load() {

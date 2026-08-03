@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate, routeParams } from '../../js/router.js';
@@ -12,6 +12,8 @@ export default async function crmAccountDetail(container) {
   const user = getUser();
   const { id } = routeParams();
   if (!org || !id) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Account not found</div></div>`; return; }
+
+  container.innerHTML = loadingSkeleton(8);
 
   const { data: account, error } = await sb
     .from('crm_accounts')

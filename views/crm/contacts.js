@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -34,7 +34,7 @@ export default async function crmContacts(container) {
         ${showScope ? scopeTabs(scope) : ''}
         <input type="text" class="form-input" id="contact-search" placeholder="Search contacts..." style="max-width:280px;height:34px">
       </div>
-      <div id="contact-list"></div>
+      <div id="contact-list">${loadingSkeleton()}</div>
     </div>
   `;
 

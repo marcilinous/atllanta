@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate, routeParams } from '../../js/router.js';
@@ -12,6 +12,8 @@ export default async function crmOpportunityDetail(container) {
   const user = getUser();
   const { id } = routeParams();
   if (!org || !id) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Deal not found</div></div>`; return; }
+
+  container.innerHTML = loadingSkeleton(8);
 
   const [{ data: opp, error }, { data: stages }, users] = await Promise.all([
     sb.from('crm_opportunities').select('*, account:account_id(id, name), contact:primary_contact_id(id, first_name, last_name), stage:stage_id(name, is_won, is_lost)').eq('id', id).maybeSingle(),
