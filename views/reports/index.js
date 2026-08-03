@@ -20,6 +20,7 @@ export default async function reportsView(container) {
     { icon: '📊', title: 'Attendance Report', desc: 'Monthly attendance breakdown by employee', route: '#/attendance/report', roles: ['owner', 'admin', 'manager'] },
     { icon: '🌿', title: 'Leave Report', desc: 'Leave usage and balance summary', route: '#/leave/report', roles: ['owner', 'admin', 'manager'] },
     { icon: '💼', title: 'Recruitment Report', desc: 'Pipeline funnel, match scores, and job analytics', route: '#/reports/recruitment', roles: ['owner', 'admin', 'manager'] },
+    { icon: '🎯', title: 'Sales Report', desc: 'CRM pipeline, weighted forecast, win rate, and owner performance', route: '#/reports/crm', roles: ['owner', 'admin', 'manager'] },
     { icon: '🎫', title: 'Helpdesk Report', desc: 'Ticket volume, categories, and resolution times', route: '#/reports/helpdesk', roles: ['owner', 'admin', 'manager'] },
     { icon: '📅', title: 'Team Planner', desc: 'Weekly view of team availability and leave', route: '#/reports/planner', roles: ['owner', 'admin', 'manager'] },
     { icon: '💰', title: 'Expense Report', desc: 'Expense analytics, categories, and monthly trends', route: '#/reports/expenses', roles: ['owner', 'admin', 'manager'] },

@@ -185,3 +185,48 @@ export function loadingSkeleton(rows = 5) {
     ${Array.from({ length: rows }, () => `<div class="skeleton skeleton-text" style="width:${60 + Math.random() * 30}%;margin-bottom:var(--space-3)"></div>`).join('')}
   </div>`;
 }
+
+// Parse CSV text into an array of objects keyed by lower-cased header.
+// Handles quoted fields, escaped quotes, and CRLF.
+export function parseCsv(text) {
+  const rows = [];
+  let field = '', row = [], inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else if (c === '"') { inQuotes = true; }
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (c !== '\r') { field += c; }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const headers = rows[0].map(h => h.trim().toLowerCase());
+  return rows.slice(1)
+    .filter(r => r.some(v => v.trim() !== ''))
+    .map(r => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? '').trim()])));
+}
+
+// Download an array of flat objects as a CSV file. Keys of the first row
+// become the header. Values are CSV-escaped.
+export function downloadCsv(filename, rows) {
+  if (!rows?.length) { toast('Nothing to export'); return; }
+  const headers = Object.keys(rows[0]);
+  const cell = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => cell(r[h])).join(','))].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

@@ -3,10 +3,54 @@ import { getUser } from './auth.js';
 
 let unreadCount = 0;
 let onCountChange = null;
+let onNew = null;
 let realtimeChannel = null;
 
 export function onUnreadChange(callback) {
   onCountChange = callback;
+}
+
+// Fired with the new notification row whenever one arrives over realtime.
+export function onNewNotification(callback) {
+  onNew = callback;
+}
+
+// Resolve a notification to the in-app route that best lets the recipient act
+// on or view it. Outcome notices ("… approved/rejected", "Your …") point at
+// the recipient's own pages; action-required ones point at the Inbox.
+export function notifTarget(n) {
+  const id = n.entity_id;
+  const isOutcome = /approv|reject|your\b|updated/i.test(n.title || '');
+
+  switch (n.entity_type) {
+    case 'job': return id ? `recruitment/job?id=${id}` : 'recruitment';
+    case 'candidate': return id ? `recruitment/candidate?id=${id}` : 'recruitment';
+    case 'job_application': return 'recruitment';
+    case 'employee':
+    case 'user': return id ? `employees/profile?id=${id}` : 'employees';
+    case 'leave_request': return isOutcome ? 'leave/balances' : 'inbox';
+    case 'attendance_regularization': return isOutcome ? 'attendance/report' : 'inbox';
+    case 'attendance': return 'attendance/report';
+    case 'expense': return 'finance';
+    case 'helpdesk_ticket': return 'helpdesk';
+    case 'announcement': return 'announcements';
+    case 'opportunity': return id ? `crm/opportunity?id=${id}` : 'crm/opportunities';
+    case 'lead': return 'crm/leads';
+    case 'account': return id ? `crm/account?id=${id}` : 'crm/accounts';
+    case 'contact': return 'crm/contacts';
+  }
+
+  switch (n.module) {
+    case 'leave': return isOutcome ? 'leave/balances' : 'inbox';
+    case 'attendance': return 'attendance/report';
+    case 'recruitment': return 'recruitment';
+    case 'people': return 'employees';
+    case 'finance': return 'finance';
+    case 'helpdesk': return 'helpdesk';
+    case 'platform': return 'announcements';
+    case 'crm': return 'crm';
+    default: return 'dashboard';
+  }
 }
 
 export async function fetchUnreadCount() {
@@ -63,6 +107,7 @@ export function subscribeRealtime() {
       (payload) => {
         unreadCount++;
         if (onCountChange) onCountChange(unreadCount);
+        if (onNew) onNew(payload.new);
       }
     )
     .subscribe();

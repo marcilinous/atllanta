@@ -1,7 +1,34 @@
 import { supabaseAdmin } from "../lib/supabaseServer.js";
 
+// Server-side event worker. Two responsibilities:
+//
+//   1. Backstop event processing. The in-browser processor handles events in
+//      real time while someone is online. This drains any events left pending
+//      once no browser claimed them (grace period below), so nothing rots.
+//
+//   2. Email delivery. The browser can never hold the Resend key, so it only
+//      queues notifications (email_status='pending'). This pass drains that
+//      queue and is the single place email is actually sent.
+//
+// Trigger it on a schedule (vercel.json cron, or any external cron pinging
+// the endpoint with the CRON_SECRET bearer token). More frequent pings =
+// lower email latency; in-app notifications stay real-time regardless.
+
 const BATCH_SIZE = 10;
 const MAX_ATTEMPTS = 3;
+const EMAIL_BATCH_SIZE = 50;
+// Only reprocess events a browser has had a fair chance to claim. Avoids the
+// server racing an online client on freshly-published events.
+const BACKSTOP_GRACE_MS = 2 * 60 * 1000;
+
+async function createNotification(sb, data, email = false) {
+  await sb.from("notifications").insert({
+    ...data,
+    channel: data.channel || "in_app",
+    status: "unread",
+    email_status: email ? "pending" : "none",
+  });
+}
 
 const recipes = {
   "people.employee.created": async (sb, event) => {
@@ -65,6 +92,7 @@ const recipes = {
           entity_id: employee_id,
           channel: "in_app",
           status: "unread",
+          email_status: "none",
         }));
       if (notifications.length) await sb.from("notifications").insert(notifications);
     }
@@ -87,34 +115,42 @@ const recipes = {
       .maybeSingle();
     const days = parseFloat(leaveReq?.days || 0);
 
-    const notifyIds = new Set();
-
-    if (requester?.reporting_manager_id) {
-      notifyIds.add(requester.reporting_manager_id);
+    // Manager gets an email; HR (looped in on long leaves) gets in-app only.
+    const managerId = requester?.reporting_manager_id;
+    if (managerId && managerId !== user_id) {
+      await createNotification(sb, {
+        org_id,
+        user_id: managerId,
+        title: "New leave request",
+        body: `${name} has requested ${days} day${days !== 1 ? "s" : ""} of leave.`,
+        module: "leave",
+        entity_type: "leave_request",
+        entity_id: leave_request_id,
+      }, true);
     }
 
+    const hrIds = new Set();
     if (days > 3) {
       const { data: hrUsers } = await sb
         .from("users")
         .select("id")
         .eq("org_id", org_id)
         .in("role", ["owner", "admin"]);
-      (hrUsers || []).forEach((u) => notifyIds.add(u.id));
+      (hrUsers || []).forEach((u) => hrIds.add(u.id));
     }
-
-    if (!notifyIds.size) {
+    if (!managerId) {
       const { data: managers } = await sb
         .from("users")
         .select("id")
         .eq("org_id", org_id)
         .in("role", ["owner", "admin", "manager"]);
-      (managers || []).forEach((u) => notifyIds.add(u.id));
+      (managers || []).forEach((u) => hrIds.add(u.id));
     }
+    hrIds.delete(user_id);
+    hrIds.delete(managerId);
 
-    notifyIds.delete(user_id);
-
-    if (notifyIds.size) {
-      const notifications = [...notifyIds].map((uid) => ({
+    if (hrIds.size) {
+      const notifications = [...hrIds].map((uid) => ({
         org_id,
         user_id: uid,
         title: "New leave request",
@@ -124,6 +160,7 @@ const recipes = {
         entity_id: leave_request_id,
         channel: "in_app",
         status: "unread",
+        email_status: "none",
       }));
       await sb.from("notifications").insert(notifications);
     }
@@ -180,7 +217,7 @@ const recipes = {
       module: "leave",
       entity_type: "leave_request",
       entity_id: leave_request_id,
-    });
+    }, true);
   },
 
   "leave.request.rejected": async (sb, event) => {
@@ -193,7 +230,7 @@ const recipes = {
       module: "leave",
       entity_type: "leave_request",
       entity_id: leave_request_id,
-    });
+    }, true);
   },
 
   "recruitment.candidate.shortlisted": async (sb, event) => {
@@ -216,7 +253,7 @@ const recipes = {
         module: "recruitment",
         entity_type: "job_application",
         entity_id: application_id || candidate_id,
-      });
+      }, true);
     }
 
     const { data: hrUsers } = await sb
@@ -237,6 +274,7 @@ const recipes = {
           entity_id: application_id || candidate_id,
           channel: "in_app",
           status: "unread",
+          email_status: "none",
         }));
       if (notifications.length) await sb.from("notifications").insert(notifications);
     }
@@ -263,7 +301,7 @@ const recipes = {
         title: "New expense claim",
         body: `${name} submitted an expense of ${amount} for "${title}".`,
         module: "finance", entity_type: "expense", entity_id: expense_id,
-        channel: "in_app", status: "unread",
+        channel: "in_app", status: "unread", email_status: "pending",
       }));
       await sb.from("notifications").insert(notifications);
     }
@@ -276,7 +314,7 @@ const recipes = {
       title: "Expense approved",
       body: "Your expense claim has been approved.",
       module: "finance", entity_type: "expense", entity_id: expense_id,
-    });
+    }, true);
   },
 
   "attendance.regularization.approved": async (sb, event) => {
@@ -290,7 +328,7 @@ const recipes = {
         module: "attendance",
         entity_type: "regularization",
         entity_id: regularization_id,
-      });
+      }, true);
     }
   },
 
@@ -347,6 +385,7 @@ const recipes = {
               entity_type: "attendance",
               channel: "in_app",
               status: "unread",
+              email_status: "none",
             }));
             await sb.from("notifications").insert(notifications);
           }
@@ -356,35 +395,24 @@ const recipes = {
   },
 };
 
-async function createNotification(sb, data) {
-  await sb.from("notifications").insert({
-    ...data,
-    channel: data.channel || "in_app",
-    status: "unread",
-  });
+// ------------------------------------------------------------
+// Email delivery
+// ------------------------------------------------------------
+function renderEmailHtml(title, body, name) {
+  const greeting = name ? `<p style="color:#6B7080">Hi ${escapeHtml(name)},</p>` : "";
+  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+    ${greeting}
+    <h2 style="color:#1A1D23">${escapeHtml(title)}</h2>
+    <p style="color:#6B7080">${escapeHtml(body || "")}</p>
+    <hr style="border:none;border-top:1px solid #E2E4E9;margin:24px 0">
+    <p style="font-size:12px;color:#9CA0AB">Atllanta Business OS</p>
+  </div>`;
+}
 
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const { data: userRecord } = await sb
-        .from("users")
-        .select("email, full_name")
-        .eq("id", data.user_id)
-        .maybeSingle();
-
-      if (userRecord?.email) {
-        await sendEmail(
-          userRecord.email,
-          data.title,
-          `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-            <h2 style="color:#1A1D23">${data.title}</h2>
-            <p style="color:#6B7080">${data.body || ''}</p>
-            <hr style="border:none;border-top:1px solid #E2E4E9;margin:24px 0">
-            <p style="font-size:12px;color:#9CA0AB">Atllanta Business OS</p>
-          </div>`
-        );
-      }
-    } catch {}
-  }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
 }
 
 async function sendEmail(to, subject, html) {
@@ -401,40 +429,91 @@ async function sendEmail(to, subject, html) {
       html,
     }),
   });
-  return res.json();
+  const result = await res.json().catch(() => ({}));
+  return { ok: res.ok, result };
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
-
-  const authHeader = req.headers.authorization || "";
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return res.status(401).json({ error: "Unauthorized" });
+async function dispatchEmails(sb) {
+  if (!process.env.RESEND_API_KEY) {
+    return { emailed: 0, failed: 0, skipped: "RESEND_API_KEY not set" };
   }
 
-  const sb = supabaseAdmin();
+  const { data: pending } = await sb
+    .from("notifications")
+    .select("id, user_id, title, body")
+    .eq("email_status", "pending")
+    .order("sent_at", { ascending: true })
+    .limit(EMAIL_BATCH_SIZE);
+
+  if (!pending?.length) return { emailed: 0, failed: 0 };
+
+  const userIds = [...new Set(pending.map((n) => n.user_id))];
+  const { data: users } = await sb
+    .from("users")
+    .select("id, email, full_name")
+    .in("id", userIds);
+  const byId = Object.fromEntries((users || []).map((u) => [u.id, u]));
+
+  let emailed = 0;
+  let failed = 0;
+
+  for (const n of pending) {
+    const user = byId[n.user_id];
+    const stamp = new Date().toISOString();
+
+    if (!user?.email) {
+      await sb.from("notifications").update({ email_status: "failed", emailed_at: stamp }).eq("id", n.id);
+      failed++;
+      continue;
+    }
+
+    try {
+      const { ok } = await sendEmail(user.email, n.title, renderEmailHtml(n.title, n.body, user.full_name));
+      await sb
+        .from("notifications")
+        .update({ email_status: ok ? "sent" : "failed", emailed_at: stamp })
+        .eq("id", n.id);
+      ok ? emailed++ : failed++;
+    } catch {
+      await sb.from("notifications").update({ email_status: "failed", emailed_at: stamp }).eq("id", n.id);
+      failed++;
+    }
+  }
+
+  return { emailed, failed };
+}
+
+// ------------------------------------------------------------
+// Backstop event processing
+// ------------------------------------------------------------
+async function processBackstopEvents(sb) {
+  const cutoff = new Date(Date.now() - BACKSTOP_GRACE_MS).toISOString();
 
   const { data: events, error } = await sb
     .from("events")
     .select("*")
     .eq("status", "pending")
     .lt("attempts", MAX_ATTEMPTS)
+    .lt("created_at", cutoff)
     .order("created_at")
     .limit(BATCH_SIZE);
 
-  if (error) return res.status(500).json({ error: error.message });
-  if (!events?.length)
-    return res.status(200).json({ processed: 0, message: "No pending events" });
+  if (error) throw new Error(error.message);
+  if (!events?.length) return { processed: 0, failed: 0 };
 
   let processed = 0;
   let failed = 0;
 
   for (const event of events) {
-    await sb
+    // Guarded claim: only proceed if this row is still pending, so a browser
+    // that grabbed it a moment ago wins and we skip it.
+    const { data: claimed } = await sb
       .from("events")
       .update({ status: "processing", attempts: event.attempts + 1 })
-      .eq("id", event.id);
+      .eq("id", event.id)
+      .eq("status", "pending")
+      .select("id");
+    if (!claimed?.length) continue;
 
     const recipe = recipes[event.event_type];
     if (!recipe) {
@@ -454,15 +533,38 @@ export default async function handler(req, res) {
         .eq("id", event.id);
       processed++;
     } catch (err) {
-      const newStatus =
-        event.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
-      await sb
-        .from("events")
-        .update({ status: newStatus })
-        .eq("id", event.id);
+      const newStatus = event.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
+      await sb.from("events").update({ status: newStatus }).eq("id", event.id);
       failed++;
     }
   }
 
-  return res.status(200).json({ processed, failed, total: events.length });
+  return { processed, failed };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST" && req.method !== "GET") {
+    return res.status(405).json({ error: "Use POST or GET" });
+  }
+
+  // Accept the secret via bearer header (POST) or ?key= (some cron providers
+  // only send GET without custom headers).
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = req.headers.authorization || "";
+    const queryKey = req.query?.key || "";
+    const authorized =
+      authHeader === `Bearer ${cronSecret}` || queryKey === cronSecret;
+    if (!authorized) return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const sb = supabaseAdmin();
+
+  try {
+    const events = await processBackstopEvents(sb);
+    const emails = await dispatchEmails(sb);
+    return res.status(200).json({ events, emails });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 }

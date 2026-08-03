@@ -52,6 +52,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span class="nav-tooltip">Finance</span>
       </button>
+      <button class="nav-btn" data-view="crm" aria-label="CRM">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M18 9l-5 5-3-3-4 4"/></svg>
+        <span class="nav-tooltip">CRM</span>
+      </button>
 
       <div class="sidebar-nav-bottom">
         <button class="nav-btn" data-view="settings" aria-label="Settings">
@@ -136,7 +140,7 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
-import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
+import { onUnreadChange, onNewNotification, notifTarget, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 import { startEventProcessor } from '/js/event-processor.js';
@@ -173,6 +177,18 @@ import jobDetail from '/views/recruitment/job-detail.js';
 import orgChart from '/views/employees/orgchart.js';
 import approvalsInbox from '/views/approvals.js';
 import inboxView from '/views/inbox.js';
+import notificationsView from '/views/notifications.js';
+import crmHub from '/views/crm/index.js';
+import crmAccounts from '/views/crm/accounts.js';
+import crmAccountDetail from '/views/crm/account-detail.js';
+import crmContacts from '/views/crm/contacts.js';
+import crmContactDetail from '/views/crm/contact-detail.js';
+import crmOpportunities from '/views/crm/opportunities.js';
+import crmOpportunityDetail from '/views/crm/opportunity-detail.js';
+import crmLeads from '/views/crm/leads.js';
+import crmLeadDetail from '/views/crm/lead-detail.js';
+import crmSettings from '/views/crm/settings.js';
+import crmReport from '/views/reports/crm.js';
 import onboarding from '/views/onboarding.js';
 import reportsView from '/views/reports/index.js';
 import documentsView from '/views/documents/index.js';
@@ -258,7 +274,9 @@ document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
 });
 
 onUnreadChange(count => {
-  document.getElementById('notif-dot').classList.toggle('hidden', count === 0);
+  const dot = document.getElementById('notif-dot');
+  dot.textContent = count > 9 ? '9+' : String(count);
+  dot.classList.toggle('hidden', count === 0);
 });
 fetchUnreadCount();
 subscribeRealtime();
@@ -339,12 +357,20 @@ notifBtn.addEventListener('click', async () => {
         <button class="btn btn-ghost btn-sm" id="notif-mark-all">Mark all read</button>
       </div>
       <div class="notif-list" id="notif-list"></div>
+      <div class="notif-panel-footer">
+        <button class="btn btn-ghost btn-sm" id="notif-view-all">View all notifications</button>
+      </div>
     `;
     document.querySelector('.topbar-right').appendChild(notifPanel);
 
     document.getElementById('notif-mark-all').addEventListener('click', async () => {
       await markAllRead();
       loadNotifList();
+    });
+
+    document.getElementById('notif-view-all').addEventListener('click', () => {
+      notifPanel.classList.add('hidden');
+      navigate('notifications');
     });
 
     document.addEventListener('click', (e) => {
@@ -358,6 +384,11 @@ notifBtn.addEventListener('click', async () => {
   notifPanel.classList.remove('hidden');
 });
 
+// Live-refresh the panel if it's open when a new notification arrives.
+onNewNotification(() => {
+  if (notifPanel && !notifPanel.classList.contains('hidden')) loadNotifList();
+});
+
 async function loadNotifList() {
   const notifs = await fetchNotifications(15);
   const listEl = document.getElementById('notif-list');
@@ -368,13 +399,13 @@ async function loadNotifList() {
 
   const moduleIcons = {
     leave: '\u{1F333}', attendance: '\u{1F551}', recruitment: '\u{1F4BC}', people: '\u{1F465}',
-    helpdesk: '\u{1F3AB}', finance: '\u{1F4B0}', platform: '\u{1F4E2}', system: '\u{2699}',
+    helpdesk: '\u{1F3AB}', finance: '\u{1F4B0}', platform: '\u{1F4E2}', system: '\u{2699}', crm: '\u{1F3AF}',
   };
   const moduleColors = {
     leave: 'var(--color-success-light)', attendance: 'var(--color-info-light)',
     recruitment: 'var(--color-warning-light)', people: 'var(--color-accent-light)',
     helpdesk: 'var(--color-info-light)', finance: 'var(--color-warning-light)',
-    platform: 'var(--color-accent-light)', system: 'var(--color-bg-tertiary)',
+    platform: 'var(--color-accent-light)', system: 'var(--color-bg-tertiary)', crm: 'var(--color-accent-light)',
   };
 
   function esc(s) {
@@ -392,7 +423,9 @@ async function loadNotifList() {
   }
 
   listEl.innerHTML = notifs.map(n => `
-    <div class="notif-item ${n.status === 'unread' ? 'unread' : ''}" data-notif-id="${n.id}">
+    <div class="notif-item ${n.status === 'unread' ? 'unread' : ''}" data-notif-id="${n.id}"
+      data-module="${esc(n.module || '')}" data-entity-type="${esc(n.entity_type || '')}"
+      data-entity-id="${esc(n.entity_id || '')}" data-title="${esc(n.title || '')}">
       <div class="notif-icon" style="background:${moduleColors[n.module] || 'var(--color-bg-tertiary)'}">${moduleIcons[n.module] || '\u{1F514}'}</div>
       <div class="notif-content">
         <div class="notif-title">${esc(n.title)}</div>
@@ -402,10 +435,20 @@ async function loadNotifList() {
     </div>
   `).join('');
 
-  listEl.querySelectorAll('.notif-item.unread').forEach(item => {
+  listEl.querySelectorAll('.notif-item').forEach(item => {
     item.addEventListener('click', async () => {
-      await markRead(item.dataset.notifId);
-      item.classList.remove('unread');
+      if (item.classList.contains('unread')) {
+        item.classList.remove('unread');
+        await markRead(item.dataset.notifId);
+      }
+      const target = notifTarget({
+        module: item.dataset.module,
+        entity_type: item.dataset.entityType,
+        entity_id: item.dataset.entityId || null,
+        title: item.dataset.title,
+      });
+      notifPanel.classList.add('hidden');
+      navigate(target);
     });
   });
 }
@@ -414,6 +457,17 @@ async function loadNotifList() {
 registerRoute('dashboard', dashboard);
 registerRoute('me', meView);
 registerRoute('inbox', inboxView);
+registerRoute('notifications', notificationsView);
+registerRoute('crm', crmHub);
+registerRoute('crm/accounts', crmAccounts);
+registerRoute('crm/account', crmAccountDetail);
+registerRoute('crm/contacts', crmContacts);
+registerRoute('crm/contact', crmContactDetail);
+registerRoute('crm/opportunities', crmOpportunities);
+registerRoute('crm/opportunity', crmOpportunityDetail);
+registerRoute('crm/leads', crmLeads);
+registerRoute('crm/lead', crmLeadDetail);
+registerRoute('crm/settings', crmSettings);
 registerRoute('people', peopleHub);
 registerRoute('employees', employeeList);
 registerRoute('attendance', attendanceDashboard);
@@ -454,6 +508,7 @@ registerRoute('announcements', announcementsView);
 registerRoute('helpdesk', helpdeskView);
 registerRoute('helpdesk/settings', helpdeskSettingsView);
 registerRoute('reports/recruitment', recruitmentReport);
+registerRoute('reports/crm', crmReport);
 registerRoute('reports/helpdesk', helpdeskReport);
 registerRoute('reports/planner', teamPlanner);
 registerRoute('reports/expenses', expenseReport);

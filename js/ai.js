@@ -18,12 +18,13 @@ export function initAIPanel() {
     </div>
     <div class="ai-messages" id="ai-messages">
       <div class="ai-msg ai-msg-bot">
-        <div class="ai-msg-content">Hi! I can help you query your HR data. Try asking me things like:
+        <div class="ai-msg-content">Hi! I can answer questions about your business — HR and CRM. I only ever see what you're allowed to. Try:
           <ul style="margin:var(--space-2) 0 0;padding-left:var(--space-4);font-size:var(--text-xs)">
             <li>Who is absent today?</li>
             <li>Show pending leave requests</li>
-            <li>How many open jobs do we have?</li>
-            <li>List employees in Engineering</li>
+            <li>What's my open pipeline?</li>
+            <li>How many deals did we win this month?</li>
+            <li>List my hot leads</li>
           </ul>
         </div>
       </div>
@@ -141,6 +142,34 @@ export async function processQuery(query) {
     }
   }
 
+  // CRM: pipeline / open deals
+  if (q.includes('pipeline') || (q.includes('open') && q.includes('deal'))) {
+    const { data } = await sb.from('crm_opportunities').select('amount, probability, stage:stage_id(probability)').eq('status', 'open');
+    const list = data || [];
+    const total = list.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+    const weighted = list.reduce((s, o) => { const p = (o.probability ?? o.stage?.probability ?? 0) / 100; return s + (Number(o.amount) || 0) * p; }, 0);
+    return `You have <strong>${list.length}</strong> open deal${list.length !== 1 ? 's' : ''} worth <strong>${crmMoney(total)}</strong> (weighted forecast ${crmMoney(weighted)}).`;
+  }
+
+  if (q.includes('won') && (q.includes('month') || q.includes('deal'))) {
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const { data } = await sb.from('crm_opportunities').select('amount').eq('status', 'won').gte('updated_at', monthStart.toISOString());
+    const list = data || [];
+    const total = list.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+    return `<strong>${list.length}</strong> deal${list.length !== 1 ? 's' : ''} won this month, totaling <strong>${crmMoney(total)}</strong>.`;
+  }
+
+  if (q.includes('lead') && (q.includes('how many') || q.includes('count') || q.includes('active'))) {
+    const { count } = await sb.from('crm_leads').select('*', { count: 'exact', head: true }).neq('status', 'converted');
+    return `There are <strong>${count || 0}</strong> active leads.`;
+  }
+
+  if (q.includes('hot') && q.includes('lead')) {
+    const { data } = await sb.from('crm_leads').select('first_name,last_name,company').eq('rating', 'hot').neq('status', 'converted').limit(15);
+    if (!data?.length) return 'No hot leads right now.';
+    return `<strong>${data.length} hot lead${data.length !== 1 ? 's' : ''}:</strong><ul>${data.map(l => `<li>${esc([l.first_name, l.last_name].filter(Boolean).join(' ') || l.company || '—')}</li>`).join('')}</ul>`;
+  }
+
   // Action: Approve leave
   if (q.includes('approve') && q.includes('leave')) {
     const membership = getMembership();
@@ -236,9 +265,10 @@ export async function processQuery(query) {
       <li>Who is absent/present/late today?</li>
       <li>Who is on leave today?</li>
       <li>Show pending leave requests</li>
-      <li>How many open jobs?</li>
-      <li>How many employees total?</li>
+      <li>How many open jobs / employees?</li>
       <li>List employees in [department]</li>
+      <li>What's my open pipeline? Deals won this month?</li>
+      <li>How many active / hot leads?</li>
       <li>Any interviews today?</li>
     </ul>
     <div style="margin-top:var(--space-2);font-size:var(--text-xs);font-weight:var(--font-weight-medium);color:var(--color-text-secondary);margin-top:var(--space-3)">I can also take actions:</div>
@@ -248,6 +278,12 @@ export async function processQuery(query) {
       <li>Shortlist top 5 for [job title]</li>
     </ul>
     <div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-text-tertiary)">Actions require confirmation before executing.</div>`;
+}
+
+function crmMoney(n) {
+  const cur = getOrg()?.currency || 'INR';
+  try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(Number(n) || 0); }
+  catch { return `${cur} ${Math.round(Number(n) || 0).toLocaleString('en-IN')}`; }
 }
 
 let actionCounter = 0;
