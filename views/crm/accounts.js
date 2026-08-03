@@ -193,6 +193,7 @@ export default async function crmAccounts(container) {
         state: pick(r, 'state') || null,
         region: pick(r, 'region') || null,
         district: pick(r, 'district') || null,
+        district_new: pick(r, 'district new', 'district_new') || pick(r, 'district') || null,
         hub: pick(r, 'hub') || null,
         telecaller: pick(r, 'telecaller') || null,
         description: (tl || cm) ? `TL: ${tl || '—'} · CM: ${cm || '—'}` : null,
@@ -260,7 +261,7 @@ export default async function crmAccounts(container) {
         || a.billing_city?.toLowerCase().includes(search)
         || a.state?.toLowerCase().includes(search)
         || a.industry?.toLowerCase().includes(search))
-      .map(a => ({ 'Site ID': a.external_id || '', Name: a.name, Owner: ownerName(users, a.owner_id), Role: a.tier || '', 'Role Status': a.partner_status || '', City: a.billing_city || '', District: a.district || '', State: a.state || '', Region: a.region || '', Hub: a.hub || '', Telecaller: a.telecaller || '', Notes: a.description || '' }));
+      .map(a => ({ 'Site ID': a.external_id || '', Name: a.name, Owner: ownerName(users, a.owner_id), Role: a.tier || '', 'Role Status': a.partner_status || '', City: a.billing_city || '', District: a.district || '', 'District New': a.district_new || '', State: a.state || '', Region: a.region || '', Hub: a.hub || '', Telecaller: a.telecaller || '', Notes: a.description || '' }));
     downloadCsv('accounts.csv', rows);
   });
   document.getElementById('account-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });
