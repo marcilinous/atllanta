@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
+import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -24,6 +24,7 @@ export default async function crmAccounts(container) {
         <p class="page-subtitle">Companies you do business with</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
+        <button class="btn btn-secondary" id="import-accounts">Import</button>
         <button class="btn btn-secondary" id="export-accounts">Export</button>
         <button class="btn btn-primary" id="add-account">+ Account</button>
       </div>
@@ -138,6 +139,99 @@ export default async function crmAccounts(container) {
   }
 
   document.getElementById('add-account').addEventListener('click', () => openForm(null));
+  document.getElementById('import-accounts').addEventListener('click', openImport);
+
+  function pick(row, ...keys) {
+    for (const k of keys) { if (row[k]?.trim()) return row[k].trim(); }
+    return '';
+  }
+
+  function openImport() {
+    // Owner match: exact full_name first (keeps distinct reps whose names
+    // differ only by case), then case-insensitive fallback.
+    const exact = {}; const ci = {};
+    users.forEach(u => { if (u.full_name) { exact[u.full_name] = u.id; ci[u.full_name.toLowerCase()] = u.id; } });
+
+    const rowToAccount = (r) => {
+      const name = pick(r, 'partner name', 'name', 'account', 'account name');
+      if (!name) return null;
+      const ownerName = pick(r, 'bde', 'owner', 'account owner', 'sales rep');
+      const owner_id = exact[ownerName] || ci[ownerName.toLowerCase()] || null;
+      const tl = pick(r, 'tl', 'team lead');
+      const cm = pick(r, 'cm', 'channel manager');
+      return {
+        org_id: org.id,
+        name,
+        owner_id,
+        created_by: user?.id || null,
+        industry: 'Tally Partner',
+        billing_country: 'India',
+        billing_city: pick(r, 'city') || null,
+        external_id: pick(r, 'site id', 'external id', 'id') || null,
+        tier: pick(r, 'role', 'tier', 'partner role') || null,
+        partner_status: pick(r, 'role status', 'status') || null,
+        state: pick(r, 'state') || null,
+        region: pick(r, 'region') || null,
+        district: pick(r, 'district') || null,
+        hub: pick(r, 'hub') || null,
+        telecaller: pick(r, 'telecaller') || null,
+        description: (tl || cm) ? `TL: ${tl || '—'} · CM: ${cm || '—'}` : null,
+        _ownerName: ownerName,
+      };
+    };
+
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div style="display:grid;gap:var(--space-3)">
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
+          Upload a partner CSV. Recognised columns: <strong>Partner Name, Site ID, City, District, State, Region, Hub, Role, Role Status, BDE, Telecaller, TL, CM</strong>.
+          Each partner is owned by its <strong>BDE</strong> (matched to staff), so territory and manager views work immediately.
+        </div>
+        <input type="file" accept=".csv,text/csv" class="form-input" id="import-file">
+        <div id="import-preview" style="font-size:var(--text-sm);color:var(--color-text-secondary)"></div>
+        <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
+          <button type="button" class="btn btn-secondary" id="import-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="import-go" disabled>Import</button>
+        </div>
+      </div>`;
+    let parsed = [];
+    wrap.querySelector('#import-cancel').addEventListener('click', closeModal);
+    wrap.querySelector('#import-file').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      parsed = parseCsv(text).map(rowToAccount).filter(Boolean);
+      const preview = wrap.querySelector('#import-preview');
+      const go = wrap.querySelector('#import-go');
+      if (!parsed.length) {
+        preview.innerHTML = `<span style="color:var(--color-error)">No valid rows found. Check your headers.</span>`;
+        go.disabled = true;
+      } else {
+        const matched = parsed.filter(a => a.owner_id).length;
+        const unmatched = parsed.length - matched;
+        preview.innerHTML = `Ready to import <strong>${parsed.length.toLocaleString('en-IN')}</strong> partners — ${matched.toLocaleString('en-IN')} matched to a BDE${unmatched ? `, <span style="color:var(--color-warning)">${unmatched} unmatched</span>` : ''}.`;
+        go.disabled = false;
+      }
+    });
+    wrap.querySelector('#import-go').addEventListener('click', async () => {
+      const go = wrap.querySelector('#import-go');
+      go.disabled = true;
+      const rows = parsed.map(({ _ownerName, ...a }) => a);
+      let done = 0, failed = 0;
+      const CHUNK = 500;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        go.textContent = `Importing… ${done.toLocaleString('en-IN')}/${rows.length.toLocaleString('en-IN')}`;
+        const { error } = await sb.from('crm_accounts').insert(rows.slice(i, i + CHUNK));
+        if (error) failed += Math.min(CHUNK, rows.length - i); else done += Math.min(CHUNK, rows.length - i);
+      }
+      await logAction('crm', 'account', null, 'imported', null, { count: done });
+      toast(`Imported ${done.toLocaleString('en-IN')} partners${failed ? ` · ${failed} failed` : ''}`);
+      closeModal();
+      load();
+    });
+    openModal('Import partners', wrap);
+  }
+
   document.getElementById('export-accounts').addEventListener('click', () => {
     const rows = scopeFilter(accounts, scope)
       .filter(a => !search || a.name?.toLowerCase().includes(search) || a.industry?.toLowerCase().includes(search))
