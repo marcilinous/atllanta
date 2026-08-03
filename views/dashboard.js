@@ -168,6 +168,8 @@ export default async function dashboard(container) {
       </div>
     </div>
 
+    <div id="dash-kpis"></div>
+
     <div class="dash-two-col">
       <div>
         <div id="composer" style="margin-bottom:var(--space-4)"></div>
@@ -200,6 +202,61 @@ export default async function dashboard(container) {
   renderDayScene(dayTheme);
 
   if (!org) return;
+
+  // Business-at-a-glance KPIs (managers + admins). All queries pass through
+  // RLS, so a manager sees their team's numbers and an admin the whole org.
+  if (isManager) renderKpis();
+
+  async function renderKpis() {
+    const el = document.getElementById('dash-kpis');
+    if (!el) return;
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const monthStartIso = monthStart.toISOString();
+
+    const [head, todayAtt, leavePend, regPend, openOpps, wonMonth, tickets, expPend] = await Promise.all([
+      sb.from('users').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      sb.from('attendance').select('status').eq('date', todayStr),
+      sb.from('leave_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      sb.from('attendance_regularizations').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      sb.from('crm_opportunities').select('amount, probability, stage:stage_id(probability)').eq('status', 'open'),
+      sb.from('crm_opportunities').select('amount').eq('status', 'won').gte('updated_at', monthStartIso),
+      sb.from('helpdesk_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress']),
+      sb.from('expenses').select('amount').eq('status', 'pending'),
+    ]);
+
+    const present = (todayAtt.data || []).filter(a => ['present', 'late'].includes(a.status)).length;
+    const onLeave = (todayAtt.data || []).filter(a => a.status === 'on_leave').length;
+    const approvals = (leavePend.count || 0) + (regPend.count || 0);
+    const openList = openOpps.data || [];
+    const pipeline = openList.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+    const weighted = openList.reduce((s, o) => { const p = (o.probability ?? o.stage?.probability ?? 0) / 100; return s + (Number(o.amount) || 0) * p; }, 0);
+    const won = (wonMonth.data || []).reduce((s, o) => s + (Number(o.amount) || 0), 0);
+    const expPendTotal = (expPend.data || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    const cur = org.currency || 'INR';
+    const money = (n) => {
+      try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: cur, maximumFractionDigits: 0, notation: 'compact' }).format(Number(n) || 0); }
+      catch { return `${cur} ${Math.round(Number(n) || 0).toLocaleString('en-IN')}`; }
+    };
+
+    const tiles = [
+      { label: 'Headcount', value: String(head.count || 0), route: 'employees' },
+      { label: 'Present today', value: `${present}${onLeave ? ` · ${onLeave} leave` : ''}`, route: 'attendance', color: 'var(--color-success)' },
+      { label: 'Pending approvals', value: String(approvals), route: 'inbox', color: approvals ? 'var(--color-warning)' : '' },
+      { label: 'Open pipeline', value: money(pipeline), route: 'crm/opportunities', color: 'var(--color-accent)' },
+      { label: 'Weighted forecast', value: money(weighted), route: 'crm/opportunities', color: 'var(--color-info)' },
+      { label: 'Won this month', value: money(won), route: 'reports/crm', color: 'var(--color-success)' },
+      { label: 'Open tickets', value: String(tickets.count || 0), route: 'helpdesk', color: tickets.count ? 'var(--color-warning)' : '' },
+      { label: 'Expenses pending', value: money(expPendTotal), route: 'finance' },
+    ];
+
+    el.innerHTML = `<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-6)">
+      ${tiles.map(t => `<a href="#/${t.route}" class="card" style="text-decoration:none;padding:var(--space-4)">
+        <div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:var(--space-1)">${esc(t.label)}</div>
+        <div style="font-size:var(--text-xl);font-weight:var(--font-weight-bold);${t.color ? `color:${t.color}` : ''}">${esc(t.value)}</div>
+      </a>`).join('')}
+    </div>`;
+  }
 
   const [attResult, postsResult, eventsResult, membersResult, leavesResult, annResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
