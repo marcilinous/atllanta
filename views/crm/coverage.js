@@ -2,7 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
-import { ownerName, canManageData } from './common.js';
+import { ownerName, canManageData, fetchAllRpc } from './common.js';
 
 const pct = (n, d) => d ? Math.round((100 * n) / d) : 0;
 const inr = (n) => {
@@ -36,7 +36,7 @@ export default async function crmCoverage(container) {
   container.querySelector('#to-opps').addEventListener('click', () => navigate('crm/opps'));
 
   const [{ data: rows, error }, { data: users }] = await Promise.all([
-    sb.rpc('crm_partner_activity'),
+    fetchAllRpc('crm_partner_activity'),
     sb.from('users').select('id, full_name, designation, reporting_manager_id').eq('status', 'active'),
   ]);
   if (error) { container.querySelector('#cov-tree').innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-desc">Could not load.</div></div>`; return; }

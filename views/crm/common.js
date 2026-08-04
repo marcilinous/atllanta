@@ -24,6 +24,22 @@ export function canSeeOthers() {
   return ['owner', 'admin', 'manager'].includes(getMembership()?.role);
 }
 
+// Fetch every row of a set-returning RPC, paging past the API's 1000-row cap.
+export async function fetchAllRpc(name, params = {}) {
+  const size = 1000;
+  let from = 0;
+  const out = [];
+  for (;;) {
+    const { data, error } = await sb.rpc(name, params).range(from, from + size - 1);
+    if (error) return { data: out.length ? out : null, error };
+    if (!data || !data.length) break;
+    out.push(...data);
+    if (data.length < size) break;
+    from += size;
+  }
+  return { data: out, error: null };
+}
+
 // Import / export of data is a TL-and-above action (TL and CM map to the
 // 'manager' membership role; BDE and Telecaller are 'member').
 export function canManageData() {

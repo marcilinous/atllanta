@@ -2,7 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
-import { ownerName, canManageData } from './common.js';
+import { ownerName, canManageData, fetchAllRpc } from './common.js';
 
 const pct = (n, d) => d ? Math.round((100 * n) / d) : 0;
 
@@ -35,18 +35,11 @@ export default async function crmOppsCoverage(container) {
       </div>
       <div id="op-tree">${loadingSkeleton(6)}</div>
     </div>
-    <div class="card">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-        <span class="card-title">District TP coverage</span>
-        <input type="text" class="form-input" id="op-dsearch" placeholder="Search district..." style="max-width:220px;height:32px">
-      </div>
-      <div id="op-district">${loadingSkeleton(6)}</div>
-    </div>
   `;
   container.querySelector('#back').addEventListener('click', () => navigate('crm/coverage'));
 
   const [{ data: rows, error }, { data: users }] = await Promise.all([
-    sb.rpc('crm_partner_activity'),
+    fetchAllRpc('crm_partner_activity'),
     sb.from('users').select('id, full_name, designation, reporting_manager_id').eq('status', 'active'),
   ]);
   if (error) { container.querySelector('#op-cards').innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-desc">Could not load opportunities.</div></div>`; return; }
@@ -153,31 +146,6 @@ export default async function crmOppsCoverage(container) {
     top.forEach(r => renderNode(r, 0, el));
   }
   renderTree();
-
-  // ---- district TP coverage ----
-  const dmap = new Map();
-  data.forEach(p => {
-    const d = p.district_new || '(none)';
-    if (!dmap.has(d)) dmap.set(d, { total: 0, tp: 0 });
-    const e = dmap.get(d); e.total++; if (p.tp_cfy > 0) e.tp++;
-  });
-  const districts = [...dmap.entries()].map(([d, e]) => ({ d, ...e, cov: pct(e.tp, e.total) })).sort((a, b) => b.total - a.total);
-  function renderDistricts(filter = '') {
-    const el = container.querySelector('#op-district');
-    const list = districts.filter(x => !filter || x.d.toLowerCase().includes(filter));
-    if (!list.length) { el.innerHTML = `<div class="empty-state" style="padding:var(--space-5)"><div class="empty-state-desc">No districts.</div></div>`; return; }
-    el.innerHTML = `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table class="table">
-      <thead><tr><th>District (New)</th><th style="text-align:right">Partners</th><th style="text-align:right">Did TP</th><th style="text-align:right">TP coverage</th></tr></thead>
-      <tbody>${list.map(x => `<tr>
-        <td style="font-weight:var(--font-weight-medium)">${esc(x.d)}</td>
-        <td style="text-align:right">${x.total.toLocaleString('en-IN')}</td>
-        <td style="text-align:right">${x.tp.toLocaleString('en-IN')}</td>
-        <td style="text-align:right"><span style="color:${x.cov >= 40 ? 'var(--color-success)' : x.cov >= 15 ? 'var(--color-warning)' : 'var(--color-error)'};font-weight:var(--font-weight-semibold)">${x.cov}%</span></td>
-      </tr>`).join('')}</tbody>
-    </table></div>`;
-  }
-  renderDistricts();
-  container.querySelector('#op-dsearch').addEventListener('input', (e) => renderDistricts(e.target.value.toLowerCase().trim()));
 
   // ---- partner list modal (export TL+) ----
   function showList(o, list, title) {

@@ -40,11 +40,18 @@ export default async function crmAccounts(container) {
 
   async function load() {
     if (!users.length) users = await fetchOrgUsers();
-    const { data } = await sb
-      .from('crm_accounts')
-      .select('*')
-      .order('name');
-    accounts = data || [];
+    // Page past the API's 1000-row cap so the full base loads.
+    const pageSize = 1000;
+    let fromIdx = 0;
+    const all = [];
+    for (;;) {
+      const { data, error } = await sb.from('crm_accounts').select('*').order('name').range(fromIdx, fromIdx + pageSize - 1);
+      if (error || !data || !data.length) break;
+      all.push(...data);
+      if (data.length < pageSize) break;
+      fromIdx += pageSize;
+    }
+    accounts = all;
     render();
   }
 
