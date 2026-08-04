@@ -206,7 +206,6 @@ async function handleInvite(req, res, db, user) {
     email,
     full_name: (full_name || "").trim() || null,
     client_id: client_id || null,
-    invited_at: new Date().toISOString(),
   });
 
   if (insertErr) return res.status(500).json({ error: insertErr.message });
