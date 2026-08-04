@@ -102,9 +102,9 @@ export default async function crmTargets(container) {
     listTitle.textContent = filterKey ? (CARDS.find(c => c.key === filterKey).title + ` (${list.length.toLocaleString('en-IN')})`) : `Priority list (${list.length.toLocaleString('en-IN')})`;
     allBtn.style.display = filterKey ? '' : 'none';
     const el = container.querySelector('#tg-list');
-    if (!list.length) { el.innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-title">Nothing here 🎉</div></div>`; return; }
+    if (!list.length) { el.innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-title">Nothing here</div></div>`; return; }
     el.innerHTML = `<div class="table-wrap" style="max-height:64vh;overflow:auto"><table class="table">
-      <thead><tr><th>Partner</th><th>District</th><th>Why</th><th style="text-align:center">Touched</th><th style="text-align:right">LFY / CFY ₹</th><th style="text-align:right">TP L/C</th></tr></thead>
+      <thead><tr><th>Partner</th><th>District</th><th>Why</th><th style="text-align:right">Visits</th><th style="text-align:right">Calls</th><th style="text-align:right">LFY / CFY ₹</th><th style="text-align:right">TP L/C</th></tr></thead>
       <tbody>${list.slice(0, 300).map(p => {
         const reason = filterKey === 'protect' ? { label: (+p.tp_cfy > 0 ? 'TP, no visit' : 'TSS, no call'), color: 'var(--color-success)' } : p._t;
         return `<tr>
@@ -112,7 +112,8 @@ export default async function crmTargets(container) {
             ${p.external_id ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary);font-family:var(--font-mono)">${esc(p.external_id)}</div>` : ''}</td>
           <td>${p.district_new ? esc(p.district_new) : '—'}</td>
           <td><span class="badge" style="font-size:10px;background:${reason.color}22;color:${reason.color}">${esc(reason.label)}</span></td>
-          <td style="text-align:center" title="${p.visited_by_me ? 'You visited' : ''}${p.called ? ' · Called' : ''}">${p.visited_by_me ? '🚗' : ''}${p.called ? '📞' : ''}${!p.visited_by_me && !p.called ? '<span style="color:var(--color-text-tertiary)">—</span>' : ''}</td>
+          <td style="text-align:right" title="Your visits">${(+p.visits_me) ? p.visits_me : '<span style="color:var(--color-text-tertiary)">0</span>'}</td>
+          <td style="text-align:right" title="Calls (telecalling)">${(+p.calls_total) ? p.calls_total : '<span style="color:var(--color-text-tertiary)">0</span>'}</td>
           <td style="text-align:right">${inr(p.rev_lfy)} / ${inr(p.rev_cfy)}</td>
           <td style="text-align:right">${p.tp_lfy}/${p.tp_cfy}</td>
         </tr>`;
@@ -125,7 +126,7 @@ export default async function crmTargets(container) {
     el.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => navigate(`crm/account?id=${a.dataset.acc}`)));
     el.querySelector('#tg-export')?.addEventListener('click', () => downloadCsv(`my_targets_${filterKey || 'all'}.csv`,
       list.map(p => ({ 'Site ID': p.external_id || '', Partner: p.name, District: p.district_new || '',
-        Why: (filterKey === 'protect' ? 'protect' : p._t.key), 'Rev LFY': Math.round(+p.rev_lfy || 0), 'Rev CFY': Math.round(+p.rev_cfy || 0), 'TP LFY': p.tp_lfy, 'TP CFY': p.tp_cfy }))));
+        Why: (filterKey === 'protect' ? 'protect' : p._t.key), Visits: +p.visits_me || 0, Calls: +p.calls_total || 0, 'Rev LFY': Math.round(+p.rev_lfy || 0), 'Rev CFY': Math.round(+p.rev_cfy || 0), 'TP LFY': p.tp_lfy, 'TP CFY': p.tp_cfy }))));
   }
   renderList();
 
