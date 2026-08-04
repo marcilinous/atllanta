@@ -56,6 +56,7 @@ export default async function handler(req, res) {
   if (req.method === "GET" && action === "team") return handleTeam(req, res, db, user);
   if (req.method === "GET" && action === "orgs") return handleOrgs(req, res, db, user);
   if (req.method === "POST" && action === "invite") return handleInvite(req, res, db, user);
+  if (req.method === "POST" && action === "reset_password") return handleResetPassword(req, res, db, user);
   if (req.method === "POST") return handleCreateOrg(req, res, db, user);
 
   return res.status(400).json({ error: "Invalid action" });
@@ -247,6 +248,41 @@ async function handleInvite(req, res, db, user) {
     new_account: authUser.new_account,
     temp_password: authUser.temp_password || null,
   });
+}
+
+// --- Reset a member's password (admin sets a new temp password) ---
+
+async function handleResetPassword(req, res, db, user) {
+  const { data: membership } = await db
+    .from("memberships")
+    .select("organization_id, role")
+    .eq("user_id", user.id)
+    .in("role", ["owner", "admin", "super_admin", "agency_admin"])
+    .single();
+
+  if (!membership) return res.status(403).json({ error: "Insufficient permissions" });
+
+  const { user_id } = req.body || {};
+  if (!user_id) return res.status(400).json({ error: "user_id is required" });
+
+  // Target must belong to the admin's organization.
+  const { data: target } = await db
+    .from("memberships")
+    .select("id, email")
+    .eq("user_id", user_id)
+    .eq("organization_id", membership.organization_id)
+    .maybeSingle();
+
+  if (!target) return res.status(404).json({ error: "Member not found in your organization" });
+
+  const tempPassword = crypto.randomUUID().slice(0, 16) + "Ax1!";
+  const { error } = await db.auth.admin.updateUserById(user_id, {
+    password: tempPassword,
+    email_confirm: true,
+  });
+  if (error) return res.status(500).json({ error: "Reset failed: " + error.message });
+
+  return res.json({ reset: true, email: target.email, temp_password: tempPassword });
 }
 
 // --- List team members ---
