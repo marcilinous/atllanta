@@ -49,6 +49,7 @@ export default async function crmAccountDetail(container) {
         <p class="page-subtitle">${esc(account.industry || 'Account')}${ownerLabel && ownerLabel !== '—' ? ' · Owner: ' + esc(ownerLabel) : ''}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
+        <button class="btn btn-secondary" id="log-visit">Log visit</button>
         <button class="btn btn-secondary" id="log-activity">Log activity</button>
         <button class="btn btn-primary" id="new-deal">+ Deal</button>
       </div>
@@ -100,6 +101,7 @@ export default async function crmAccountDetail(container) {
 
   container.querySelector('#back').addEventListener('click', () => navigate('crm/accounts'));
   container.querySelector('#new-deal').addEventListener('click', () => navigate(`crm/opportunities?account=${id}`));
+  container.querySelector('#log-visit')?.addEventListener('click', () => navigate(`crm/visits?account=${id}`));
   container.querySelector('#log-activity').addEventListener('click', () => openActivityModal('account', id, refreshTimeline));
   container.querySelector('#add-contact').addEventListener('click', openContactForm);
 

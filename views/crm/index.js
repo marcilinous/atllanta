@@ -24,6 +24,7 @@ export default async function crmHub(container) {
 
   const sections = [
     { title: 'My targets', desc: 'Where to do business — your partners, ranked', route: 'crm/targets', color: 'var(--color-error)', icon: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' },
+    { title: 'Log a visit', desc: 'Record a partner visit with GPS and a selfie', route: 'crm/visits', color: 'var(--color-success)', icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z' },
     { title: 'Pipeline', desc: 'Drag deals through your sales stages', route: 'crm/opportunities', color: 'var(--color-accent)', icon: 'M3 3v18h18M18 9l-5 5-3-3-4 4' },
     { title: 'Leads', desc: 'Capture and qualify new prospects', route: 'crm/leads', color: 'var(--color-warning)', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
     { title: 'Accounts', desc: 'Companies you do business with', route: 'crm/accounts', color: 'var(--color-info)', icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01' },
