@@ -22,7 +22,7 @@ export default async function crmOppsCoverage(container) {
   if (!org) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div></div>`; return; }
 
   container.innerHTML = `
-    <div style="margin-bottom:var(--space-4)"><button class="btn btn-ghost btn-sm" id="back">← Coverage</button></div>
+    <div style="margin-bottom:var(--space-4)"><button class="btn btn-ghost btn-sm" id="back">← Business by territory</button></div>
     <div class="page-header">
       <h1 class="page-title">Opportunities</h1>
       <p class="page-subtitle">Target lists that drive business — overall, and rolled up CM → TL → BDE.</p>
