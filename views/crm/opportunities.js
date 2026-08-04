@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from 
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { routeParams, navigate } from '../../js/router.js';
-import { money, contactName, ownerName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
+import { money, contactName, ownerName, fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, field, currentUserId, canSeeOthers, canManageData, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmOpportunities(container) {
   const org = getOrg();
@@ -29,7 +29,7 @@ export default async function crmOpportunities(container) {
       <div style="display:flex;gap:var(--space-3);align-items:center">
         ${showScope ? scopeTabs(scope) : ''}
         ${['owner', 'admin'].includes(getMembership()?.role) ? '<button class="btn btn-secondary" id="edit-stages">Edit stages</button>' : ''}
-        <button class="btn btn-secondary" id="export-deals">Export</button>
+        ${canManageData() ? '<button class="btn btn-secondary" id="export-deals">Export</button>' : ''}
         <button class="btn btn-primary" id="add-deal">+ Deal</button>
       </div>
     </div>
@@ -220,7 +220,7 @@ export default async function crmOpportunities(container) {
 
   document.getElementById('add-deal').addEventListener('click', () => openForm(null));
   document.getElementById('edit-stages')?.addEventListener('click', () => navigate('crm/settings'));
-  document.getElementById('export-deals').addEventListener('click', () => {
+  document.getElementById('export-deals')?.addEventListener('click', () => {
     const rows = scopeFilter(opps, scope).map(o => ({
       Deal: o.name,
       Account: o.account?.name || '',

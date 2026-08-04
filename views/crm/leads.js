@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal, downloadCsv, parseCsv, loadingSkelet
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers, userOptions, leadName, field, RATING_BADGE, LEAD_STATUS_BADGE, ownerName, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
+import { fetchOrgUsers, userOptions, leadName, field, RATING_BADGE, LEAD_STATUS_BADGE, ownerName, currentUserId, canSeeOthers, canManageData, defaultScope, scopeFilter, scopeTabs } from './common.js';
 import { openConvertModal } from './lead-actions.js';
 
 export default async function crmLeads(container) {
@@ -25,8 +25,8 @@ export default async function crmLeads(container) {
         <p class="page-subtitle">Capture and qualify new prospects</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        <button class="btn btn-secondary" id="import-leads">Import</button>
-        <button class="btn btn-secondary" id="export-leads">Export</button>
+        ${canManageData() ? `<button class="btn btn-secondary" id="import-leads">Import</button>
+        <button class="btn btn-secondary" id="export-leads">Export</button>` : ''}
         <button class="btn btn-primary" id="add-lead">+ Lead</button>
       </div>
     </div>
@@ -148,7 +148,7 @@ export default async function crmLeads(container) {
   }
 
   document.getElementById('add-lead').addEventListener('click', () => openForm(null));
-  document.getElementById('import-leads').addEventListener('click', openImport);
+  document.getElementById('import-leads')?.addEventListener('click', openImport);
 
   function pick(row, ...keys) {
     for (const k of keys) { if (row[k]?.trim()) return row[k].trim(); }
@@ -223,7 +223,7 @@ export default async function crmLeads(container) {
     openModal('Import leads', wrap);
   }
 
-  document.getElementById('export-leads').addEventListener('click', () => {
+  document.getElementById('export-leads')?.addEventListener('click', () => {
     const rows = scopeFilter(leads, scope)
       .filter(l => statusFilter === 'all' ? true : statusFilter === 'converted' ? l.status === 'converted' : l.status !== 'converted')
       .map(l => ({ Name: leadName(l), Company: l.company || '', Title: l.title || '', Email: l.email || '', Phone: l.phone || '', Status: l.status, Rating: l.rating || '', Source: l.source || '', Owner: ownerName(users, l.owner_id) }));

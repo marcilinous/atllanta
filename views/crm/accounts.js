@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseC
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers, userOptions, field, ownerName, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
+import { fetchOrgUsers, userOptions, field, ownerName, currentUserId, canSeeOthers, canManageData, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmAccounts(container) {
   const org = getOrg();
@@ -24,8 +24,8 @@ export default async function crmAccounts(container) {
         <p class="page-subtitle">Companies you do business with</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        <button class="btn btn-secondary" id="import-accounts">Import</button>
-        <button class="btn btn-secondary" id="export-accounts">Export</button>
+        ${canManageData() ? `<button class="btn btn-secondary" id="import-accounts">Import</button>
+        <button class="btn btn-secondary" id="export-accounts">Export</button>` : ''}
         <button class="btn btn-primary" id="add-account">+ Account</button>
       </div>
     </div>
@@ -159,7 +159,7 @@ export default async function crmAccounts(container) {
   }
 
   document.getElementById('add-account').addEventListener('click', () => openForm(null));
-  document.getElementById('import-accounts').addEventListener('click', openImport);
+  document.getElementById('import-accounts')?.addEventListener('click', openImport);
 
   function pick(row, ...keys) {
     for (const k of keys) { if (row[k]?.trim()) return row[k].trim(); }
@@ -253,7 +253,7 @@ export default async function crmAccounts(container) {
     openModal('Import partners', wrap);
   }
 
-  document.getElementById('export-accounts').addEventListener('click', () => {
+  document.getElementById('export-accounts')?.addEventListener('click', () => {
     const rows = scopeFilter(accounts, scope)
       .filter(a => !search
         || a.name?.toLowerCase().includes(search)

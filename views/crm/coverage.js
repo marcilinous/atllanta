@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
+import { canManageData } from './common.js';
 
 const ZERO = { total: 0, called: 0, visited: 0, sold: 0, touched: 0 };
 const pct = (n, d) => d ? Math.round((100 * n) / d) : 0;
@@ -142,7 +143,7 @@ export default async function crmCoverage(container) {
     body.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary)"><strong>${list.length.toLocaleString('en-IN')}</strong> partners with no activity this period</div>
-        <button class="btn btn-secondary btn-sm" id="cov-export">Export</button>
+        ${canManageData() ? `<button class="btn btn-secondary btn-sm" id="cov-export">Export</button>` : ''}
       </div>
       <div class="table-wrap" style="max-height:56vh;overflow:auto"><table class="table">
         <thead><tr><th>Site ID</th><th>Partner</th><th>City</th><th>State</th></tr></thead>
@@ -153,7 +154,7 @@ export default async function crmCoverage(container) {
           <td>${a.state ? esc(a.state) : '—'}</td>
         </tr>`).join('')}</tbody>
       </table></div>`;
-    body.querySelector('#cov-export').addEventListener('click', () =>
+    body.querySelector('#cov-export')?.addEventListener('click', () =>
       downloadCsv(`untouched_${(ownerName || 'owner').replace(/[^\w.-]+/g, '_')}.csv`,
         list.map(a => ({ 'Site ID': a.external_id || '', Partner: a.name, City: a.billing_city || '', State: a.state || '' }))));
     body.querySelectorAll('[data-acc]').forEach(el => el.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${el.dataset.acc}`); }));

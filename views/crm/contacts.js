@@ -4,7 +4,7 @@ import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseC
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, contactName, field, currentUserId, canSeeOthers, defaultScope, scopeFilter, scopeTabs } from './common.js';
+import { fetchOrgUsers, userOptions, fetchAccountsLite, accountOptions, contactName, field, currentUserId, canSeeOthers, canManageData, defaultScope, scopeFilter, scopeTabs } from './common.js';
 
 export default async function crmContacts(container) {
   const org = getOrg();
@@ -25,8 +25,8 @@ export default async function crmContacts(container) {
         <p class="page-subtitle">People at your accounts</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        <button class="btn btn-secondary" id="import-contacts">Import</button>
-        <button class="btn btn-secondary" id="export-contacts">Export</button>
+        ${canManageData() ? `<button class="btn btn-secondary" id="import-contacts">Import</button>
+        <button class="btn btn-secondary" id="export-contacts">Export</button>` : ''}
         <button class="btn btn-primary" id="add-contact">+ Contact</button>
       </div>
     </div>
@@ -134,7 +134,7 @@ export default async function crmContacts(container) {
   }
 
   document.getElementById('add-contact').addEventListener('click', () => openForm(null));
-  document.getElementById('import-contacts').addEventListener('click', openImport);
+  document.getElementById('import-contacts')?.addEventListener('click', openImport);
 
   function pick(row, ...keys) {
     for (const k of keys) { if (row[k]?.trim()) return row[k].trim(); }
@@ -206,7 +206,7 @@ export default async function crmContacts(container) {
     });
     openModal('Import contacts', wrap);
   }
-  document.getElementById('export-contacts').addEventListener('click', () => {
+  document.getElementById('export-contacts')?.addEventListener('click', () => {
     const rows = scopeFilter(contacts, scope)
       .filter(c => !search || contactName(c).toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.account?.name?.toLowerCase().includes(search))
       .map(c => ({ Name: contactName(c), Title: c.title || '', Account: c.account?.name || '', Email: c.email || '', Phone: c.phone || '' }));

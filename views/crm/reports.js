@@ -3,7 +3,7 @@ import { getOrg, getUser } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv, formatDate } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { navigate } from '../../js/router.js';
-import { fetchOrgUsers } from './common.js';
+import { fetchOrgUsers, canManageData } from './common.js';
 
 const REPORT_TYPES = ['Renewals (TSS)', 'Sales', 'Licenses', 'Payments', 'Support', 'Other'];
 const SITE_ID_RE = /^(site[\s_-]*id|siteid|external[\s_-]*id|site)$/i;
@@ -102,13 +102,13 @@ export default async function crmReports(container) {
         <p class="page-subtitle">Drop any partner report here — renewals, sales, licenses, payments. Rows are stored raw and keyed on <strong>Site ID</strong>, ready to wire into accounts later.</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        <button class="btn btn-primary" id="import-report">+ Import report</button>
+        ${canManageData() ? `<button class="btn btn-primary" id="import-report">+ Import report</button>` : ''}
       </div>
     </div>
     <div class="card"><div id="reports-list">${loadingSkeleton()}</div></div>
   `;
   container.querySelector('#back').addEventListener('click', () => navigate('crm'));
-  container.querySelector('#import-report').addEventListener('click', openImport);
+  container.querySelector('#import-report')?.addEventListener('click', openImport);
 
   async function load() {
     const { data } = await sb.from('crm_report_imports').select('*').order('created_at', { ascending: false });
@@ -138,8 +138,8 @@ export default async function crmReports(container) {
           <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${formatDate(r.created_at)}</td>
           <td style="text-align:right;white-space:nowrap">
             <button class="btn btn-ghost btn-sm" data-preview="${r.id}">Preview</button>
-            <button class="btn btn-ghost btn-sm" data-export="${r.id}">Export</button>
-            <button class="btn btn-ghost btn-sm" data-delete="${r.id}" style="color:var(--color-error)">Delete</button>
+            ${canManageData() ? `<button class="btn btn-ghost btn-sm" data-export="${r.id}">Export</button>
+            <button class="btn btn-ghost btn-sm" data-delete="${r.id}" style="color:var(--color-error)">Delete</button>` : ''}
           </td>
         </tr>`;
       }).join('')}</tbody>
