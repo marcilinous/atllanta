@@ -27,7 +27,21 @@ export default async function crmSales(container) {
   let dim = 'region';
   let channel = 'RTcompu';
   let metric = 'revenue'; // or 'count'
+  let from = '';
+  let to = '';
   const cache = {};
+
+  const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  function applyPreset(p) {
+    const d = new Date(), today = isoLocal(d);
+    if (p === 'all') { from = ''; to = ''; }
+    else if (p === 'mtd') { from = isoLocal(new Date(d.getFullYear(), d.getMonth(), 1)); to = today; }
+    else if (p === '30d') { const s = new Date(d); s.setDate(s.getDate() - 29); from = isoLocal(s); to = today; }
+    else if (p === 'qtd') { const q = Math.floor(d.getMonth() / 3) * 3; from = isoLocal(new Date(d.getFullYear(), q, 1)); to = today; }
+    else if (p === 'fytd') { const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; from = isoLocal(new Date(y, 3, 1)); to = today; }
+    container.querySelector('#sl-from').value = from;
+    container.querySelector('#sl-to').value = to;
+  }
 
   container.innerHTML = `
     <style>
@@ -47,6 +61,17 @@ export default async function crmSales(container) {
         <button class="tab active" data-metric="revenue">Revenue</button>
         <button class="tab" data-metric="count">Sale count</button>
       </div></div>
+      <div><div class="tab-label">Period</div><div class="tabs" id="sl-preset">
+        <button class="tab" data-preset="mtd">Month</button>
+        <button class="tab" data-preset="30d">30d</button>
+        <button class="tab" data-preset="qtd">Quarter</button>
+        <button class="tab" data-preset="fytd">FY</button>
+        <button class="tab active" data-preset="all">All</button>
+      </div></div>
+      <div style="display:flex;gap:var(--space-2)">
+        <div><div class="tab-label">From</div><input type="date" class="form-input" id="sl-from" style="height:34px"></div>
+        <div><div class="tab-label">To</div><input type="date" class="form-input" id="sl-to" style="height:34px"></div>
+      </div>
       <div style="margin-left:auto"><button class="btn btn-secondary btn-sm" id="sl-export">Export</button></div>
     </div></div>
     <div id="sl-kpi" class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-5)"></div>
@@ -55,12 +80,13 @@ export default async function crmSales(container) {
   container.querySelector('#back').addEventListener('click', () => navigate('crm'));
 
   async function rows() {
-    if (!cache[dim]) {
-      const { data, error } = await sb.rpc('crm_sales_by', { p_dim: dim });
+    const key = `${dim}|${from}|${to}`;
+    if (!cache[key]) {
+      const { data, error } = await sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to });
       if (error) { toast('Could not load sales'); return []; }
-      cache[dim] = (data || []).map(r => ({ ...r, sales_count: +r.sales_count, revenue: +r.revenue }));
+      cache[key] = (data || []).map(r => ({ ...r, sales_count: +r.sales_count, revenue: +r.revenue }));
     }
-    return cache[dim];
+    return cache[key];
   }
 
   function pivot(data) {
@@ -126,6 +152,20 @@ export default async function crmSales(container) {
     container.querySelectorAll('#sl-metric .tab').forEach(t => t.classList.toggle('active', t === b));
     render();
   });
+  container.querySelector('#sl-preset').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-preset]'); if (!b) return;
+    applyPreset(b.dataset.preset);
+    container.querySelectorAll('#sl-preset .tab').forEach(t => t.classList.toggle('active', t === b));
+    render();
+  });
+  const onDate = () => {
+    from = container.querySelector('#sl-from').value || '';
+    to = container.querySelector('#sl-to').value || '';
+    container.querySelectorAll('#sl-preset .tab').forEach(t => t.classList.remove('active'));
+    render();
+  };
+  container.querySelector('#sl-from').addEventListener('change', onDate);
+  container.querySelector('#sl-to').addEventListener('change', onDate);
   container.querySelector('#sl-export').addEventListener('click', async () => {
     const { list } = pivot(await rows());
     const dimLabel = DIMS.find(d => d.key === dim).label;
