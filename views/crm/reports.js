@@ -69,6 +69,22 @@ async function readReportFile(file) {
   return { rows, cols: rows.length ? Object.keys(rows[0]) : [], forcedSite: null, tss: false };
 }
 
+// Fiscal year (Apr–Mar) of a report, from its latest date column. Lets each
+// year's data be retained side by side and keeps year-over-year rolling.
+function detectPeriod(rows, cols) {
+  const isISO = v => /^\d{4}-\d{2}-\d{2}/.test(String(v ?? ''));
+  const sample = rows.slice(0, 60);
+  const dateCol = cols.find(c => /date/i.test(c) && sample.some(r => isISO(r[c])))
+    || cols.find(c => sample.filter(r => isISO(r[c])).length > sample.length * 0.5);
+  if (!dateCol) return null;
+  let mx = '';
+  for (const r of rows) { const v = String(r[dateCol] ?? '').slice(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v > mx) mx = v; }
+  if (!mx) return null;
+  const y = +mx.slice(0, 4), m = +mx.slice(5, 7);
+  const s = m >= 4 ? y : y - 1;
+  return `FY${s}-${String(s + 1).slice(2)}`;
+}
+
 export default async function crmReports(container) {
   const org = getOrg();
   const user = getUser();
@@ -110,12 +126,13 @@ export default async function crmReports(container) {
       return;
     }
     el.innerHTML = `<div class="table-wrap"><table class="table">
-      <thead><tr><th>Report</th><th>Type</th><th>Rows</th><th>Matched to partner</th><th>Imported</th><th></th></tr></thead>
+      <thead><tr><th>Report</th><th>Type</th><th>Year</th><th>Rows</th><th>Matched to partner</th><th>Imported</th><th></th></tr></thead>
       <tbody>${imports.map(r => {
         const pct = r.row_count ? Math.round((r.matched_count / r.row_count) * 100) : 0;
         return `<tr>
           <td style="font-weight:var(--font-weight-medium)">${esc(r.name)}${r.source_filename ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(r.source_filename)}</div>` : ''}</td>
           <td>${r.report_type ? esc(r.report_type) : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
+          <td>${r.period_label ? `<span class="badge badge-info" style="font-size:10px">${esc(r.period_label)}</span>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>
           <td>${(r.row_count || 0).toLocaleString('en-IN')}</td>
           <td>${(r.matched_count || 0).toLocaleString('en-IN')} <span style="color:var(--color-text-tertiary)">(${pct}%)</span></td>
           <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${formatDate(r.created_at)}</td>
@@ -202,6 +219,7 @@ export default async function crmReports(container) {
 
     let rows = [];       // parsed row objects
     let cols = [];       // column keys
+    let period = null;   // fiscal year of the data, if datable
     const nameEl = wrap.querySelector('#rep-name');
     const typeEl = wrap.querySelector('#rep-type');
     const colsWrap = wrap.querySelector('#rep-cols-wrap');
@@ -229,7 +247,8 @@ export default async function crmReports(container) {
       if (siteCol) parts.push(`${partner.toLocaleString('en-IN')} linked to a partner`);
       if (personCol) parts.push(`${person.toLocaleString('en-IN')} linked to staff`);
       preview.innerHTML = `Ready to import <strong>${rows.length.toLocaleString('en-IN')}</strong> rows across ${cols.length} columns`
-        + (parts.length ? ` — ${parts.join(', ')}.` : `. <span style="color:var(--color-warning)">Pick a Site ID or Person column so rows can be linked.</span>`);
+        + (parts.length ? ` — ${parts.join(', ')}` : `. <span style="color:var(--color-warning)">Pick a Site ID or Person column so rows can be linked.</span>`)
+        + (period ? ` · <strong>${esc(period)}</strong>` : '') + (parts.length ? '.' : '');
       go.disabled = false;
     }
 
@@ -250,6 +269,7 @@ export default async function crmReports(container) {
         if (!typeEl.value.trim()) typeEl.value = 'Renewals (TSS)';
         snapshotEl.checked = true;
       }
+      period = detectPeriod(rows, cols);
       const detectedSite = parsedFile.forcedSite || detectSiteCol(cols);
       const detectedPerson = detectPersonCol(cols);
       const opts = (sel) => `<option value="">— none —</option>` + cols.map(c => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
@@ -272,7 +292,8 @@ export default async function crmReports(container) {
 
       const { data: imp, error: impErr } = await sb.from('crm_report_imports').insert({
         org_id: org.id, name, report_type: reportType, source_filename: fileName || null,
-        columns: cols, site_id_column: siteCol || null, person_column: personCol || null, imported_by: user?.id || null,
+        columns: cols, site_id_column: siteCol || null, person_column: personCol || null,
+        period_label: period, imported_by: user?.id || null,
       }).select('id').single();
       if (impErr || !imp) { toast('Could not start import'); go.disabled = false; return; }
 
@@ -299,11 +320,14 @@ export default async function crmReports(container) {
       await sb.from('crm_report_imports').update({ row_count: done, matched_count: matched }).eq('id', imp.id);
       await logAction('crm', 'report_import', imp.id, 'imported', null, { name, rows: done, matched });
 
-      // Daily snapshot: replace the previous import with the same name (rows
-      // cascade). Keyed on name, not type, so a historical load (e.g. an LFY
-      // report of the same type) is never clobbered by the daily upload.
+      // Daily snapshot: replace the previous import with the same name AND
+      // the same fiscal year (rows cascade). Scoping by period keeps every
+      // year's data — next year's daily upload starts a new period instead of
+      // overwriting this year — and never touches a historical (e.g. LFY) load.
       if (snapshotEl.checked && name) {
-        await sb.from('crm_report_imports').delete().eq('org_id', org.id).eq('name', name).neq('id', imp.id);
+        let del = sb.from('crm_report_imports').delete().eq('org_id', org.id).eq('name', name).neq('id', imp.id);
+        del = period ? del.eq('period_label', period) : del.is('period_label', null);
+        await del;
       }
       toast(`Imported ${done.toLocaleString('en-IN')} rows${failed ? ` · ${failed} failed` : ''} · ${matched.toLocaleString('en-IN')} matched`);
       closeModal();
