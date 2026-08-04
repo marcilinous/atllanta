@@ -191,7 +191,7 @@ export default async function crmReports(container) {
           </div>
         </div>
         <label style="display:flex;gap:var(--space-2);align-items:center;font-size:var(--text-sm);color:var(--color-text-secondary)">
-          <input type="checkbox" id="rep-snapshot"> Replace the previous import of this type (daily snapshot)
+          <input type="checkbox" id="rep-snapshot"> Replace the previous import with the same name (daily snapshot)
         </label>
         <div id="rep-preview" style="font-size:var(--text-sm);color:var(--color-text-secondary)"></div>
         <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
@@ -299,9 +299,11 @@ export default async function crmReports(container) {
       await sb.from('crm_report_imports').update({ row_count: done, matched_count: matched }).eq('id', imp.id);
       await logAction('crm', 'report_import', imp.id, 'imported', null, { name, rows: done, matched });
 
-      // Daily snapshot: drop older imports of the same type (rows cascade).
-      if (snapshotEl.checked && reportType) {
-        await sb.from('crm_report_imports').delete().eq('org_id', org.id).eq('report_type', reportType).neq('id', imp.id);
+      // Daily snapshot: replace the previous import with the same name (rows
+      // cascade). Keyed on name, not type, so a historical load (e.g. an LFY
+      // report of the same type) is never clobbered by the daily upload.
+      if (snapshotEl.checked && name) {
+        await sb.from('crm_report_imports').delete().eq('org_id', org.id).eq('name', name).neq('id', imp.id);
       }
       toast(`Imported ${done.toLocaleString('en-IN')} rows${failed ? ` · ${failed} failed` : ''} · ${matched.toLocaleString('en-IN')} matched`);
       closeModal();
