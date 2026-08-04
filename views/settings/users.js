@@ -182,6 +182,7 @@ export default async function settingsUsers(container) {
                 <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
                 <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>
               </select>
+              <button class="btn btn-ghost btn-sm" data-reset-pw="${m.user_id}" data-email="${esc(m.email || '')}" title="Reset password">Reset pw</button>
               <button class="btn btn-ghost btn-sm" data-remove-member="${m.id}" style="color:var(--color-error)" title="Remove member">&times;</button>` : '<span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">—</span>'}
             </div>
           </td>` : ''}
@@ -245,6 +246,61 @@ export default async function settingsUsers(container) {
           await logAction('people', 'membership', memberId, 'removed', { email: member?.email, role: member?.role }, null);
           toast('Member removed');
           loadMembers();
+        });
+      });
+
+      // Reset-password handlers — admin sets a new temporary password for a
+      // member, then shares it. Goes through the service-role endpoint since
+      // the anon client can't touch other users' auth records.
+      wrap.querySelectorAll('[data-reset-pw]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const targetUserId = btn.dataset.resetPw;
+          const email = btn.dataset.email || '';
+          if (!confirm(`Reset the password for ${email || 'this member'}? Their current password will stop working.`)) return;
+          btn.disabled = true;
+          const orig = btn.textContent;
+          btn.textContent = 'Resetting...';
+          try {
+            const { data: { session } } = await sb.auth.getSession();
+            const resp = await fetch('/api/create-org', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ action: 'reset_password', user_id: targetUserId }),
+            });
+            const result = await resp.json();
+            if (!resp.ok) {
+              toast(result.error || 'Failed to reset password');
+              btn.disabled = false;
+              btn.textContent = orig;
+              return;
+            }
+            await logAction('people', 'employee', targetUserId, 'password_reset', null, { email: result.email });
+
+            const info = document.createElement('div');
+            info.innerHTML = `
+              <div style="display:grid;gap:var(--space-4)">
+                <div style="text-align:center">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" width="48" height="48" style="margin:0 auto var(--space-3)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Password Reset</div>
+                </div>
+                <div style="background:var(--color-bg-secondary);border-radius:var(--radius-md);padding:var(--space-4)">
+                  <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-2)">Share the new credentials with the member:</div>
+                  <div style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Email:</strong> ${esc(result.email || email)}</div>
+                  <div style="font-size:var(--text-sm)"><strong>New Password:</strong> <code style="background:var(--color-bg-tertiary);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);user-select:all">${esc(result.temp_password)}</code></div>
+                </div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);text-align:center">They should change their password after logging in.</div>
+                <button class="btn btn-primary" id="reset-done-btn">Done</button>
+              </div>`;
+            openModal('Password Reset', info);
+            info.querySelector('#reset-done-btn').addEventListener('click', closeModal);
+          } catch (err) {
+            toast('Failed to reset password: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = orig;
+          }
         });
       });
     }
