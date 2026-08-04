@@ -150,7 +150,7 @@ export default async function crmOppsCoverage(container) {
   // ---- partner list modal (export TL+) ----
   function showList(o, list, title) {
     const body = document.createElement('div');
-    if (!list.length) { body.innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-title">None 🎉</div></div>`; openModal(title || o.title, body); return; }
+    if (!list.length) { body.innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-title">None</div></div>`; openModal(title || o.title, body); return; }
     body.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
         <div style="font-size:var(--text-sm);color:var(--color-text-secondary)"><strong>${list.length.toLocaleString('en-IN')}</strong> partners · ${esc(o.desc)}</div>
