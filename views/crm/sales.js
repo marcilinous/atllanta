@@ -2,7 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, toast, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
-import { canManageData } from './common.js';
+import { canManageData, fetchAllRpc } from './common.js';
 
 const DIMS = [
   { key: 'region', label: 'Region' },
@@ -83,7 +83,7 @@ export default async function crmSales(container) {
   async function rows() {
     const key = `${dim}|${from}|${to}`;
     if (!cache[key]) {
-      const { data, error } = await sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to });
+      const { data, error } = await fetchAllRpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to });
       if (error) { toast('Could not load sales'); return []; }
       cache[key] = (data || []).map(r => ({ ...r, sales_count: +r.sales_count, revenue: +r.revenue }));
     }
