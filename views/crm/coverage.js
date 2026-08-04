@@ -12,9 +12,12 @@ export default async function crmCoverage(container) {
 
   container.innerHTML = `
     <div style="margin-bottom:var(--space-4)"><button class="btn btn-ghost btn-sm" id="back">← CRM</button></div>
-    <div class="page-header">
-      <h1 class="page-title">Coverage</h1>
-      <p class="page-subtitle">Who in your partner base is being called, visited and sold to — and who's untouched — by territory.</p>
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-3)">
+      <div>
+        <h1 class="page-title">Coverage</h1>
+        <p class="page-subtitle">Who in your partner base is being called, visited and sold to — and who's untouched — by territory.</p>
+      </div>
+      <button class="btn btn-primary" id="to-opps">Opportunities →</button>
     </div>
     <div id="cov-kpi" class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-6)"></div>
     <div class="card">
@@ -23,6 +26,7 @@ export default async function crmCoverage(container) {
     </div>
   `;
   container.querySelector('#back').addEventListener('click', () => navigate('crm'));
+  container.querySelector('#to-opps').addEventListener('click', () => navigate('crm/opps'));
 
   const [{ data: users }, { data: cov, error }] = await Promise.all([
     sb.from('users').select('id, full_name, designation, reporting_manager_id').eq('status', 'active'),
