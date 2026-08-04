@@ -24,6 +24,12 @@ export function canSeeOthers() {
   return ['owner', 'admin', 'manager'].includes(getMembership()?.role);
 }
 
+// Import / export of data is a TL-and-above action (TL and CM map to the
+// 'manager' membership role; BDE and Telecaller are 'member').
+export function canManageData() {
+  return ['owner', 'admin', 'manager'].includes(getMembership()?.role);
+}
+
 export function defaultScope() {
   const r = getMembership()?.role;
   return (r === 'owner' || r === 'admin') ? 'all' : 'mine';

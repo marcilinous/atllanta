@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, toast, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
+import { canManageData } from './common.js';
 
 const DIMS = [
   { key: 'region', label: 'Region' },
@@ -72,7 +73,7 @@ export default async function crmSales(container) {
         <div><div class="tab-label">From</div><input type="date" class="form-input" id="sl-from" style="height:34px"></div>
         <div><div class="tab-label">To</div><input type="date" class="form-input" id="sl-to" style="height:34px"></div>
       </div>
-      <div style="margin-left:auto"><button class="btn btn-secondary btn-sm" id="sl-export">Export</button></div>
+      ${canManageData() ? `<div style="margin-left:auto"><button class="btn btn-secondary btn-sm" id="sl-export">Export</button></div>` : ''}
     </div></div>
     <div id="sl-kpi" class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-5)"></div>
     <div class="card"><div id="sl-table">${loadingSkeleton(6)}</div></div>
@@ -166,7 +167,7 @@ export default async function crmSales(container) {
   };
   container.querySelector('#sl-from').addEventListener('change', onDate);
   container.querySelector('#sl-to').addEventListener('change', onDate);
-  container.querySelector('#sl-export').addEventListener('click', async () => {
+  container.querySelector('#sl-export')?.addEventListener('click', async () => {
     const { list } = pivot(await rows());
     const dimLabel = DIMS.find(d => d.key === dim).label;
     downloadCsv(`sales_${dim}_${channel}_${metric}.csv`,
