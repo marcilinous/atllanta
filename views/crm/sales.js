@@ -65,8 +65,8 @@ export default async function crmSales(container) {
         <button class="tab" data-preset="mtd">Month</button>
         <button class="tab" data-preset="30d">30d</button>
         <button class="tab" data-preset="qtd">Quarter</button>
-        <button class="tab" data-preset="fytd">FY</button>
-        <button class="tab active" data-preset="all">All</button>
+        <button class="tab active" data-preset="fytd">FY</button>
+        <button class="tab" data-preset="all">All</button>
       </div></div>
       <div style="display:flex;gap:var(--space-2)">
         <div><div class="tab-label">From</div><input type="date" class="form-input" id="sl-from" style="height:34px"></div>
@@ -173,5 +173,6 @@ export default async function crmSales(container) {
       list.map(r => ({ [dimLabel]: r.bucket, ...Object.fromEntries(CATS.map(c => [c, Math.round(r.cats[c])])), Total: Math.round(r.total) })));
   });
 
+  applyPreset('fytd'); // default to current FY so newly-loaded LFY data doesn't inflate the headline
   await render();
 }
