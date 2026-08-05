@@ -19,14 +19,27 @@ async function getUserFromToken(token) {
   return resp.json();
 }
 
-async function findOrCreateUser(db, email) {
-  const { data: existingUsers } = await db.auth.admin.listUsers();
-  const existing = existingUsers?.users?.find((u) => u.email === email);
-
-  if (existing) {
-    return { id: existing.id, new_account: false };
+// Find an existing auth user by email. auth.admin.listUsers() is paginated
+// (default 50/page), so a simple one-call lookup silently misses anyone past
+// the first page once an org grows — page through until a hit or an empty page.
+async function findAuthUserByEmail(db, email) {
+  const target = email.toLowerCase();
+  const perPage = 1000;
+  for (let page = 1; page <= 100; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage });
+    if (error) return null;
+    const users = data?.users || [];
+    const hit = users.find((u) => (u.email || "").toLowerCase() === target);
+    if (hit) return hit;
+    if (!users.length) return null; // reached the end
   }
+  return null;
+}
 
+async function findOrCreateUser(db, email) {
+  // Create first: on the common new-user path this avoids paging the whole
+  // auth list. If the email already exists (including an orphaned account
+  // from a prior failed add), createUser errors and we resolve it by lookup.
   const tempPassword = crypto.randomUUID().slice(0, 16) + "Ax1!";
   const { data: newUser, error } = await db.auth.admin.createUser({
     email,
@@ -34,9 +47,14 @@ async function findOrCreateUser(db, email) {
     email_confirm: true,
   });
 
-  if (error) return { error: "Failed to create user: " + error.message };
+  if (!error && newUser?.user) {
+    return { id: newUser.user.id, new_account: true, temp_password: tempPassword };
+  }
 
-  return { id: newUser.user.id, new_account: true, temp_password: tempPassword };
+  const existing = await findAuthUserByEmail(db, email);
+  if (existing) return { id: existing.id, new_account: false };
+
+  return { error: "Failed to create user: " + (error?.message || "unknown error") };
 }
 
 export default async function handler(req, res) {
@@ -201,6 +219,27 @@ async function handleInvite(req, res, db, user) {
   const authUser = await findOrCreateUser(db, email);
   if (authUser.error) return res.status(500).json({ error: authUser.error });
 
+  // An existing auth account with no membership anywhere is an orphan — left
+  // by a prior failed add. Give it a fresh temp password so the admin has
+  // shareable credentials, and treat it as a new login. (An account that is
+  // already a member of some org keeps its password untouched.)
+  let isNew = authUser.new_account;
+  let sharePassword = authUser.temp_password || null;
+  if (!authUser.new_account) {
+    const { count } = await db
+      .from("memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", authUser.id);
+    if (!count) {
+      const pw = crypto.randomUUID().slice(0, 16) + "Ax1!";
+      const { error: pwErr } = await db.auth.admin.updateUserById(authUser.id, {
+        password: pw,
+        email_confirm: true,
+      });
+      if (!pwErr) { sharePassword = pw; isNew = true; }
+    }
+  }
+
   const { error: insertErr } = await db.from("memberships").insert({
     user_id: authUser.id,
     organization_id: orgId,
@@ -246,8 +285,8 @@ async function handleInvite(req, res, db, user) {
     email,
     role,
     user_id: authUser.id,
-    new_account: authUser.new_account,
-    temp_password: authUser.temp_password || null,
+    new_account: isNew,
+    temp_password: sharePassword,
   });
 }
 
