@@ -140,6 +140,7 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
+import { loadFeatureAccess, isFeatureAllowed, FEATURES } from '/js/features.js';
 import { onUnreadChange, onNewNotification, notifTarget, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
@@ -155,6 +156,7 @@ import recruitmentJobs from '/views/recruitment/jobs.js';
 import interviewsView from '/views/recruitment/interviews.js';
 import settingsOrg from '/views/settings/org.js';
 import settingsUsers from '/views/settings/users.js';
+import settingsAccess from '/views/settings/access.js';
 import departmentsView from '/views/settings/departments.js';
 import integrationsView from '/views/settings/integrations.js';
 import employeeProfile from '/views/employees/profile.js';
@@ -259,6 +261,15 @@ document.querySelectorAll('.nav-btn[data-role="manager"]').forEach(btn => {
 });
 document.querySelectorAll('.nav-btn[data-role="admin"]').forEach(btn => {
   if (!isAdmin) btn.style.display = 'none';
+});
+
+// Admin/HR-configurable feature access — hide sidebar modules turned off for
+// this user (admins bypass). Loaded before the router so the first route is
+// gated too.
+await loadFeatureAccess({ orgId: org?.id, userId: user?.id, role: userRole, isAdmin });
+FEATURES.forEach(f => {
+  if (f.locked || isFeatureAllowed(f.key)) return;
+  document.querySelectorAll(`.nav-btn[data-view="${f.key}"]`).forEach(btn => { btn.style.display = 'none'; });
 });
 
 // Dark mode
@@ -492,6 +503,7 @@ registerRoute('recruitment/interviews', interviewsView);
 registerRoute('settings', profileSettings);
 registerRoute('settings/org', settingsOrg);
 registerRoute('settings/users', settingsUsers);
+registerRoute('settings/access', settingsAccess);
 registerRoute('settings/departments', departmentsView);
 registerRoute('settings/integrations', integrationsView);
 registerRoute('employees/profile', employeeProfile);
