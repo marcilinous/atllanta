@@ -668,6 +668,27 @@ export default async function attendanceDashboard(container) {
     const absent = teamData.filter(a => a.status === 'absent').length;
     const onLeave = teamData.filter(a => a.status === 'on_leave').length;
 
+    // Sign punch-selfie thumbnails so managers can verify each check-in/out.
+    const thumbPaths = [];
+    teamData.forEach(a => {
+      if (a.check_in_selfie_path) thumbPaths.push(thumbOf(a.check_in_selfie_path));
+      if (a.check_out_selfie_path) thumbPaths.push(thumbOf(a.check_out_selfie_path));
+    });
+    const sig = {};
+    if (thumbPaths.length) {
+      const { data: urls } = await sb.storage.from(ATT_BUCKET).createSignedUrls(thumbPaths, 3600);
+      (urls || []).forEach(u => { if (u.signedUrl) sig[u.path] = u.signedUrl; });
+    }
+    const selfieCell = (a) => {
+      const parts = [];
+      if (a.check_in_selfie_path && sig[thumbOf(a.check_in_selfie_path)]) parts.push(['Check-in', a.check_in_selfie_path]);
+      if (a.check_out_selfie_path && sig[thumbOf(a.check_out_selfie_path)]) parts.push(['Check-out', a.check_out_selfie_path]);
+      if (!parts.length) return '<span style="color:var(--color-text-tertiary)">—</span>';
+      return `<div style="display:flex;gap:4px">${parts.map(([label, full]) =>
+        `<img src="${sig[thumbOf(full)]}" data-full="${esc(full)}" class="team-selfie" title="${label} selfie" style="width:32px;height:32px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--color-border)">`
+      ).join('')}</div>`;
+    };
+
     el.innerHTML = `<div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
         <span class="card-title">Team Attendance — Today</span>
@@ -679,7 +700,7 @@ export default async function attendanceDashboard(container) {
         </div>
       </div>
       ${teamData.length ? `<div class="table-wrap"><table class="table">
-        <thead><tr><th>Employee</th><th>Check In</th><th>Check Out</th><th>Hours</th><th>Status</th></tr></thead>
+        <thead><tr><th>Employee</th><th>Check In</th><th>Check Out</th><th>Hours</th><th>Status</th><th>Selfie</th></tr></thead>
         <tbody>${teamData.map(a => {
           const sc = { present: 'success', absent: 'error', late: 'warning', on_leave: 'info', half_day: 'warning' };
           return `<tr>
@@ -693,10 +714,16 @@ export default async function attendanceDashboard(container) {
             <td>${a.check_out ? new Date(a.check_out).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
             <td>${a.total_hours ? Number(a.total_hours).toFixed(1) : '—'}</td>
             <td><span class="badge badge-${sc[a.status] || 'neutral'}"><span class="badge-dot"></span>${esc(a.status || '—')}</span></td>
+            <td>${selfieCell(a)}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>` : '<div style="padding:var(--space-6);text-align:center;color:var(--color-text-tertiary)">No attendance records for today</div>'}
     </div>`;
+
+    el.querySelectorAll('.team-selfie').forEach(img => img.addEventListener('click', async () => {
+      const { data } = await sb.storage.from(ATT_BUCKET).createSignedUrl(img.dataset.full, 3600);
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    }));
 
     el.querySelector('#team-export-csv')?.addEventListener('click', () => {
       if (!teamData.length) return toast('No data to export');
