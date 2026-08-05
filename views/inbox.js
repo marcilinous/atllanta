@@ -3,6 +3,7 @@ import { getUser, getOrg, getMembership } from '../js/auth.js';
 import { esc, toast, formatDate, initials, avColor, openModal, closeModal, timeAgo } from '../js/ui.js';
 import { logAction } from '../js/audit.js';
 import { publishEvent } from '../js/events.js';
+import { isFeatureAllowed } from '../js/features.js';
 
 export default async function inboxView(container) {
   const org = getOrg();
@@ -63,7 +64,7 @@ export default async function inboxView(container) {
     <div class="tabs" id="inbox-tabs">
       <button class="tab active" data-tab="leave">Leave Requests${leaveCount ? ` <span class="badge badge-error" style="margin-left:var(--space-1);font-size:10px;padding:1px 6px">${leaveCount}</span>` : ''}</button>
       <button class="tab" data-tab="regularization">Regularization${regCount ? ` <span class="badge badge-error" style="margin-left:var(--space-1);font-size:10px;padding:1px 6px">${regCount}</span>` : ''}</button>
-      <button class="tab" data-tab="helpdesk">Helpdesk${ticketCount ? ` <span class="badge badge-error" style="margin-left:var(--space-1);font-size:10px;padding:1px 6px">${ticketCount}</span>` : ''}</button>
+      ${isFeatureAllowed('helpdesk') ? `<button class="tab" data-tab="helpdesk">Helpdesk${ticketCount ? ` <span class="badge badge-error" style="margin-left:var(--space-1);font-size:10px;padding:1px 6px">${ticketCount}</span>` : ''}</button>` : ''}
     </div>
     <div id="inbox-content" style="margin-top:var(--space-4)">
       <div style="padding:var(--space-4);color:var(--color-text-secondary)">Loading...</div>

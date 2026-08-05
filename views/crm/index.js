@@ -3,6 +3,7 @@ import { getOrg, getUser } from '../../js/auth.js';
 import { esc, toast } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { money, fetchAllRpc } from './common.js';
+import { isFeatureAllowed } from '../../js/features.js';
 
 export default async function crmHub(container) {
   const org = getOrg();
@@ -19,7 +20,7 @@ export default async function crmHub(container) {
     </div>
     <div id="crm-stats" class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-6)"></div>
     <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))" id="crm-nav"></div>
-    <div style="margin-top:var(--space-6)">
+    <div style="margin-top:var(--space-6)" id="crm-general-section">
       <div style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);margin-bottom:var(--space-3)">General CRM</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))" id="crm-nav-general"></div>
     </div>
@@ -39,11 +40,12 @@ export default async function crmHub(container) {
   ];
 
   // Secondary — generic CRM, kept available but out of the primary flow.
+  // Each maps to its own feature toggle so it can be hidden independently.
   const general = [
-    { title: 'Contacts', desc: 'People at your partners', route: 'crm/contacts', color: 'var(--color-text-secondary)', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
-    { title: 'Pipeline', desc: 'Track named deals through stages', route: 'crm/opportunities', color: 'var(--color-text-secondary)', icon: 'M3 3v18h18M18 9l-5 5-3-3-4 4' },
-    { title: 'Leads', desc: 'Capture and qualify new prospects', route: 'crm/leads', color: 'var(--color-text-secondary)', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
-  ];
+    { title: 'Contacts', feature: 'crm_contacts', desc: 'People at your partners', route: 'crm/contacts', color: 'var(--color-text-secondary)', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
+    { title: 'Pipeline', feature: 'crm_pipeline', desc: 'Track named deals through stages', route: 'crm/opportunities', color: 'var(--color-text-secondary)', icon: 'M3 3v18h18M18 9l-5 5-3-3-4 4' },
+    { title: 'Leads', feature: 'crm_leads', desc: 'Capture and qualify new prospects', route: 'crm/leads', color: 'var(--color-text-secondary)', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
+  ].filter(s => isFeatureAllowed(s.feature));
 
   const cardHtml = (s) => `
     <div class="card" style="cursor:pointer;transition:box-shadow var(--transition-fast),border-color var(--transition-fast)" data-route="${s.route}"
@@ -62,6 +64,7 @@ export default async function crmHub(container) {
 
   container.querySelector('#crm-nav').innerHTML = primary.map(cardHtml).join('');
   container.querySelector('#crm-nav-general').innerHTML = general.map(cardHtml).join('');
+  if (!general.length) container.querySelector('#crm-general-section').style.display = 'none';
   container.querySelectorAll('[data-route]').forEach(card => {
     card.addEventListener('click', () => navigate(card.dataset.route));
   });
