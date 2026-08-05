@@ -43,7 +43,8 @@ export default async function attendanceDashboard(container) {
         <p class="page-subtitle">${today.toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        ${membership && ['owner', 'admin'].includes(membership.role) ? '<a href="#/attendance/locations" class="btn btn-secondary btn-sm">Locations</a>' : ''}
+        ${membership && (['owner', 'admin'].includes(membership.role) || (membership.hr_level && membership.hr_level !== 'none')) ? '<a href="#/attendance/hr" class="btn btn-secondary btn-sm">HR console</a>' : ''}
+        ${membership && (['owner', 'admin'].includes(membership.role) || membership.hr_level === 'head') ? '<a href="#/attendance/locations" class="btn btn-secondary btn-sm">Locations</a>' : ''}
         ${isManager ? '<a href="#/attendance/report" class="btn btn-secondary btn-sm">Report</a>' : ''}
         <a href="#/attendance/regularize" class="btn btn-secondary btn-sm">Regularize</a>
       </div>

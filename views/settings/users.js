@@ -51,6 +51,8 @@ export default async function settingsUsers(container) {
 
   let allMembers = [];
   let profileById = {};
+  let departments = [];
+  const HR_LABEL = { exec: 'HR·Exec', manager: 'HR·Mgr', head: 'HR·Head' };
 
   // Membership roles can be broader (super_admin, etc.); map to the users
   // enum (owner/admin/manager/member) when materialising an employee profile.
@@ -58,9 +60,10 @@ export default async function settingsUsers(container) {
   const toUserRole = (r) => roleMap[r] || (['owner', 'admin', 'manager', 'member'].includes(r) ? r : 'member');
 
   async function loadMembers() {
-    const [{ data: members, error }, { data: staff }] = await Promise.all([
+    const [{ data: members, error }, { data: staff }, { data: depts }] = await Promise.all([
       sb.from('memberships').select('*').eq('organization_id', org.id).order('created_at', { ascending: true }),
       sb.from('users').select('id, full_name, email, role, reporting_manager_id').eq('org_id', org.id),
+      sb.from('departments').select('id, name').eq('org_id', org.id).order('name'),
     ]);
 
     if (error) {
@@ -68,6 +71,7 @@ export default async function settingsUsers(container) {
       return;
     }
     allMembers = members || [];
+    departments = depts || [];
     profileById = Object.fromEntries((staff || []).map(p => [p.id, p]));
     renderTable();
     renderSelfBanner();
@@ -182,6 +186,7 @@ export default async function settingsUsers(container) {
                 <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
                 <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>
               </select>
+              <button class="btn btn-ghost btn-sm" data-hr="${m.user_id}" title="HR access" style="${m.hr_level && m.hr_level !== 'none' ? 'color:var(--color-accent)' : ''}">${m.hr_level && m.hr_level !== 'none' ? esc(HR_LABEL[m.hr_level] || 'HR') : 'HR'}</button>
               <button class="btn btn-ghost btn-sm" data-reset-pw="${m.user_id}" data-email="${esc(m.email || '')}" title="Reset password">Reset pw</button>
               <button class="btn btn-ghost btn-sm" data-remove-member="${m.id}" style="color:var(--color-error)" title="Remove member">&times;</button>` : '<span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">—</span>'}
             </div>
@@ -246,6 +251,74 @@ export default async function settingsUsers(container) {
           await logAction('people', 'membership', memberId, 'removed', { email: member?.email, role: member?.role }, null);
           toast('Member removed');
           loadMembers();
+        });
+      });
+
+      // HR-access handlers — assign an HR level (and optional department
+      // scope) so designated staff get org-wide/scoped HR visibility and
+      // approvals without being made a full org admin.
+      wrap.querySelectorAll('[data-hr]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetUserId = btn.dataset.hr;
+          const member = allMembers.find(m => m.user_id === targetUserId);
+          const curLevel = member?.hr_level || 'none';
+          const curScope = member?.hr_scope_department_id || '';
+
+          const f = document.createElement('div');
+          f.innerHTML = `
+            <div style="display:grid;gap:var(--space-4)">
+              <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
+                HR access lets someone see and act on other people's attendance & leave without being a full org admin.
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">HR level</label>
+                <select class="form-input" id="hr-level">
+                  <option value="none" ${curLevel === 'none' ? 'selected' : ''}>None</option>
+                  <option value="exec" ${curLevel === 'exec' ? 'selected' : ''}>HR Executive — view + corrections + onboarding</option>
+                  <option value="manager" ${curLevel === 'manager' ? 'selected' : ''}>HR Manager — the above + approvals</option>
+                  <option value="head" ${curLevel === 'head' ? 'selected' : ''}>HR Head — all of the above, org-wide + config</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0" id="hr-scope-wrap">
+                <label class="form-label">Scope</label>
+                <select class="form-input" id="hr-scope">
+                  <option value="">Whole organization</option>
+                  ${departments.map(d => `<option value="${d.id}" ${curScope === d.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}
+                </select>
+                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:2px">Limit an Exec/Manager to one department, or leave org-wide. HR Head is always org-wide.</div>
+              </div>
+              <button class="btn btn-primary" id="hr-save">Save HR access</button>
+            </div>`;
+          openModal(`HR access — ${esc(member?.full_name || member?.email || 'member')}`, f);
+
+          const levelEl = f.querySelector('#hr-level');
+          const scopeWrap = f.querySelector('#hr-scope-wrap');
+          const syncScope = () => { scopeWrap.style.display = ['exec', 'manager'].includes(levelEl.value) ? '' : 'none'; };
+          syncScope();
+          levelEl.addEventListener('change', syncScope);
+
+          f.querySelector('#hr-save').addEventListener('click', async () => {
+            const hr_level = levelEl.value;
+            const hr_scope_department_id = ['exec', 'manager'].includes(hr_level) ? (f.querySelector('#hr-scope').value || null) : null;
+            const save = f.querySelector('#hr-save');
+            save.disabled = true; save.textContent = 'Saving…';
+            try {
+              const { data: { session } } = await sb.auth.getSession();
+              const resp = await fetch('/api/create-org', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ action: 'set_hr_access', user_id: targetUserId, hr_level, hr_scope_department_id }),
+              });
+              const result = await resp.json();
+              if (!resp.ok) { toast(result.error || 'Failed to update HR access'); save.disabled = false; save.textContent = 'Save HR access'; return; }
+              await logAction('people', 'membership', targetUserId, 'hr_access_changed', { hr_level: curLevel }, { hr_level, hr_scope_department_id });
+              closeModal();
+              toast('HR access updated');
+              loadMembers();
+            } catch (err) {
+              toast('Failed: ' + err.message); save.disabled = false; save.textContent = 'Save HR access';
+            }
+          });
         });
       });
 
