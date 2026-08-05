@@ -22,7 +22,7 @@ export default async function crmContacts(container) {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
       <div>
         <h1 class="page-title">Contacts</h1>
-        <p class="page-subtitle">People at your accounts</p>
+        <p class="page-subtitle">People at your partners</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
         ${canManageData() ? `<button class="btn btn-secondary" id="import-contacts">Import</button>
@@ -66,7 +66,7 @@ export default async function crmContacts(container) {
     }
 
     el.innerHTML = `<div class="table-wrap"><table class="table">
-      <thead><tr><th>Name</th><th>Title</th><th>Account</th><th>Email</th><th>Phone</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Title</th><th>Partner</th><th>Email</th><th>Phone</th><th></th></tr></thead>
       <tbody>${rows.map(c => `
         <tr>
           <td style="font-weight:var(--font-weight-medium)"><a data-contact="${c.id}" style="color:var(--color-accent);cursor:pointer">${esc(contactName(c))}</a></td>
@@ -95,7 +95,7 @@ export default async function crmContacts(container) {
         ${field('Phone', `<input class="form-input" name="phone" value="${esc(c.phone || '')}">`)}
         ${field('Owner', `<select class="form-input" name="owner_id">${userOptions(users, existing ? c.owner_id : currentUserId())}</select>`)}
       </div>
-      ${field('Account', `<select class="form-input" name="account_id">${accountOptions(accounts, c.account_id)}</select>`)}
+      ${field('Partner', `<select class="form-input" name="account_id">${accountOptions(accounts, c.account_id)}</select>`)}
       <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)">
         <button type="button" class="btn btn-secondary" id="cancel-c">Cancel</button>
         <button type="submit" class="btn btn-primary">${existing ? 'Save' : 'Create contact'}</button>
@@ -209,7 +209,7 @@ export default async function crmContacts(container) {
   document.getElementById('export-contacts')?.addEventListener('click', () => {
     const rows = scopeFilter(contacts, scope)
       .filter(c => !search || contactName(c).toLowerCase().includes(search) || c.email?.toLowerCase().includes(search) || c.account?.name?.toLowerCase().includes(search))
-      .map(c => ({ Name: contactName(c), Title: c.title || '', Account: c.account?.name || '', Email: c.email || '', Phone: c.phone || '' }));
+      .map(c => ({ Name: contactName(c), Title: c.title || '', Partner: c.account?.name || '', Email: c.email || '', Phone: c.phone || '' }));
     downloadCsv('contacts.csv', rows);
   });
   document.getElementById('contact-search').addEventListener('input', (e) => { search = e.target.value.toLowerCase().trim(); render(); });

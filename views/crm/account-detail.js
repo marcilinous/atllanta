@@ -82,7 +82,7 @@ export default async function crmAccountDetail(container) {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-3)">
       <div>
         <h1 class="page-title">${esc(account.name)}</h1>
-        <p class="page-subtitle">${esc(account.industry || 'Account')}${ownerLabel && ownerLabel !== '—' ? ' · Owner: ' + esc(ownerLabel) : ''}</p>
+        <p class="page-subtitle">${esc([account.tier, account.region].filter(Boolean).join(' · ') || 'Partner')}${ownerLabel && ownerLabel !== '—' ? ' · BDE: ' + esc(ownerLabel) : ''}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
         <button class="btn btn-secondary" id="log-visit">Log visit</button>

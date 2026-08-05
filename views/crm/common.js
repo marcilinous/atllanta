@@ -117,7 +117,7 @@ export async function fetchAccountsLite() {
   return data || [];
 }
 
-export function accountOptions(accounts, selectedId, placeholder = '— No account —') {
+export function accountOptions(accounts, selectedId, placeholder = '— No partner —') {
   return `<option value="">${esc(placeholder)}</option>` + accounts.map(a =>
     `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${esc(a.name)}</option>`
   ).join('');
