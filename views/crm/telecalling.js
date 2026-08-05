@@ -1,13 +1,8 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser, getMembership } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, loadingSkeleton } from '../../js/ui.js';
+import { esc, toast, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
-import { publishEvent } from '../../js/events.js';
-import { logAction } from '../../js/audit.js';
-
-const CALL_STATUS = ['Connected', 'No answer', 'Busy', 'Switched off', 'Wrong number', 'Call back later'];
-const OUTCOME = ['Renewed', 'Will renew', 'Considering', 'Not interested', 'Not required', 'Info shared', 'Wrong contact'];
-const OUTCOME_BADGE = { 'Renewed': 'success', 'Will renew': 'info', 'Considering': 'warning', 'Not interested': 'error', 'Not required': 'neutral', 'Info shared': 'info', 'Wrong contact': 'neutral' };
+import { logCallModal } from './telecalling-common.js';
 
 export default async function crmTelecalling(container) {
   const org = getOrg();
@@ -23,9 +18,12 @@ export default async function crmTelecalling(container) {
 
   container.innerHTML = `
     <div style="margin-bottom:var(--space-4)"><button class="btn btn-ghost btn-sm" id="back">← CRM</button></div>
-    <div class="page-header">
-      <h1 class="page-title">Telecalling</h1>
-      <p class="page-subtitle">Your partner call book, prioritised by TSS renewals due. Log every call and set follow-ups.</p>
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-3)">
+      <div>
+        <h1 class="page-title">Telecalling</h1>
+        <p class="page-subtitle">Your partner call book, prioritised by TSS renewals due. Log every call and set follow-ups.</p>
+      </div>
+      <a href="#/crm/telecalling/daily" class="btn btn-primary">Daily update</a>
     </div>
     <div id="tc-picker" style="margin-bottom:var(--space-4)"></div>
     <div id="tc-kpi" class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-5)"></div>
@@ -118,58 +116,13 @@ export default async function crmTelecalling(container) {
     // Reps log calls as themselves; a manager viewing another telecaller can't
     // log on their behalf (insert requires called_by = self).
     if (canManage) return toast('Managers view books; calls are logged by the telecaller.');
-    const f = document.createElement('div');
-    f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
-        <div style="font-size:var(--text-sm)"><strong>${esc(p.name)}</strong>${p.external_id ? ` · <span style="font-family:var(--font-mono)">${esc(p.external_id)}</span>` : ''}
-          <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">TSS last year ${p.tss_lfy} · this year ${p.tss_cfy}${p._due ? ' — renewal due' : ''}</div></div>
-        <div class="crm-cols-2" style="gap:var(--space-3)">
-          <div class="form-group" style="margin:0"><label class="form-label">Call status *</label>
-            <select class="form-input" id="c-status">${CALL_STATUS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}</select></div>
-          <div class="form-group" style="margin:0"><label class="form-label">Outcome</label>
-            <select class="form-input" id="c-outcome"><option value="">— Select —</option>${OUTCOME.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}</select></div>
-        </div>
-        <div class="form-group" style="margin:0"><label class="form-label">Follow-up date</label>
-          <input type="date" class="form-input" id="c-follow" style="max-width:200px"></div>
-        <div class="form-group" style="margin:0"><label class="form-label">Remarks</label>
-          <textarea class="form-input" id="c-remarks" rows="2" placeholder="What was discussed"></textarea></div>
-        <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
-          <button type="button" class="btn btn-secondary" id="c-cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="c-save">Save call</button>
-        </div>
-      </div>`;
-    openModal('Log a call', f);
-    f.querySelector('#c-cancel').addEventListener('click', closeModal);
-    f.querySelector('#c-save').addEventListener('click', async () => {
-      const btn = f.querySelector('#c-save');
-      btn.disabled = true; btn.textContent = 'Saving…';
-      const { data: call, error } = await sb.from('crm_calls').insert({
-        org_id: org.id,
-        account_id: p.account_id,
-        site_id: p.external_id || null,
-        firm_name: p.name,
-        called_by: user.id,
-        called_by_name: user.user_metadata?.full_name || user.email || null,
-        telecaller_name: p.telecaller || null,
-        called_at: new Date().toISOString(),
-        call_status: f.querySelector('#c-status').value,
-        outcome: f.querySelector('#c-outcome').value || null,
-        remarks: f.querySelector('#c-remarks').value.trim() || null,
-        follow_up_date: f.querySelector('#c-follow').value || null,
-        source: 'app',
-      }).select('id').single();
-      if (error || !call) { toast('Could not save call: ' + (error?.message || '')); btn.disabled = false; btn.textContent = 'Save call'; return; }
-      await logAction('crm', 'call', call.id, 'logged', null, { account_id: p.account_id, status: f.querySelector('#c-status').value });
-      await publishEvent('crm.call.logged', { call_id: call.id, account_id: p.account_id });
-      // reflect locally
+    logCallModal({ sb, org, user, partner: p, onSaved: () => {
       p.calls_total = (+p.calls_total || 0) + 1;
       p.called_by_me = true;
       p.last_call_at = new Date().toISOString();
-      closeModal();
-      toast('Call logged');
       renderKpi(book);
       renderList();
-    });
+    } });
   }
 
   container.querySelector('#tc-due').addEventListener('change', (e) => { dueOnly = e.target.checked; renderList(); });
