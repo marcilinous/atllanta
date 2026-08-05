@@ -7,6 +7,7 @@
 // GET   ?action=orgs                             — list orgs + clients hierarchy
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { findOrCreateUser, provisionMember } from "../lib/provisionMember.js";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -17,48 +18,6 @@ async function getUserFromToken(token) {
   });
   if (!resp.ok) return null;
   return resp.json();
-}
-
-// Find an existing auth user by email. Primary path is a direct indexed
-// lookup (RPC) — robust against GoTrue's admin listUsers, which is paginated
-// (misses users past the first page) and 500s outright when any auth.users
-// row has a legacy NULL token column. listUsers paging is kept as a fallback.
-async function findAuthUserByEmail(db, email) {
-  const { data: rpcId, error: rpcErr } = await db.rpc("auth_user_id_by_email", { p_email: email });
-  if (!rpcErr && rpcId) return { id: rpcId };
-
-  const target = email.toLowerCase();
-  const perPage = 1000;
-  for (let page = 1; page <= 100; page++) {
-    const { data, error } = await db.auth.admin.listUsers({ page, perPage });
-    if (error) return null;
-    const users = data?.users || [];
-    const hit = users.find((u) => (u.email || "").toLowerCase() === target);
-    if (hit) return { id: hit.id };
-    if (!users.length) return null; // reached the end
-  }
-  return null;
-}
-
-async function findOrCreateUser(db, email) {
-  // Create first: on the common new-user path this avoids paging the whole
-  // auth list. If the email already exists (including an orphaned account
-  // from a prior failed add), createUser errors and we resolve it by lookup.
-  const tempPassword = crypto.randomUUID().slice(0, 16) + "Ax1!";
-  const { data: newUser, error } = await db.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
-  });
-
-  if (!error && newUser?.user) {
-    return { id: newUser.user.id, new_account: true, temp_password: tempPassword };
-  }
-
-  const existing = await findAuthUserByEmail(db, email);
-  if (existing) return { id: existing.id, new_account: false };
-
-  return { error: "Failed to create user: " + (error?.message || "unknown error") };
 }
 
 export default async function handler(req, res) {
@@ -220,77 +179,19 @@ async function handleInvite(req, res, db, user) {
     return res.status(409).json({ error: "This email is already a member" });
   }
 
-  const authUser = await findOrCreateUser(db, email);
-  if (authUser.error) return res.status(500).json({ error: authUser.error });
-
-  // An existing auth account with no membership anywhere is an orphan — left
-  // by a prior failed add. Give it a fresh temp password so the admin has
-  // shareable credentials, and treat it as a new login. (An account that is
-  // already a member of some org keeps its password untouched.)
-  let isNew = authUser.new_account;
-  let sharePassword = authUser.temp_password || null;
-  if (!authUser.new_account) {
-    const { count } = await db
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", authUser.id);
-    if (!count) {
-      const pw = crypto.randomUUID().slice(0, 16) + "Ax1!";
-      const { error: pwErr } = await db.auth.admin.updateUserById(authUser.id, {
-        password: pw,
-        email_confirm: true,
-      });
-      if (!pwErr) { sharePassword = pw; isNew = true; }
-    }
-  }
-
-  const { error: insertErr } = await db.from("memberships").insert({
-    user_id: authUser.id,
-    organization_id: orgId,
-    role,
-    email,
-    full_name: (full_name || "").trim() || null,
-    client_id: client_id || null,
+  const result = await provisionMember(db, {
+    orgId, email, role, full_name, client_id,
+    department_id, reporting_manager_id, designation, date_of_joining,
   });
-
-  if (insertErr) return res.status(500).json({ error: insertErr.message });
-
-  // Create the employee profile so the person occupies a place in the org
-  // hierarchy — this is what role-based HRMS/CRM (manager visibility, leave
-  // approvals, record ownership) keys off. department_id / reporting_manager
-  // are validated to belong to this org before use.
-  const profile = {
-    id: authUser.id,
-    org_id: orgId,
-    full_name: (full_name || "").trim() || email,
-    email,
-    role,
-    status: "active",
-    designation: (designation || "").trim() || null,
-    date_of_joining: date_of_joining || null,
-  };
-
-  if (department_id) {
-    const { data: dept } = await db.from("departments")
-      .select("id").eq("id", department_id).eq("org_id", orgId).maybeSingle();
-    if (dept) profile.department_id = department_id;
-  }
-  if (reporting_manager_id) {
-    const { data: mgr } = await db.from("users")
-      .select("id").eq("id", reporting_manager_id).eq("org_id", orgId).maybeSingle();
-    if (mgr) profile.reporting_manager_id = reporting_manager_id;
-  }
-
-  const { error: profErr } = await db.from("users").upsert(profile, { onConflict: "id" });
-  if (profErr) return res.status(500).json({ error: "Profile: " + profErr.message });
+  if (result.error) return res.status(500).json({ error: result.error });
 
   return res.json({
     invited: true,
     email,
     role,
-    user_id: authUser.id,
-    new_account: isNew,
-    temp_password: sharePassword,
+    user_id: result.user_id,
+    new_account: result.new_account,
+    temp_password: result.temp_password || null,
   });
 }
 
