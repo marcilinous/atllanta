@@ -57,6 +57,7 @@ export default async function settingsOrg(container) {
       <button class="tab" data-tab="holidays">Holidays</button>
       <button class="tab" data-tab="schedules">Work Schedules</button>
       <button class="tab" data-tab="expenses">Expense Categories</button>
+      <button class="tab" data-tab="access">Access</button>
       <button class="tab" data-tab="integrations">Integrations</button>
     </div>
     <div id="settings-content" style="margin-top:var(--space-4)"></div>
@@ -88,6 +89,7 @@ export default async function settingsOrg(container) {
     else if (currentTab === 'holidays') await renderHolidays();
     else if (currentTab === 'schedules') await renderSchedules();
     else if (currentTab === 'expenses') await renderExpenseCategories();
+    else if (currentTab === 'access') { navigate('settings/access'); return; }
     else if (currentTab === 'integrations') { navigate('settings/integrations'); return; }
   }
 

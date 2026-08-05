@@ -1,3 +1,5 @@
+import { isRouteAllowed } from './features.js';
+
 const routes = {};
 let currentView = null;
 let contentEl = null;
@@ -34,6 +36,18 @@ async function handleRoute() {
       <div class="empty-state-title">Page not found</div>
       <div class="empty-state-desc">The page you're looking for doesn't exist.</div>
     </div>`;
+    return;
+  }
+
+  // Admin/HR-configured module access — block navigation to hidden features.
+  if (!isRouteAllowed(path)) {
+    currentView = path;
+    contentEl.innerHTML = `<div class="empty-state" style="padding:var(--space-16)">
+      <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <div class="empty-state-title">Not available</div>
+      <div class="empty-state-desc">This section has been turned off for your account. Contact your administrator if you need access.</div>
+    </div>`;
+    updateActiveNav(path);
     return;
   }
 
