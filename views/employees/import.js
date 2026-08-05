@@ -180,55 +180,73 @@ export default async function employeeImport(container) {
     importBtn.disabled = true;
     importBtn.textContent = 'Importing...';
     document.getElementById('import-progress').classList.remove('hidden');
+    document.getElementById('progress-bar').style.width = '35%';
+    document.getElementById('progress-text').textContent = `Creating ${parsedRows.length} logins…`;
 
-    const validRoles = ['owner', 'admin', 'manager', 'member'];
-    let imported = 0;
-    let skipped = 0;
-    const errors = [];
-
-    for (let i = 0; i < parsedRows.length; i++) {
-      const row = parsedRows[i];
-      const pct = Math.round(((i + 1) / parsedRows.length) * 100);
-      document.getElementById('progress-bar').style.width = pct + '%';
-      document.getElementById('progress-text').textContent = `Processing ${i + 1} of ${parsedRows.length}...`;
-
-      const role = validRoles.includes(row.role) ? row.role : 'member';
-
-      const { error } = await sb.from('memberships').insert({
-        organization_id: org.id,
-        full_name: row.full_name,
-        email: row.email,
-        phone: row.phone || null,
-        role,
-        invited_at: new Date().toISOString(),
-      });
-
-      if (error) {
-        if (error.message.includes('duplicate') || error.code === '23505') {
-          skipped++;
-        } else {
-          errors.push(`Row ${i + 1} (${row.email}): ${error.message}`);
-        }
-      } else {
-        imported++;
-      }
-    }
-
-    if (imported > 0) {
-      await publishEvent('people.employees.bulk_imported', { count: imported });
-    }
-
-    importBtn.disabled = false;
-    importBtn.textContent = 'Import Employees';
+    const rows = parsedRows.map(r => ({
+      full_name: r.full_name, email: r.email, role: r.role,
+      designation: r.designation || null, date_of_joining: r.date_of_joining || null,
+    }));
 
     const resultEl = document.getElementById('import-result');
-    resultEl.classList.remove('hidden');
-    resultEl.innerHTML = `
-      <div style="padding:var(--space-3);border-radius:var(--radius-md);background:var(--color-success-light);font-size:var(--text-sm)">
-        <div style="font-weight:var(--font-weight-semibold);color:var(--color-success)">Import complete</div>
-        <div>${imported} imported, ${skipped} skipped (duplicates)${errors.length ? `, ${errors.length} errors` : ''}</div>
-      </div>
-      ${errors.length ? `<div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-error)">${errors.slice(0, 5).map(e => esc(e)).join('<br>')}</div>` : ''}
-    `;
+    try {
+      // Goes through the service-role endpoint: each row gets an auth login,
+      // a membership and an employee profile (a plain table insert can't do
+      // that, and can't create logins).
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch('/api/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ type: 'employees', rows }),
+      });
+      const result = await resp.json();
+      document.getElementById('progress-bar').style.width = '100%';
+
+      if (!resp.ok) {
+        resultEl.classList.remove('hidden');
+        resultEl.innerHTML = `<div style="padding:var(--space-3);border-radius:var(--radius-md);background:var(--color-error-light);font-size:var(--text-sm);color:var(--color-error)">${esc(result.error || 'Import failed')}</div>`;
+        return;
+      }
+
+      if (result.imported > 0) await publishEvent('people.employees.bulk_imported', { count: result.imported });
+
+      const creds = result.credentials || [];
+      const errs = result.errors || [];
+      resultEl.classList.remove('hidden');
+      resultEl.innerHTML = `
+        <div style="padding:var(--space-3);border-radius:var(--radius-md);background:var(--color-success-light);font-size:var(--text-sm)">
+          <div style="font-weight:var(--font-weight-semibold);color:var(--color-success)">Import complete</div>
+          <div>${result.imported} added, ${result.skipped} already members${errs.length ? `, ${errs.length} errors` : ''}</div>
+        </div>
+        ${creds.length ? `
+          <div style="margin-top:var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) var(--space-3);background:var(--color-bg-secondary)">
+              <span style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${creds.length} new login${creds.length !== 1 ? 's' : ''} — share these credentials</span>
+              <button class="btn btn-secondary btn-sm" id="dl-creds">Download CSV</button>
+            </div>
+            <div class="table-wrap" style="max-height:240px;overflow:auto"><table class="table">
+              <thead><tr><th>Email</th><th>Temporary password</th></tr></thead>
+              <tbody>${creds.map(c => `<tr><td style="font-size:var(--text-sm)">${esc(c.email)}</td><td style="font-family:var(--font-mono);font-size:var(--text-sm);user-select:all">${esc(c.temp_password)}</td></tr>`).join('')}</tbody>
+            </table></div>
+          </div>` : ''}
+        ${errs.length ? `<div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-error)">${errs.slice(0, 8).map(e => esc(`Row ${e.row}: ${e.error}`)).join('<br>')}</div>` : ''}
+      `;
+
+      resultEl.querySelector('#dl-creds')?.addEventListener('click', () => {
+        const csv = 'Email,Temporary Password\n' + creds.map(c => `"${c.email}","${c.temp_password}"`).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'new_logins.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    } catch (err) {
+      resultEl.classList.remove('hidden');
+      resultEl.innerHTML = `<div style="padding:var(--space-3);border-radius:var(--radius-md);background:var(--color-error-light);font-size:var(--text-sm);color:var(--color-error)">Import failed: ${esc(err.message)}</div>`;
+    } finally {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import Employees';
+    }
   });
 }

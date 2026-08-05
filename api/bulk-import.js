@@ -1,4 +1,5 @@
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { provisionMember } from "../lib/provisionMember.js";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
   let imported = 0;
   let skipped = 0;
   const errors = [];
+  const credentials = []; // { email, temp_password } for new logins to share
 
   if (type === "employees") {
     for (let i = 0; i < rows.length; i++) {
@@ -53,19 +55,21 @@ export default async function handler(req, res) {
         errors.push({ row: i + 1, error: "full_name and email required" });
         continue;
       }
-      const { error } = await sb.from("memberships").insert({
-        organization_id: orgId,
+      const result = await provisionMember(sb, {
+        orgId,
+        email: String(row.email).trim().toLowerCase(),
+        role: row.role,
         full_name: row.full_name,
-        email: row.email,
-        phone: row.phone || null,
-        role: ["owner", "admin", "manager", "member"].includes(row.role) ? row.role : "member",
-        invited_at: new Date().toISOString(),
+        designation: row.designation,
+        date_of_joining: row.date_of_joining || null,
       });
-      if (error) {
-        if (error.code === "23505") skipped++;
-        else errors.push({ row: i + 1, error: error.message });
+      if (result.error) {
+        errors.push({ row: i + 1, error: result.error });
+      } else if (result.membership_existed) {
+        skipped++;
       } else {
         imported++;
+        if (result.temp_password) credentials.push({ email: result.email, temp_password: result.temp_password });
       }
     }
   } else if (type === "candidates") {
@@ -93,5 +97,5 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Unknown import type: ${type}` });
   }
 
-  return res.status(200).json({ imported, skipped, errors: errors.slice(0, 20), total: rows.length });
+  return res.status(200).json({ imported, skipped, errors: errors.slice(0, 20), credentials, total: rows.length });
 }
