@@ -57,6 +57,7 @@ export default async function handler(req, res) {
   if (req.method === "GET" && action === "orgs") return handleOrgs(req, res, db, user);
   if (req.method === "POST" && action === "invite") return handleInvite(req, res, db, user);
   if (req.method === "POST" && action === "reset_password") return handleResetPassword(req, res, db, user);
+  if (req.method === "POST" && action === "set_hr_access") return handleSetHrAccess(req, res, db, user);
   if (req.method === "POST") return handleCreateOrg(req, res, db, user);
 
   return res.status(400).json({ error: "Invalid action" });
@@ -283,6 +284,63 @@ async function handleResetPassword(req, res, db, user) {
   if (error) return res.status(500).json({ error: "Reset failed: " + error.message });
 
   return res.json({ reset: true, email: target.email, temp_password: tempPassword });
+}
+
+// --- Assign HR access (level + optional department scope) to a member ---
+
+async function handleSetHrAccess(req, res, db, user) {
+  const { data: me } = await db
+    .from("memberships")
+    .select("organization_id, role, hr_level")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!me) return res.status(403).json({ error: "Insufficient permissions" });
+
+  const orgAdminRoles = ["owner", "admin", "super_admin", "agency_admin", "client_admin"];
+  const isOrgAdmin = orgAdminRoles.includes(me.role);
+  const isHrHead = me.hr_level === "head";
+  if (!isOrgAdmin && !isHrHead) {
+    return res.status(403).json({ error: "Only admins or HR heads can manage HR access" });
+  }
+
+  const { user_id, hr_level, hr_scope_department_id } = req.body || {};
+  const levels = ["none", "exec", "manager", "head"];
+  if (!user_id) return res.status(400).json({ error: "user_id is required" });
+  if (!levels.includes(hr_level)) return res.status(400).json({ error: "Invalid hr_level" });
+  // Only org admins may mint HR Heads; an HR Head can grant exec/manager only.
+  if (hr_level === "head" && !isOrgAdmin) {
+    return res.status(403).json({ error: "Only org admins can grant HR Head" });
+  }
+
+  const { data: target } = await db
+    .from("memberships")
+    .select("id")
+    .eq("user_id", user_id)
+    .eq("organization_id", me.organization_id)
+    .maybeSingle();
+
+  if (!target) return res.status(404).json({ error: "Member not found in your organization" });
+
+  // Scope only applies to exec/manager, and must be a department in this org.
+  let scope = null;
+  if ((hr_level === "exec" || hr_level === "manager") && hr_scope_department_id) {
+    const { data: dept } = await db
+      .from("departments")
+      .select("id")
+      .eq("id", hr_scope_department_id)
+      .eq("org_id", me.organization_id)
+      .maybeSingle();
+    if (dept) scope = hr_scope_department_id;
+  }
+
+  const { error } = await db
+    .from("memberships")
+    .update({ hr_level, hr_scope_department_id: scope })
+    .eq("id", target.id);
+  if (error) return res.status(500).json({ error: error.message });
+
+  return res.json({ updated: true, user_id, hr_level, hr_scope_department_id: scope });
 }
 
 // --- List team members ---
