@@ -19,10 +19,14 @@ async function getUserFromToken(token) {
   return resp.json();
 }
 
-// Find an existing auth user by email. auth.admin.listUsers() is paginated
-// (default 50/page), so a simple one-call lookup silently misses anyone past
-// the first page once an org grows — page through until a hit or an empty page.
+// Find an existing auth user by email. Primary path is a direct indexed
+// lookup (RPC) — robust against GoTrue's admin listUsers, which is paginated
+// (misses users past the first page) and 500s outright when any auth.users
+// row has a legacy NULL token column. listUsers paging is kept as a fallback.
 async function findAuthUserByEmail(db, email) {
+  const { data: rpcId, error: rpcErr } = await db.rpc("auth_user_id_by_email", { p_email: email });
+  if (!rpcErr && rpcId) return { id: rpcId };
+
   const target = email.toLowerCase();
   const perPage = 1000;
   for (let page = 1; page <= 100; page++) {
@@ -30,7 +34,7 @@ async function findAuthUserByEmail(db, email) {
     if (error) return null;
     const users = data?.users || [];
     const hit = users.find((u) => (u.email || "").toLowerCase() === target);
-    if (hit) return hit;
+    if (hit) return { id: hit.id };
     if (!users.length) return null; // reached the end
   }
   return null;
