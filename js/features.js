@@ -16,22 +16,39 @@ export const FEATURES = [
   { key: 'me', label: 'My attendance & leave' },
   { key: 'inbox', label: 'Approvals inbox' },
   { key: 'people', label: 'People & Employees' },
+  { key: 'recruitment', label: 'Recruitment (hiring)' },
   { key: 'crm', label: 'CRM' },
+  { key: 'crm_leads', label: 'CRM · Leads' },
+  { key: 'crm_pipeline', label: 'CRM · Pipeline (deals)' },
+  { key: 'crm_contacts', label: 'CRM · Contacts' },
   { key: 'documents', label: 'Documents' },
   { key: 'finance', label: 'Finance' },
   { key: 'reports', label: 'Reports' },
+  { key: 'helpdesk', label: 'Helpdesk' },
+  { key: 'announcements', label: 'Announcements' },
+  { key: 'ai', label: 'AI assistant' },
 ];
 
 // Route base -> feature key (mirrors router.js nav aliases).
 const ALIAS = {
-  employees: 'people', recruitment: 'people', lifecycle: 'people', assets: 'people', letters: 'people',
+  employees: 'people', lifecycle: 'people', assets: 'people', letters: 'people',
   approvals: 'inbox',
   leave: 'me', attendance: 'me',
-  announcements: 'admin', audit: 'admin',
+  audit: 'admin',
+};
+
+// CRM sub-routes map to their own toggle so the generic Salesforce screens can
+// be hidden without hiding the whole CRM.
+const CRM_SUB = {
+  leads: 'crm_leads', lead: 'crm_leads',
+  opportunities: 'crm_pipeline', opportunity: 'crm_pipeline',
+  contacts: 'crm_contacts', contact: 'crm_contacts',
 };
 
 export function featureForRoute(path) {
-  const base = (path || '').split('/')[0].split('?')[0];
+  const parts = (path || '').split('?')[0].split('/');
+  const base = parts[0];
+  if (base === 'crm') return CRM_SUB[parts[1] || ''] || 'crm';
   return ALIAS[base] || base;
 }
 

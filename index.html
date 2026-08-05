@@ -273,6 +273,9 @@ FEATURES.forEach(f => {
   if (f.locked || isFeatureAllowed(f.key)) return;
   document.querySelectorAll(`.nav-btn[data-view="${f.key}"]`).forEach(btn => { btn.style.display = 'none'; });
 });
+if (!isFeatureAllowed('ai')) {
+  document.getElementById('ai-toggle-btn')?.style.setProperty('display', 'none');
+}
 
 // Dark mode
 const savedTheme = localStorage.getItem('atllanta-theme');

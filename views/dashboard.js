@@ -1,6 +1,7 @@
 import sb from '../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../js/auth.js';
 import { esc, toast, timeAgo, initials, avColor, openModal, closeModal, formatDate } from '../js/ui.js';
+import { isRouteAllowed } from '../js/features.js';
 
 export default async function dashboard(container) {
   const org = getOrg();
@@ -298,7 +299,7 @@ export default async function dashboard(container) {
       { label: 'Won this month', value: money(won), route: 'reports/crm', color: 'var(--color-success)' },
       { label: 'Open tickets', value: String(tickets.count || 0), route: 'helpdesk', color: tickets.count ? 'var(--color-warning)' : '' },
       { label: 'Expenses pending', value: money(expPendTotal), route: 'finance' },
-    ];
+    ].filter(t => isRouteAllowed(t.route));
 
     el.innerHTML = `<div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);margin-bottom:var(--space-6)">
       ${tiles.map(t => `<a href="#/${t.route}" class="card" style="text-decoration:none;padding:var(--space-4)">

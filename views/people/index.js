@@ -1,6 +1,7 @@
 import { getOrg, getMembership } from '../../js/auth.js';
 import { esc } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
+import { isFeatureAllowed } from '../../js/features.js';
 
 export default async function peopleHub(container) {
   const org = getOrg();
@@ -63,10 +64,11 @@ export default async function peopleHub(container) {
       route: 'recruitment',
       color: 'var(--color-warning)',
       requiresAdmin: true,
+      feature: 'recruitment',
     },
   ];
 
-  const visible = sections.filter(s => !s.requiresAdmin || isAdmin);
+  const visible = sections.filter(s => (!s.requiresAdmin || isAdmin) && (!s.feature || isFeatureAllowed(s.feature)));
 
   container.innerHTML = `
     <div style="margin-bottom:var(--space-6)">
