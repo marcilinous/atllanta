@@ -3,6 +3,16 @@ import { getUser, getOrg, getMembership } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal, formatDate, initials, avColor } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
 import { logAction } from '../../js/audit.js';
+import { makeRenditions, formatBytes } from '../../js/image.js';
+
+const ATT_BUCKET = 'attendance-selfies';
+const thumbOf = (p) => p ? p.replace(/\.jpg$/, '_thumb.jpg') : p;
+function distanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toR = (d) => d * Math.PI / 180;
+  const dLat = toR(lat2 - lat1), dLng = toR(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
 export default async function attendanceDashboard(container) {
   const user = getUser();
@@ -24,7 +34,7 @@ export default async function attendanceDashboard(container) {
   let myRegs = [];
   let teamData = [];
   let myAtt = null;
-  let currentLat = null, currentLng = null;
+  let activeLocations = [];
 
   container.innerHTML = `
     <div class="page-header" style="margin-bottom:var(--space-4);display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-2)">
@@ -33,6 +43,7 @@ export default async function attendanceDashboard(container) {
         <p class="page-subtitle">${today.toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
+        ${membership && ['owner', 'admin'].includes(membership.role) ? '<a href="#/attendance/locations" class="btn btn-secondary btn-sm">Locations</a>' : ''}
         ${isManager ? '<a href="#/attendance/report" class="btn btn-secondary btn-sm">Report</a>' : ''}
         <a href="#/attendance/regularize" class="btn btn-secondary btn-sm">Regularize</a>
       </div>
@@ -123,25 +134,19 @@ export default async function attendanceDashboard(container) {
   tickClock();
   const clockInterval = setInterval(tickClock, 1000);
 
-  // Geolocation
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      currentLat = pos.coords.latitude;
-      currentLng = pos.coords.longitude;
-    }, () => {});
-  }
-
   // Load initial data
-  const [attResult, monthResult, regsResult] = await Promise.all([
+  const [attResult, monthResult, regsResult, locResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
     loadMonthData(viewYear, viewMonth),
     sb.from('attendance_regularizations').select('*, attendance:attendance_id(date)').eq('user_id', user.id).order('created_at', { ascending: false }),
+    sb.from('work_locations').select('id, name, lat, lng, radius_m').eq('is_active', true),
   ]);
 
   if (attResult.error) toast('Failed to load attendance: ' + attResult.error.message);
   myAtt = attResult.data;
   myMonthData = monthResult;
   myRegs = regsResult.data || [];
+  activeLocations = locResult.data || [];
 
   renderCheckinCard();
   renderMonthStats();
@@ -229,34 +234,157 @@ export default async function attendanceDashboard(container) {
     return diff.toFixed(1) + 'h';
   }
 
+  // Fresh, accurate GPS reading as a promise (never rejects).
+  function getPosition() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: +pos.coords.latitude.toFixed(7), lng: +pos.coords.longitude.toFixed(7), acc: Math.round(pos.coords.accuracy) }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  }
+
+  function nearestLocation(lat, lng) {
+    let best = null;
+    for (const l of activeLocations) {
+      const d = distanceM(lat, lng, +l.lat, +l.lng);
+      if (!best || d < best.dist) best = { loc: l, dist: d };
+    }
+    return best;
+  }
+
+  function geofenceMessage(msg) {
+    if (/OUTSIDE_ALLOTTED_LOCATION/.test(msg || '')) return 'You must be at an allotted work location to mark attendance.';
+    if (/LOCATION_REQUIRED/.test(msg || '')) return 'Enable location to mark attendance at your workplace.';
+    return 'Attendance failed: ' + msg;
+  }
+
+  // Modal that captures fresh GPS + a selfie and checks the geofence. Resolves
+  // to { coords, renditions } when confirmed, or null when cancelled. The
+  // server trigger enforces the geofence too; this just guides the user.
+  function capturePunch(kind) {
+    return new Promise((resolve) => {
+      let coords = null, renditions = null, settled = false, geoOk = false;
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <div style="display:grid;gap:var(--space-4)">
+          <div id="cp-geo" style="font-size:var(--text-sm);color:var(--color-text-secondary)">Getting your location…</div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Selfie <span style="color:var(--color-error)">*</span></label>
+            <input type="file" accept="image/*" capture="user" id="cp-file" style="display:none">
+            <div id="cp-drop" style="border:1.5px dashed var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);text-align:center;cursor:pointer">
+              <div id="cp-empty" style="color:var(--color-text-secondary);font-size:var(--text-sm)">Tap to take a photo — compressed on your phone before upload.</div>
+              <div id="cp-prev" style="display:none;align-items:center;gap:var(--space-3);justify-content:center"></div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
+            <button type="button" class="btn btn-secondary" id="cp-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="cp-confirm" disabled>${kind === 'in' ? 'Check in' : 'Check out'}</button>
+          </div>
+        </div>`;
+      openModal(kind === 'in' ? 'Check in' : 'Check out', body);
+
+      const geo = body.querySelector('#cp-geo');
+      const confirmBtn = body.querySelector('#cp-confirm');
+      const fileInput = body.querySelector('#cp-file');
+      const emptyEl = body.querySelector('#cp-empty');
+      const prev = body.querySelector('#cp-prev');
+      const refresh = () => { confirmBtn.disabled = !(geoOk && renditions); };
+
+      getPosition().then((pos) => {
+        coords = pos;
+        if (!pos) {
+          geoOk = activeLocations.length === 0;
+          geo.innerHTML = activeLocations.length
+            ? `<span style="color:var(--color-error)">Location needed — enable GPS to mark attendance at your workplace.</span>`
+            : `Location unavailable — attendance is open, you can continue.`;
+        } else if (!activeLocations.length) {
+          geoOk = true;
+          geo.innerHTML = `At ${pos.lat}, ${pos.lng} <span style="color:var(--color-text-tertiary)">(±${pos.acc}m)</span> · no geofence set`;
+        } else {
+          const near = nearestLocation(pos.lat, pos.lng);
+          if (near && near.dist <= near.loc.radius_m) {
+            geoOk = true;
+            geo.innerHTML = `<span style="color:var(--color-success)">At ${esc(near.loc.name)}</span> · ${Math.round(near.dist)}m away (within ${near.loc.radius_m}m)`;
+          } else {
+            geoOk = false;
+            geo.innerHTML = near
+              ? `<span style="color:var(--color-error)">Not at an allotted location</span> — nearest is ${esc(near.loc.name)}, ${Math.round(near.dist)}m away (limit ${near.loc.radius_m}m).`
+              : `<span style="color:var(--color-error)">Not at an allotted location.</span>`;
+          }
+        }
+        refresh();
+      });
+
+      body.querySelector('#cp-drop').addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        emptyEl.style.display = 'none'; prev.style.display = 'flex';
+        prev.innerHTML = `<span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Compressing…</span>`;
+        try {
+          renditions = await makeRenditions(file);
+          const url = URL.createObjectURL(renditions.thumb);
+          prev.innerHTML = `<img src="${url}" style="width:56px;height:56px;object-fit:cover;border-radius:var(--radius-md)">
+            <div style="text-align:left;font-size:var(--text-xs);color:var(--color-text-secondary)"><div>${formatBytes(file.size)} → <strong>${formatBytes(renditions.full.size)}</strong></div><div style="color:var(--color-accent);cursor:pointer" id="cp-redo">Retake</div></div>`;
+          prev.querySelector('#cp-redo').addEventListener('click', (ev) => { ev.stopPropagation(); fileInput.value = ''; fileInput.click(); });
+        } catch { renditions = null; prev.style.display = 'none'; emptyEl.style.display = 'block'; toast('Could not process that photo'); }
+        refresh();
+      });
+
+      const done = (val) => { if (settled) return; settled = true; closeModal(); resolve(val); };
+      body.querySelector('#cp-cancel').addEventListener('click', () => done(null));
+      confirmBtn.addEventListener('click', () => done({ coords, renditions }));
+    });
+  }
+
+  async function uploadPunchSelfie(attId, kind, renditions) {
+    const full = `${org.id}/${attId}_${kind}.jpg`;
+    const a = await sb.storage.from(ATT_BUCKET).upload(full, renditions.full, { contentType: 'image/jpeg', upsert: true });
+    const b = await sb.storage.from(ATT_BUCKET).upload(thumbOf(full), renditions.thumb, { contentType: 'image/jpeg', upsert: true });
+    return (a.error || b.error) ? null : full;
+  }
+
   async function handleCheckIn() {
+    const cap = await capturePunch('in');
+    if (!cap) return;
     const btn = document.getElementById('att-action-btn');
     btn.disabled = true;
     const now = new Date().toISOString();
     const { data, error } = await sb.from('attendance').insert({
       org_id: org.id, user_id: user.id, date: todayStr, check_in: now, status: 'present',
-      check_in_lat: currentLat, check_in_lng: currentLng,
+      check_in_lat: cap.coords?.lat ?? null, check_in_lng: cap.coords?.lng ?? null,
     }).select().single();
-    if (error) { toast('Check-in failed: ' + error.message); btn.disabled = false; return; }
+    if (error) { toast(geofenceMessage(error.message)); btn.disabled = false; renderCheckinCard(); return; }
     myAtt = data;
-    await logAction('attendance', 'attendance', myAtt.id, 'check_in', null, { date: todayStr, check_in: now });
+    const path = await uploadPunchSelfie(myAtt.id, 'in', cap.renditions);
+    if (path) { const u = await sb.from('attendance').update({ check_in_selfie_path: path }).eq('id', myAtt.id).select().single(); if (u.data) myAtt = u.data; }
+    else toast('Checked in, but the selfie upload failed');
+    await logAction('attendance', 'attendance', myAtt.id, 'check_in', null, { date: todayStr, check_in: now, location_id: myAtt.check_in_location_id });
     await publishEvent('attendance.checkin.completed', { user_id: user.id, org_id: org.id, check_in_time: now });
     toast('Checked in!');
     renderCheckinCard();
   }
 
   async function handleCheckOut() {
+    const cap = await capturePunch('out');
+    if (!cap) return;
     const btn = document.getElementById('att-action-btn');
     btn.disabled = true;
     const now = new Date();
     const totalHours = ((now - new Date(myAtt.check_in)) / 3600000).toFixed(2);
     const { data, error } = await sb.from('attendance').update({
       check_out: now.toISOString(), total_hours: parseFloat(totalHours),
-      check_out_lat: currentLat, check_out_lng: currentLng,
+      check_out_lat: cap.coords?.lat ?? null, check_out_lng: cap.coords?.lng ?? null,
     }).eq('id', myAtt.id).select().single();
-    if (error) { toast('Check-out failed: ' + error.message); btn.disabled = false; return; }
+    if (error) { toast(geofenceMessage(error.message)); btn.disabled = false; renderCheckinCard(); return; }
     myAtt = data;
-    await logAction('attendance', 'attendance', myAtt.id, 'check_out', null, { check_out: now.toISOString(), total_hours: totalHours });
+    const path = await uploadPunchSelfie(myAtt.id, 'out', cap.renditions);
+    if (path) { const u = await sb.from('attendance').update({ check_out_selfie_path: path }).eq('id', myAtt.id).select().single(); if (u.data) myAtt = u.data; }
+    else toast('Checked out, but the selfie upload failed');
+    await logAction('attendance', 'attendance', myAtt.id, 'check_out', null, { check_out: now.toISOString(), total_hours: totalHours, location_id: myAtt.check_out_location_id });
     toast('Checked out!');
     renderCheckinCard();
   }
@@ -382,6 +510,7 @@ export default async function attendanceDashboard(container) {
           <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Status:</span>
           <span class="badge badge-${statusBadge[att.status] || 'neutral'}"><span class="badge-dot"></span>${esc(att.status)}</span>
         </div>
+        <div id="day-selfies"></div>
         ${hasExistingReg
           ? '<div style="padding:var(--space-3);background:var(--color-warning-light);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--color-warning)">A regularization request is already pending for this date.</div>'
           : `<div style="border-top:1px solid var(--color-border);padding-top:var(--space-3)">
@@ -399,6 +528,25 @@ export default async function attendanceDashboard(container) {
     `;
 
     openModal(formatDate(dateStr), f);
+
+    // Punch selfies (signed thumbnails; open full in a new tab).
+    (async () => {
+      const selfiesEl = f.querySelector('#day-selfies');
+      if (!selfiesEl) return;
+      const items = [];
+      if (att.check_in_selfie_path) items.push(['In', thumbOf(att.check_in_selfie_path), att.check_in_selfie_path]);
+      if (att.check_out_selfie_path) items.push(['Out', thumbOf(att.check_out_selfie_path), att.check_out_selfie_path]);
+      if (!items.length) return;
+      const { data: urls } = await sb.storage.from(ATT_BUCKET).createSignedUrls(items.map(i => i[1]), 3600);
+      const sig = {}; (urls || []).forEach(u => { if (u.signedUrl) sig[u.path] = u.signedUrl; });
+      selfiesEl.innerHTML = `<div style="display:flex;gap:var(--space-3)">${items.map(([label, tp, full]) =>
+        sig[tp] ? `<div style="text-align:center"><img src="${sig[tp]}" data-full="${esc(full)}" class="day-selfie" style="width:72px;height:72px;object-fit:cover;border-radius:var(--radius-md);cursor:pointer;border:1px solid var(--color-border)"><div style="font-size:10px;color:var(--color-text-tertiary);margin-top:2px">${label}</div></div>` : ''
+      ).join('')}</div>`;
+      selfiesEl.querySelectorAll('.day-selfie').forEach(img => img.addEventListener('click', async () => {
+        const { data } = await sb.storage.from(ATT_BUCKET).createSignedUrl(img.dataset.full, 3600);
+        if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+      }));
+    })();
 
     if (!hasExistingReg) {
       f.querySelector('#day-reg-submit')?.addEventListener('click', async () => {
