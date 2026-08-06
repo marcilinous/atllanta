@@ -56,8 +56,14 @@ const KNOWN = new Set(FEATURES.map(f => f.key));
 
 // Module state: which feature keys are hidden for the current user.
 let _disallowed = new Set();
-let _bypass = true;        // admins bypass all gating
+let _bypass = true;        // admins bypass all per-role gating
 let _loaded = false;
+let _crmEnabled = true;    // platform gate: CRM suite enabled for this org?
+
+// The CRM (Tally partner) suite is proprietary — enabled per organization at
+// the platform level. Unlike per-role access, this is NOT bypassed by an org's
+// own admins: an org it isn't enabled for never sees CRM.
+export function setCrmEnabled(v) { _crmEnabled = v !== false; }
 
 // Compute the current user's hidden features from stored rules. Owners/admins
 // bypass entirely. Precedence: user override > role default > visible.
@@ -87,6 +93,8 @@ export async function loadFeatureAccess({ orgId, userId, role, isAdmin }) {
 }
 
 export function isFeatureAllowed(key) {
+  // Platform gate first (admins do NOT bypass this).
+  if (!_crmEnabled && (key === 'crm' || key.startsWith('crm_'))) return false;
   if (!_loaded || _bypass) return true;
   if (!KNOWN.has(key)) return true;   // unknown/uncontrolled routes stay open
   return !_disallowed.has(key);
