@@ -37,13 +37,27 @@ const ALIAS = {
   audit: 'admin',
 };
 
-// CRM sub-routes map to their own toggle so the generic Salesforce screens can
-// be hidden without hiding the whole CRM.
+// CRM sub-routes map to their own key. Generic screens gate with the base CRM;
+// the partner-vertical screens gate with the partner pack (see PARTNER_FEATURES).
 const CRM_SUB = {
   leads: 'crm_leads', lead: 'crm_leads',
   opportunities: 'crm_pipeline', opportunity: 'crm_pipeline',
   contacts: 'crm_contacts', contact: 'crm_contacts',
+  visits: 'crm_visits',
+  telecalling: 'crm_telecalling',
+  coverage: 'crm_coverage',
+  sales: 'crm_sales',
+  targets: 'crm_targets',
+  opps: 'crm_opps',
+  reports: 'crm_reports',
 };
+
+// The RT partner vertical pack — only orgs with partner_crm_enabled see these.
+const PARTNER_FEATURES = new Set([
+  'crm_visits', 'crm_telecalling', 'crm_coverage', 'crm_sales', 'crm_targets', 'crm_opps', 'crm_reports',
+]);
+// Generic CRM keys gated by crm_enabled (the standard baseline).
+const GENERIC_CRM = new Set(['crm', 'crm_leads', 'crm_pipeline', 'crm_contacts']);
 
 export function featureForRoute(path) {
   const parts = (path || '').split('?')[0].split('/');
@@ -58,12 +72,14 @@ const KNOWN = new Set(FEATURES.map(f => f.key));
 let _disallowed = new Set();
 let _bypass = true;        // admins bypass all per-role gating
 let _loaded = false;
-let _crmEnabled = true;    // platform gate: CRM suite enabled for this org?
+let _crmEnabled = true;    // platform gate: generic CRM enabled for this org?
+let _partnerPack = false;  // platform gate: RT partner vertical pack enabled?
 
-// The CRM (Tally partner) suite is proprietary — enabled per organization at
-// the platform level. Unlike per-role access, this is NOT bypassed by an org's
-// own admins: an org it isn't enabled for never sees CRM.
+// Platform gates, set per organization at bootstrap. Unlike per-role access,
+// these are NOT bypassed by an org's own admins.
 export function setCrmEnabled(v) { _crmEnabled = v !== false; }
+export function setPartnerPack(v) { _partnerPack = v === true; }
+export function hasPartnerPack() { return _partnerPack; }
 
 // Compute the current user's hidden features from stored rules. Owners/admins
 // bypass entirely. Precedence: user override > role default > visible.
@@ -93,8 +109,9 @@ export async function loadFeatureAccess({ orgId, userId, role, isAdmin }) {
 }
 
 export function isFeatureAllowed(key) {
-  // Platform gate first (admins do NOT bypass this).
-  if (!_crmEnabled && (key === 'crm' || key.startsWith('crm_'))) return false;
+  // Platform gates first (admins do NOT bypass these).
+  if (GENERIC_CRM.has(key) && !_crmEnabled) return false;
+  if (PARTNER_FEATURES.has(key) && !_partnerPack) return false;
   if (!_loaded || _bypass) return true;
   if (!KNOWN.has(key)) return true;   // unknown/uncontrolled routes stay open
   return !_disallowed.has(key);

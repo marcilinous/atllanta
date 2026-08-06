@@ -140,7 +140,7 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
-import { loadFeatureAccess, isFeatureAllowed, FEATURES, setCrmEnabled } from '/js/features.js';
+import { loadFeatureAccess, isFeatureAllowed, FEATURES, setCrmEnabled, setPartnerPack } from '/js/features.js';
 import { onUnreadChange, onNewNotification, notifTarget, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
@@ -269,6 +269,7 @@ document.querySelectorAll('.nav-btn[data-role="admin"]').forEach(btn => {
 // this user (admins bypass). Loaded before the router so the first route is
 // gated too.
 setCrmEnabled(org?.crm_enabled);
+setPartnerPack(org?.partner_crm_enabled);
 await loadFeatureAccess({ orgId: org?.id, userId: user?.id, role: userRole, isAdmin });
 FEATURES.forEach(f => {
   if (f.locked || isFeatureAllowed(f.key)) return;

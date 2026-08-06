@@ -6,6 +6,7 @@ import { publishEvent } from '../../js/events.js';
 import { navigate, routeParams } from '../../js/router.js';
 import { money, contactName, field, ownerName, fetchOrgUsers } from './common.js';
 import { renderTimeline, openActivityModal } from './activities.js';
+import { hasPartnerPack } from '../../js/features.js';
 
 const VISIT_BUCKET = 'visit-selfies';
 const vThumb = (p) => p ? p.replace(/\.jpg$/, '_thumb.jpg') : p;
@@ -47,6 +48,7 @@ export default async function crmAccountDetail(container) {
   ]);
   const ownerLabel = account.owner_id ? ownerName(users, account.owner_id) : null;
   const visits = visitData || [];
+  const partner = hasPartnerPack();
 
   // Business summary from this partner's Sales (activation) rows: TP (New),
   // TSS and activation revenue, current fiscal year vs last.
@@ -69,7 +71,7 @@ export default async function crmAccountDetail(container) {
       <div style="font-size:var(--text-xs);color:${col}">LFY ${fmt(lfy)}</div>
     </div>`;
   };
-  const hasSales = (salesData || []).length > 0;
+  const hasSales = partner && (salesData || []).length > 0;
 
   const infoRow = (label, val) => val ? `<div style="display:flex;justify-content:space-between;gap:var(--space-4);padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light)">
     <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(label)}</span>
@@ -82,10 +84,12 @@ export default async function crmAccountDetail(container) {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:var(--space-3)">
       <div>
         <h1 class="page-title">${esc(account.name)}</h1>
-        <p class="page-subtitle">${esc([account.tier, account.region].filter(Boolean).join(' · ') || 'Partner')}${ownerLabel && ownerLabel !== '—' ? ' · BDE: ' + esc(ownerLabel) : ''}</p>
+        <p class="page-subtitle">${partner
+          ? esc([account.tier, account.region].filter(Boolean).join(' · ') || 'Partner') + (ownerLabel && ownerLabel !== '—' ? ' · BDE: ' + esc(ownerLabel) : '')
+          : esc([account.industry, account.billing_city].filter(Boolean).join(' · ') || 'Account') + (ownerLabel && ownerLabel !== '—' ? ' · Owner: ' + esc(ownerLabel) : '')}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        <button class="btn btn-secondary" id="log-visit">Log visit</button>
+        ${partner ? '<button class="btn btn-secondary" id="log-visit">Log visit</button>' : ''}
         <button class="btn btn-secondary" id="log-activity">Log activity</button>
         <button class="btn btn-primary" id="new-deal">+ Deal</button>
       </div>
@@ -128,13 +132,13 @@ export default async function crmAccountDetail(container) {
           <div id="contacts-body">${renderContacts(contacts || [])}</div>
         </div>
 
-        <div class="card">
+        ${partner ? `<div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
             <span class="card-title">Visits (${visits.length})</span>
             <button class="btn btn-ghost btn-sm" id="log-visit-2">+ Log</button>
           </div>
           <div id="visits-body">${renderVisits(visits)}</div>
-        </div>
+        </div>` : ''}
 
         <div class="card">
           <div class="card-header"><span class="card-title">Opportunities (${(opps || []).length})</span></div>
