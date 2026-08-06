@@ -1,0 +1,13 @@
+-- ============================================================
+-- CRM BECOMES THE GENERIC BASELINE — default it ON for new orgs
+-- ============================================================
+-- CRM was originally proprietary to the operator (crm_enabled defaulted OFF,
+-- see 20260805200000_org_crm_gate.sql). It is now productised: the generic CRM
+-- baseline (Accounts / Contacts / Leads / Pipeline) ships to every organization,
+-- while the RT partner vertical pack stays gated by partner_crm_enabled
+-- (see 20260806060000_org_partner_crm_pack.sql).
+--
+-- So new organizations should get the generic CRM by default. The partner pack
+-- remains OFF by default and is enabled per organization.
+-- ============================================================
+ALTER TABLE organizations ALTER COLUMN crm_enabled SET DEFAULT true;
