@@ -1,0 +1,20 @@
+# Only the shell's source of truth is tracked (template/, setup.sh, README).
+# Everything below is generated locally by ./setup.sh and Flutter builds — it's
+# regenerated on demand and must not bloat the repo.
+
+/lib/
+/android/
+/ios/
+/linux/
+/macos/
+/windows/
+/web/
+/build/
+/.dart_tool/
+/.flutter-plugins
+/.flutter-plugins-dependencies
+/.metadata
+pubspec.yaml
+pubspec.lock
+*.iml
+.idea/
