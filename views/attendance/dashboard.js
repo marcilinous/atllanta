@@ -4,8 +4,17 @@ import { esc, toast, openModal, closeModal, formatDate, initials, avColor } from
 import { publishEvent } from '../../js/events.js';
 import { logAction } from '../../js/audit.js';
 import { makeRenditions, formatBytes } from '../../js/image.js';
+import { enqueue } from '../../js/outbox.js';
 
 const ATT_BUCKET = 'attendance-selfies';
+// A Supabase write failed because of the network (offline / unreachable), as
+// opposed to a real rejection like the geofence trigger. Those get queued.
+function isNetworkError(error) {
+  if (!navigator.onLine) return true;
+  const m = String((error && error.message) || '').toLowerCase();
+  return /failed to fetch|network|load failed|fetch event|timeout|offline/.test(m);
+}
+const uuid = () => (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + '-' + Math.random().toString(16).slice(2));
 const thumbOf = (p) => p ? p.replace(/\.jpg$/, '_thumb.jpg') : p;
 function distanceM(lat1, lng1, lat2, lng2) {
   const R = 6371000, toR = (d) => d * Math.PI / 180;
@@ -354,11 +363,20 @@ export default async function attendanceDashboard(container) {
     const btn = document.getElementById('att-action-btn');
     btn.disabled = true;
     const now = new Date().toISOString();
-    const { data, error } = await sb.from('attendance').insert({
-      org_id: org.id, user_id: user.id, date: todayStr, check_in: now, status: 'present',
+    // Client-generated id so an offline check-in and its later check-out share
+    // the same row, and a replay upserts rather than duplicates.
+    const row = {
+      id: uuid(), org_id: org.id, user_id: user.id, date: todayStr, check_in: now, status: 'present',
       check_in_lat: cap.coords?.lat ?? null, check_in_lng: cap.coords?.lng ?? null,
-    }).select().single();
-    if (error) { toast(geofenceMessage(error.message)); btn.disabled = false; renderCheckinCard(); return; }
+    };
+
+    if (!navigator.onLine) return queueCheckIn(row, cap.renditions);
+
+    const { data, error } = await sb.from('attendance').insert(row).select().single();
+    if (error) {
+      if (isNetworkError(error)) return queueCheckIn(row, cap.renditions);
+      toast(geofenceMessage(error.message)); btn.disabled = false; renderCheckinCard(); return;
+    }
     myAtt = data;
     const path = await uploadPunchSelfie(myAtt.id, 'in', cap.renditions);
     if (path) { const u = await sb.from('attendance').update({ check_in_selfie_path: path }).eq('id', myAtt.id).select().single(); if (u.data) myAtt = u.data; }
@@ -369,6 +387,15 @@ export default async function attendanceDashboard(container) {
     renderCheckinCard();
   }
 
+  // Save the check-in to the offline outbox and reflect it optimistically. The
+  // selfie blobs ride along and upload when the queue flushes.
+  async function queueCheckIn(row, renditions) {
+    await enqueue('attendance.checkin', { row }, renditions ? { full: renditions.full, thumb: renditions.thumb } : null);
+    myAtt = { ...row, _pendingSync: true };
+    toast('Saved offline — will sync when you\'re back online');
+    renderCheckinCard();
+  }
+
   async function handleCheckOut() {
     const cap = await capturePunch('out');
     if (!cap) return;
@@ -376,17 +403,36 @@ export default async function attendanceDashboard(container) {
     btn.disabled = true;
     const now = new Date();
     const totalHours = ((now - new Date(myAtt.check_in)) / 3600000).toFixed(2);
-    const { data, error } = await sb.from('attendance').update({
+    const updates = {
       check_out: now.toISOString(), total_hours: parseFloat(totalHours),
       check_out_lat: cap.coords?.lat ?? null, check_out_lng: cap.coords?.lng ?? null,
-    }).eq('id', myAtt.id).select().single();
-    if (error) { toast(geofenceMessage(error.message)); btn.disabled = false; renderCheckinCard(); return; }
+    };
+
+    if (!navigator.onLine) return queueCheckOut(updates, cap.renditions);
+
+    const { data, error } = await sb.from('attendance').update(updates).eq('id', myAtt.id).select().single();
+    if (error) {
+      if (isNetworkError(error)) return queueCheckOut(updates, cap.renditions);
+      toast(geofenceMessage(error.message)); btn.disabled = false; renderCheckinCard(); return;
+    }
     myAtt = data;
     const path = await uploadPunchSelfie(myAtt.id, 'out', cap.renditions);
     if (path) { const u = await sb.from('attendance').update({ check_out_selfie_path: path }).eq('id', myAtt.id).select().single(); if (u.data) myAtt = u.data; }
     else toast('Checked out, but the selfie upload failed');
     await logAction('attendance', 'attendance', myAtt.id, 'check_out', null, { check_out: now.toISOString(), total_hours: totalHours, location_id: myAtt.check_out_location_id });
     toast('Checked out!');
+    renderCheckinCard();
+  }
+
+  // Queue the check-out offline, keyed by the row id (which may itself still be
+  // a pending check-in — the outbox replays oldest-first, so the insert lands
+  // before this update).
+  async function queueCheckOut(updates, renditions) {
+    await enqueue('attendance.checkout',
+      { id: myAtt.id, org_id: org.id, updates },
+      renditions ? { full: renditions.full, thumb: renditions.thumb } : null);
+    myAtt = { ...myAtt, ...updates, _pendingSync: true };
+    toast('Saved offline — will sync when you\'re back online');
     renderCheckinCard();
   }
 
