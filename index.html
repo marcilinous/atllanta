@@ -88,6 +88,13 @@
       <button class="topbar-icon-btn" id="ai-toggle-btn" title="AI Assistant">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
       </button>
+      <button class="sync-pill hidden" id="sync-pill" title="Items waiting to sync">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.7"/><path d="M21 3v6h-6"/></svg>
+        <span id="sync-pill-text">0</span>
+      </button>
+      <button class="topbar-icon-btn hidden" id="install-btn" title="Install app">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
       <button class="topbar-icon-btn" id="notif-btn" title="Notifications">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-dot hidden" id="notif-dot"></span>
@@ -145,6 +152,8 @@ import { onUnreadChange, onNewNotification, notifTarget, fetchUnreadCount, fetch
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 import { startEventProcessor } from '/js/event-processor.js';
+import { initOutbox, onOutboxChange } from '/js/outbox.js';
+import { registerOutboxHandlers } from '/js/outbox-handlers.js';
 
 // Views
 import dashboard from '/views/dashboard.js';
@@ -278,6 +287,37 @@ FEATURES.forEach(f => {
 if (!isFeatureAllowed('ai')) {
   document.getElementById('ai-toggle-btn')?.style.setProperty('display', 'none');
 }
+
+// Offline outbox — queue field writes (check-in, …) when signal drops and
+// replay them on reconnect. Register handlers before wiring the flush triggers
+// so a job queued in an earlier session flushes no matter which view is open.
+registerOutboxHandlers();
+initOutbox();
+const syncPill = document.getElementById('sync-pill');
+const syncText = document.getElementById('sync-pill-text');
+onOutboxChange(({ count, syncing }) => {
+  syncPill.classList.toggle('hidden', count === 0);
+  syncPill.classList.toggle('syncing', syncing);
+  syncText.textContent = syncing ? 'Syncing…' : String(count);
+  syncPill.title = count ? `${count} item${count === 1 ? '' : 's'} waiting to sync` : 'All synced';
+});
+
+// Install prompt (Android/Chrome). iOS installs via Share → Add to Home Screen.
+let deferredInstall = null;
+const installBtn = document.getElementById('install-btn');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  installBtn.classList.remove('hidden');
+});
+installBtn.addEventListener('click', async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  await deferredInstall.userChoice;
+  deferredInstall = null;
+  installBtn.classList.add('hidden');
+});
+window.addEventListener('appinstalled', () => { installBtn.classList.add('hidden'); });
 
 // Dark mode
 const savedTheme = localStorage.getItem('atllanta-theme');
