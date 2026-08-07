@@ -5,6 +5,16 @@ import { navigate, routeParams } from '../../js/router.js';
 import { publishEvent } from '../../js/events.js';
 import { logAction } from '../../js/audit.js';
 import { makeRenditions, formatBytes } from '../../js/image.js';
+import { enqueue } from '../../js/outbox.js';
+
+const uuid = () => (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + '-' + Math.random().toString(16).slice(2));
+// A Supabase write failed for want of a network (offline / unreachable), not a
+// real rejection. Those get queued to the offline outbox.
+function isNetworkError(error) {
+  if (!navigator.onLine) return true;
+  const m = String((error && error.message) || '').toLowerCase();
+  return /failed to fetch|network|load failed|timeout|offline/.test(m);
+}
 
 // Field values taken straight from the "TL/BDE Visits" dump so app-logged
 // visits and the imported dump share one vocabulary.
@@ -207,24 +217,53 @@ export default async function crmVisits(container) {
     const label = saveBtn.textContent;
     saveBtn.textContent = 'Saving…';
 
+    // Client-generated id so an offline visit upserts (never duplicates) on
+    // replay, and the queued selfie can be keyed to the same row.
+    const row = {
+      id: uuid(),
+      org_id: org.id,
+      account_id: picked.id,
+      site_id: picked.external_id || null,
+      firm_name: picked.name,
+      visited_by: user.id,
+      visited_by_name: user.user_metadata?.full_name || user.email || null,
+      visited_at: new Date().toISOString(),
+      visit_status: status,
+      call_outcome: outcome,
+      remarks,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
+      location_text: coords ? `${coords.lat}, ${coords.lng}` : null,
+      source: 'app',
+    };
+    const rends = renditions; // capture before the form resets
+
+    // Save the visit + selfie to the offline queue and reset optimistically.
+    const queueVisit = async () => {
+      await enqueue('crm.visit.logged', { row }, rends ? { full: rends.full, thumb: rends.thumb } : null);
+      toast('Saved offline — will sync when you\'re back online');
+      resetForm();
+    };
+    // Shared reset used by both the online success path and the offline queue.
+    function resetForm() {
+      picked = null; renditions = null; originalSize = 0;
+      partnerInput.value = ''; meta.textContent = `${accounts.length.toLocaleString('en-IN')} partners you can log against`;
+      formEl.querySelector('#v-outcome').value = '';
+      formEl.querySelector('#v-remarks').value = '';
+      previewEl.style.display = 'none'; emptyEl.style.display = 'block'; fileInput.value = '';
+    }
+
+    if (!navigator.onLine) {
+      try { await queueVisit(); } finally { saveBtn.disabled = false; saveBtn.textContent = label; }
+      return;
+    }
+
     try {
-      const { data: visit, error } = await sb.from('crm_visits').insert({
-        org_id: org.id,
-        account_id: picked.id,
-        site_id: picked.external_id || null,
-        firm_name: picked.name,
-        visited_by: user.id,
-        visited_by_name: user.user_metadata?.full_name || user.email || null,
-        visited_at: new Date().toISOString(),
-        visit_status: status,
-        call_outcome: outcome,
-        remarks,
-        lat: coords?.lat ?? null,
-        lng: coords?.lng ?? null,
-        location_text: coords ? `${coords.lat}, ${coords.lng}` : null,
-        source: 'app',
-      }).select('id').single();
-      if (error || !visit) throw new Error(error?.message || 'Could not save visit');
+      const { data: visit, error } = await sb.from('crm_visits').insert(row).select('id').single();
+      if (error || !visit) {
+        if (isNetworkError(error)) { await queueVisit(); return; }
+        throw new Error(error?.message || 'Could not save visit');
+      }
 
       const base = `${org.id}/${visit.id}`;
       const fullPath = `${base}.jpg`;
@@ -241,14 +280,10 @@ export default async function crmVisits(container) {
       await publishEvent('crm.visit.logged', { visit_id: visit.id, account_id: picked.id, status });
 
       toast('Visit logged');
-      // Reset for the next entry, keep location.
-      picked = null; renditions = null; originalSize = 0;
-      partnerInput.value = ''; meta.textContent = `${accounts.length.toLocaleString('en-IN')} partners you can log against`;
-      formEl.querySelector('#v-outcome').value = '';
-      formEl.querySelector('#v-remarks').value = '';
-      previewEl.style.display = 'none'; emptyEl.style.display = 'block'; fileInput.value = '';
+      resetForm(); // keep location for the next entry
       loadRecent();
     } catch (err) {
+      if (isNetworkError(err)) { await queueVisit(); return; }
       toast(err.message || 'Could not save visit');
     } finally {
       saveBtn.disabled = false;

@@ -11,6 +11,7 @@ import { logAction } from './audit.js';
 import { publishEvent } from './events.js';
 
 const ATT_BUCKET = 'attendance-selfies';
+const VISIT_BUCKET = 'visit-selfies';
 const thumbOf = (p) => (p ? p.replace(/\.jpg$/, '_thumb.jpg') : p);
 
 async function uploadPunchSelfie(orgId, attId, kind, blobs) {
@@ -43,5 +44,20 @@ export function registerOutboxHandlers() {
     if (path) await sb.from('attendance').update({ check_out_selfie_path: path }).eq('id', payload.id);
     await logAction('attendance', 'attendance', payload.id, 'check_out', null,
       { check_out: payload.updates.check_out, total_hours: payload.updates.total_hours, queued_offline: true });
+  });
+
+  registerHandler('crm.visit.logged', async (payload, blobs) => {
+    const { error } = await sb.from('crm_visits').upsert(payload.row, { onConflict: 'id' });
+    if (error) throw new Error(error.message);
+    if (blobs && blobs.full) {
+      const full = `${payload.row.org_id}/${payload.row.id}.jpg`;
+      const a = await sb.storage.from(VISIT_BUCKET).upload(full, blobs.full, { contentType: 'image/jpeg', upsert: true });
+      if (blobs.thumb) await sb.storage.from(VISIT_BUCKET).upload(thumbOf(full), blobs.thumb, { contentType: 'image/jpeg', upsert: true });
+      if (!a.error) await sb.from('crm_visits').update({ selfie_path: full }).eq('id', payload.row.id);
+    }
+    await logAction('crm', 'visit', payload.row.id, 'logged', null,
+      { account_id: payload.row.account_id, status: payload.row.visit_status, queued_offline: true });
+    await publishEvent('crm.visit.logged',
+      { visit_id: payload.row.id, account_id: payload.row.account_id, status: payload.row.visit_status });
   });
 }
