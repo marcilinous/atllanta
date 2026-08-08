@@ -3,357 +3,362 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Atllanta — The Business OS your team actually uses</title>
-<meta name="description" content="Hiring AI, HR, attendance, leave and CRM in one ready-to-use platform. Installable app, works offline, multi-tenant. Built for Indian businesses.">
-<meta property="og:title" content="Atllanta — The Business OS your team actually uses">
-<meta property="og:description" content="Hiring AI, HR, attendance, leave and CRM in one ready-to-use platform. Installable app, works offline.">
+<title>Atllanta — Run your company on one system. Not five.</title>
+<meta name="description" content="Atllanta is the business operating system for Indian companies — hiring, attendance, leave and CRM in one platform. Installable, works offline, priced for reality.">
+<meta property="og:title" content="Atllanta — One system. Not five.">
+<meta property="og:description" content="Hiring, people and customers in one platform. Built for India, priced for reality, installable and offline-ready.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/tokens.css">
-<link rel="stylesheet" href="/css/base.css">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="/icon-192.svg">
-<meta name="theme-color" content="#2563EB">
+<meta name="theme-color" content="#08090c">
 <style>
-  body { background: var(--color-bg); color: var(--color-text-primary); }
-  a { text-decoration: none; color: inherit; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 var(--space-6); }
-  .section { padding: var(--space-16) 0; }
+  :root{
+    --bg:#08090c; --ink:#f3f5f8; --muted:#8b93a3; --faint:#525a68;
+    --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.055);
+    --blue:#5b8cff; --blue-deep:#3d6dff; --lime:#ccff02; --cyan:#43e7d0;
+    --glass:rgba(255,255,255,.04); --glassborder:rgba(255,255,255,.10);
+    --maxw:1180px;
+    --disp:'Space Grotesk',-apple-system,sans-serif;
+    --serif:'Instrument Serif',Georgia,serif;
+    --body:'Inter',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden;font-size:16px}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--blue);color:#06070a}
 
-  /* Nav */
-  .lp-nav {
-    position: sticky; top: 0; z-index: 50;
-    background: color-mix(in srgb, var(--color-bg) 88%, transparent);
-    backdrop-filter: saturate(140%) blur(10px);
-    border-bottom: 1px solid var(--color-border-light);
-  }
-  .lp-nav-inner { display: flex; align-items: center; gap: var(--space-6); height: 60px; }
-  .brand { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--font-weight-bold); font-size: var(--text-lg); }
-  .brand-mark {
-    width: 30px; height: 30px; display: grid; place-items: center;
-    background: var(--color-accent); color: #fff; font-weight: 800; border-radius: var(--radius-md);
-  }
-  .lp-nav-links { display: flex; gap: var(--space-5); margin-left: auto; align-items: center; }
-  .lp-nav-links a { font-size: var(--text-base); color: var(--color-text-secondary); font-weight: var(--font-weight-medium); }
-  .lp-nav-links a:hover { color: var(--color-text-primary); }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-    height: 40px; padding: 0 var(--space-4); border-radius: var(--radius-md);
-    font-size: var(--text-base); font-weight: var(--font-weight-semibold); cursor: pointer; border: 1px solid transparent;
-    transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-  }
-  .btn-primary { background: var(--color-accent); color: #fff; }
-  .btn-primary:hover { background: var(--color-accent-hover); }
-  .btn-ghost { background: transparent; color: var(--color-text-primary); border-color: var(--color-border); }
-  .btn-ghost:hover { background: var(--color-bg-secondary); }
-  .btn-lg { height: 48px; padding: 0 var(--space-6); font-size: var(--text-md); }
+  .glow{position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background:
+      radial-gradient(62vw 52vw at 82% -10%, rgba(91,140,255,.16), transparent 60%),
+      radial-gradient(50vw 46vw at 4% 8%, rgba(67,231,208,.08), transparent 62%),
+      radial-gradient(46vw 56vw at 52% 112%, rgba(91,140,255,.10), transparent 60%);}
+  .grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 
-  /* Hero */
-  .hero { text-align: center; padding: var(--space-16) 0 var(--space-12); }
-  .eyebrow {
-    display: inline-flex; align-items: center; gap: var(--space-2);
-    font-size: var(--text-sm); font-weight: var(--font-weight-semibold); color: var(--color-accent);
-    background: var(--color-accent-light); padding: 6px 12px; border-radius: var(--radius-full); margin-bottom: var(--space-5);
-  }
-  .hero h1 {
-    font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.08; letter-spacing: -0.02em;
-    font-weight: 800; margin: 0 auto var(--space-5); max-width: 14ch;
-  }
-  .hero h1 .accent { color: var(--color-accent); }
-  .hero p.sub { font-size: clamp(1rem, 2.2vw, 1.25rem); color: var(--color-text-secondary); max-width: 60ch; margin: 0 auto var(--space-8); line-height: 1.5; }
-  .hero-cta { display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap; }
-  .hero-note { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
 
-  /* Feature chips under hero */
-  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; margin-top: var(--space-10); }
-  .chip {
-    font-size: var(--text-sm); font-weight: var(--font-weight-medium); color: var(--color-text-secondary);
-    background: var(--color-bg-secondary); border: 1px solid var(--color-border-light);
-    padding: 8px 14px; border-radius: var(--radius-full);
-  }
+  nav{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line2);background:rgba(8,9,12,.62);backdrop-filter:blur(16px) saturate(140%)}
+  .nav-in{display:flex;align-items:center;height:66px;gap:26px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .brand .m{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--blue);color:#06070a;font-weight:700;font-size:17px}
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:24px}
+  .nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color .15s}
+  .nav-links a:hover{color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 20px;border-radius:11px;
+    font-family:var(--disp);font-weight:600;font-size:14px;cursor:pointer;border:1px solid transparent;transition:transform .15s,background .15s,box-shadow .15s}
+  .btn svg{width:16px;height:16px}
+  .btn-blue{background:var(--blue);color:#06070a}
+  .btn-blue:hover{transform:translateY(-1px);box-shadow:0 12px 30px -10px rgba(91,140,255,.7)}
+  .btn-ghost{border:1px solid var(--line);color:var(--ink)}
+  .btn-ghost:hover{background:rgba(255,255,255,.05)}
+  .btn-lg{height:54px;padding:0 28px;font-size:15.5px;border-radius:13px}
 
-  /* Section heads */
-  .sec-head { text-align: center; max-width: 60ch; margin: 0 auto var(--space-10); }
-  .sec-head h2 { font-size: clamp(1.6rem, 3.4vw, 2.25rem); letter-spacing: -0.02em; font-weight: 800; margin-bottom: var(--space-3); }
-  .sec-head p { color: var(--color-text-secondary); font-size: var(--text-md); line-height: 1.5; }
+  .hero{padding:104px 0 30px}
+  .kicker{display:inline-flex;align-items:center;gap:10px;font-family:var(--disp);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:30px}
+  .kicker .tick{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 12px var(--blue)}
+  h1{font-family:var(--disp);font-weight:700;font-size:clamp(2.7rem,7.6vw,6.2rem);line-height:.96;letter-spacing:-.035em;max-width:15ch}
+  h1 em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue);letter-spacing:-.01em}
+  .lede{margin-top:28px;max-width:56ch;font-size:clamp(1.05rem,2vw,1.35rem);color:var(--muted);line-height:1.5}
+  .lede b{color:var(--ink);font-weight:600}
+  .hero-cta{margin-top:38px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .hero-note{margin-top:20px;font-size:14px;color:var(--faint)}
+  .hero-note b{color:var(--muted);font-weight:600}
 
-  /* Value grid */
-  .grid { display: grid; gap: var(--space-5); }
-  .grid-3 { grid-template-columns: repeat(3, 1fr); }
-  .grid-2 { grid-template-columns: repeat(2, 1fr); }
-  .card {
-    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
-    padding: var(--space-6); transition: box-shadow var(--transition-normal), transform var(--transition-normal), border-color var(--transition-normal);
-  }
-  .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--color-border); }
-  .card .ico {
-    width: 40px; height: 40px; border-radius: var(--radius-md); display: grid; place-items: center;
-    background: var(--color-accent-light); color: var(--color-accent); margin-bottom: var(--space-4);
-  }
-  .card .ico svg { width: 22px; height: 22px; }
-  .card h3 { font-size: var(--text-lg); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-2); }
-  .card p { color: var(--color-text-secondary); font-size: var(--text-base); line-height: 1.55; }
+  .marquee{margin-top:70px;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:16px 0;overflow:hidden;white-space:nowrap;-webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)}
+  .mtrack{display:inline-block;animation:scroll 36s linear infinite;font-family:var(--disp);font-weight:600;font-size:14.5px;letter-spacing:.03em;color:var(--faint);text-transform:uppercase}
+  .mtrack span{margin:0 24px}
+  .mtrack span b{color:var(--blue);font-weight:700}
+  @keyframes scroll{to{transform:translateX(-50%)}}
 
-  /* Modules band */
-  .band { background: var(--color-bg-secondary); border-top: 1px solid var(--color-border-light); border-bottom: 1px solid var(--color-border-light); }
-  .mod { display: flex; gap: var(--space-3); align-items: flex-start; }
-  .mod .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); margin-top: 8px; }
-  .mod h4 { font-size: var(--text-md); font-weight: var(--font-weight-semibold); margin-bottom: 2px; }
-  .mod p { font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.5; }
-  .mod-group h3 { font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-4); }
-  .mod-group { display: grid; gap: var(--space-5); }
+  section{padding:96px 0}
+  .eyebrow{font-family:var(--disp);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-bottom:16px}
+  .sec-h{font-family:var(--disp);font-weight:700;font-size:clamp(1.9rem,4.6vw,3.4rem);letter-spacing:-.025em;line-height:1.02;max-width:20ch}
+  .sec-h em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue)}
+  .sec-sub{margin-top:16px;color:var(--muted);max-width:56ch;font-size:16px}
 
-  /* Ready-to-use strip */
-  .ready-list { display: grid; gap: var(--space-4); }
-  .ready-item { display: flex; gap: var(--space-3); align-items: flex-start; }
-  .ready-item .tick { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--color-success-light); color: var(--color-success); display: grid; place-items: center; margin-top: 1px; }
-  .ready-item .tick svg { width: 13px; height: 13px; }
-  .ready-item b { font-weight: var(--font-weight-semibold); }
-  .ready-item span { color: var(--color-text-secondary); }
+  /* Problem / comparison */
+  .versus{border-top:1px solid var(--line2)}
+  .vs-grid{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .vs{border-radius:20px;padding:34px;border:1px solid var(--line2)}
+  .vs.old{background:rgba(255,80,80,.03)}
+  .vs.new{background:linear-gradient(160deg,rgba(91,140,255,.10),rgba(255,255,255,.02));border-color:rgba(91,140,255,.28)}
+  .vs h3{font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .vs.old h3{color:#ff8080}
+  .vs.new h3{color:var(--blue)}
+  .vs ul{list-style:none;display:grid;gap:15px}
+  .vs li{display:flex;gap:12px;font-size:15.5px;color:#c9cedb;line-height:1.4}
+  .vs li svg{width:19px;height:19px;flex:none;margin-top:1px}
+  .vs.old li svg{color:#ff6b6b;opacity:.8}
+  .vs.new li svg{color:var(--blue)}
+  .vs.new li b{color:#fff;font-weight:600}
+
+  /* Bento modules */
+  .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-top:48px}
+  .tile{position:relative;overflow:hidden;background:var(--glass);border:1px solid var(--glassborder);border-radius:20px;padding:28px;backdrop-filter:blur(16px);transition:transform .22s,border-color .22s}
+  .tile:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.2)}
+  .tile.big{grid-column:span 3}
+  .tile.sm{grid-column:span 2}
+  .tile .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(91,140,255,.14);color:var(--blue);margin-bottom:16px}
+  .tile .ic svg{width:20px;height:20px}
+  .tile h4{font-family:var(--disp);font-weight:600;font-size:19px;letter-spacing:-.01em;margin-bottom:8px}
+  .tile p{color:var(--muted);font-size:14.5px;line-height:1.5}
+  .tile .chips{margin-top:16px;display:flex;flex-wrap:wrap;gap:7px}
+  .tile .chips span{font-size:12px;font-weight:500;color:#aab2c2;border:1px solid var(--line2);padding:4px 10px;border-radius:999px}
+
+  /* Ready */
+  .ready{border-top:1px solid var(--line2)}
+  .ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin-top:40px}
+  .ready-list{display:grid;gap:20px}
+  .ri{display:flex;gap:14px}
+  .ri .n{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:rgba(204,255,2,.12);color:var(--lime);font-family:var(--disp);font-weight:700;font-size:14px}
+  .ri b{font-family:var(--disp);font-weight:600;font-size:16px}
+  .ri p{color:var(--muted);font-size:14.5px;margin-top:3px;line-height:1.5}
+  .ready-panel{border-radius:22px;border:1px solid var(--glassborder);background:var(--glass);backdrop-filter:blur(16px);padding:36px}
+  .ready-panel .big{font-family:var(--disp);font-weight:700;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.02em;line-height:1.1}
+  .ready-panel .big em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue)}
+  .ready-panel p{color:var(--muted);margin-top:14px;font-size:15px}
+  .ready-panel .steps{margin-top:26px;display:grid;gap:14px}
+  .ready-panel .steps div{display:flex;gap:12px;font-size:15px}
+  .ready-panel .steps i{font-style:normal;color:var(--blue);font-family:var(--disp);font-weight:700}
 
   /* Pricing */
-  .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); align-items: stretch; }
-  .price {
-    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
-    padding: var(--space-8) var(--space-6); display: flex; flex-direction: column;
-  }
-  .price.featured { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-light); position: relative; }
-  .price .tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--color-accent); color: #fff; font-size: var(--text-xs); font-weight: 600; padding: 4px 12px; border-radius: var(--radius-full); }
-  .price h3 { font-size: var(--text-lg); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-1); }
-  .price .amt { font-size: var(--text-3xl); font-weight: 800; letter-spacing: -0.02em; margin: var(--space-2) 0; }
-  .price .amt small { font-size: var(--text-base); font-weight: var(--font-weight-medium); color: var(--color-text-tertiary); }
-  .price .desc { color: var(--color-text-secondary); font-size: var(--text-sm); margin-bottom: var(--space-5); min-height: 40px; }
-  .price ul { list-style: none; display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
-  .price li { display: flex; gap: var(--space-2); font-size: var(--text-base); color: var(--color-text-primary); }
-  .price li svg { width: 16px; height: 16px; color: var(--color-success); flex: none; margin-top: 3px; }
-  .price .btn { margin-top: auto; width: 100%; }
+  .pricing{border-top:1px solid var(--line2)}
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
+  .price{position:relative;border:1px solid var(--line2);border-radius:20px;padding:34px 30px;background:rgba(255,255,255,.02);display:flex;flex-direction:column}
+  .price.hot{border-color:var(--blue);background:linear-gradient(160deg,rgba(91,140,255,.12),rgba(255,255,255,.02))}
+  .price .flag{position:absolute;top:-12px;left:30px;background:var(--blue);color:#06070a;font-family:var(--disp);font-weight:700;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
+  .price h3{font-family:var(--disp);font-weight:600;font-size:16px;color:var(--muted);letter-spacing:.02em;text-transform:uppercase}
+  .price .amt{font-family:var(--disp);font-weight:700;font-size:clamp(2rem,4vw,2.8rem);letter-spacing:-.02em;margin:14px 0 6px}
+  .price .d{color:var(--muted);font-size:14px;min-height:42px;margin-bottom:22px}
+  .price ul{list-style:none;display:grid;gap:12px;margin-bottom:28px}
+  .price li{display:flex;gap:10px;font-size:14.5px;color:#d0d5e0}
+  .price li svg{width:16px;height:16px;color:var(--blue);flex:none;margin-top:2px}
+  .price .btn{margin-top:auto;width:100%}
 
   /* CTA */
-  .cta-band { text-align: center; background: var(--color-accent); border-radius: var(--radius-xl); padding: var(--space-12) var(--space-6); color: #fff; }
-  .cta-band h2 { font-size: clamp(1.6rem, 3.4vw, 2.25rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: var(--space-3); }
-  .cta-band p { color: rgba(255,255,255,0.9); font-size: var(--text-md); max-width: 52ch; margin: 0 auto var(--space-6); }
-  .cta-band .btn-primary { background: #fff; color: var(--color-accent); }
-  .cta-band .btn-primary:hover { background: rgba(255,255,255,0.9); }
-  .cta-band .btn-ghost { color: #fff; border-color: rgba(255,255,255,0.5); }
-  .cta-band .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+  .cta{border-top:1px solid var(--line2)}
+  .cta-card{position:relative;overflow:hidden;text-align:center;border-radius:28px;padding:clamp(48px,8vw,90px) 28px;
+    background:linear-gradient(155deg,rgba(91,140,255,.18),rgba(67,231,208,.06));border:1px solid var(--glassborder);backdrop-filter:blur(16px)}
+  .cta-card h2{font-family:var(--disp);font-weight:700;font-size:clamp(2.1rem,5.4vw,4rem);letter-spacing:-.03em;line-height:1;max-width:18ch;margin:0 auto}
+  .cta-card h2 em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue)}
+  .cta-card p{margin:18px auto 0;color:var(--muted);max-width:52ch;font-size:16px}
+  .cta-actions{margin-top:34px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
 
-  /* Footer */
-  .lp-foot { border-top: 1px solid var(--color-border-light); padding: var(--space-8) 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
-  .lp-foot-inner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  footer{border-top:1px solid var(--line2);padding:34px 0}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--faint);font-size:13.5px}
 
-  @media (max-width: 860px) {
-    .grid-3, .price-grid { grid-template-columns: 1fr; }
-    .grid-2 { grid-template-columns: 1fr; }
-    .lp-nav-links a.nav-link { display: none; }
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(max-width:860px){
+    .vs-grid,.ready-grid,.prices{grid-template-columns:1fr}
+    .bento{grid-template-columns:1fr 1fr}
+    .tile.big,.tile.sm{grid-column:span 2}
+    .nav-links a.hide{display:none}
+    .ready-grid{gap:36px}
   }
+  @media(max-width:520px){.bento{grid-template-columns:1fr}.tile.big,.tile.sm{grid-column:span 1}}
 </style>
 </head>
 <body>
+<div class="glow"></div>
+<div class="grain"></div>
 
-<!-- Nav -->
-<nav class="lp-nav">
-  <div class="wrap lp-nav-inner">
-    <a class="brand" href="/landing"><span class="brand-mark">A</span> Atllanta</a>
-    <div class="lp-nav-links">
-      <a class="nav-link" href="#modules">Modules</a>
-      <a class="nav-link" href="#ready">Why Atllanta</a>
-      <a class="nav-link" href="#pricing">Pricing</a>
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><span class="m">A</span>Atllanta</a>
+    <div class="nav-links">
+      <a class="hide" href="#why">Why</a>
+      <a class="hide" href="#inside">Inside</a>
+      <a class="hide" href="#pricing">Pricing</a>
       <a href="/login">Sign in</a>
-      <a class="btn btn-primary" href="/login">Get started</a>
+      <a class="btn btn-blue" href="/login">Start free</a>
     </div>
   </div>
 </nav>
 
-<!-- Hero -->
-<header class="wrap hero">
-  <span class="eyebrow">● Ready to use — one platform, live today</span>
-  <h1>The Business OS your team <span class="accent">actually uses</span></h1>
-  <p class="sub">Hiring AI, employees, attendance, leave and CRM — unified in one platform with a shared login, search, and workflows. Come for the AI hiring tool, stay for the whole operating system.</p>
-  <div class="hero-cta">
-    <a class="btn btn-primary btn-lg" href="/login">Start free</a>
-    <a class="btn btn-ghost btn-lg" href="#pricing">See what's included</a>
+<header class="wrap hero" id="top">
+  <div class="kicker reveal"><span class="tick"></span>Business Operating System · Built for India</div>
+  <h1 class="reveal">Run your company on one system. <em>Not five.</em></h1>
+  <p class="lede reveal">Hiring, attendance, leave and customers — <b>one login, one source of truth</b>, workflows that actually connect. Stop paying five vendors to run one business.</p>
+  <div class="hero-cta reveal">
+    <a class="btn btn-blue btn-lg" href="/login">Start free</a>
+    <a class="btn btn-ghost btn-lg" href="#why">See why it's different</a>
   </div>
-  <p class="hero-note">No setup projects. Installable on your phone. Works offline in the field.</p>
-
-  <div class="chips">
-    <span class="chip">AI CV–JD matching</span>
-    <span class="chip">Selfie + GPS attendance</span>
-    <span class="chip">Leave &amp; approvals</span>
-    <span class="chip">Employee directory</span>
-    <span class="chip">CRM &amp; pipeline</span>
-    <span class="chip">Interview scheduling</span>
-    <span class="chip">AI assistant</span>
-    <span class="chip">Audit &amp; roles</span>
-  </div>
+  <p class="hero-note reveal"><b>No setup projects.</b> Installable on your phone. Works offline in the field.</p>
 </header>
 
-<!-- Value props -->
-<section class="wrap section" id="value">
-  <div class="sec-head">
-    <h2>One platform instead of five tools</h2>
-    <p>Most teams stitch together a hiring tool, an HR sheet, an attendance app, and a separate CRM. Atllanta puts them in one place — with one identity, one search bar, and workflows that connect them.</p>
+<div class="marquee">
+  <div class="mtrack">
+    <span>Recruitment <b>·</b></span><span>AI matching <b>·</b></span><span>Attendance <b>·</b></span><span>Leave <b>·</b></span><span>CRM <b>·</b></span><span>Pipeline <b>·</b></span><span>Approvals <b>·</b></span><span>Audit <b>·</b></span><span>Offline-first <b>·</b></span><span>Made in India <b>·</b></span>
+    <span>Recruitment <b>·</b></span><span>AI matching <b>·</b></span><span>Attendance <b>·</b></span><span>Leave <b>·</b></span><span>CRM <b>·</b></span><span>Pipeline <b>·</b></span><span>Approvals <b>·</b></span><span>Audit <b>·</b></span><span>Offline-first <b>·</b></span><span>Made in India <b>·</b></span>
   </div>
-  <div class="grid grid-3">
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg></div>
-      <h3>AI does the first pass</h3>
-      <p>Upload resumes and a JD — Atllanta parses skills and ranks candidates with a transparent match score, so shortlisting takes minutes, not evenings.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <h3>People, handled</h3>
-      <p>A real employee directory, attendance with selfie + geofence, leave balances and approvals — everything HR chases, in one inbox.</p>
-    </div>
-    <div class="card">
-      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></div>
-      <h3>Customers &amp; field work</h3>
-      <p>Accounts, contacts, leads and a deal pipeline — plus a field mode for visits and telecalling that keeps working when the signal drops.</p>
-    </div>
-  </div>
-</section>
+</div>
 
-<!-- Modules -->
-<section class="band" id="modules">
-  <div class="wrap section">
-    <div class="sec-head">
-      <h2>Everything included, from day one</h2>
-      <p>No add-on pricing for the basics. These ship in the box.</p>
-    </div>
-    <div class="grid grid-3">
-      <div class="mod-group">
-        <h3>People</h3>
-        <div class="mod"><span class="dot"></span><div><h4>Employee directory</h4><p>Profiles, departments, teams, reporting lines and bulk import.</p></div></div>
-        <div class="mod"><span class="dot"></span><div><h4>Attendance</h4><p>Selfie + GPS check-in, geofencing, regularization and reports.</p></div></div>
-        <div class="mod"><span class="dot"></span><div><h4>Leave</h4><p>Types, balances, holiday calendar, apply and manager approvals.</p></div></div>
+<section class="versus" id="why">
+  <div class="wrap">
+    <div class="eyebrow reveal">The honest problem</div>
+    <h2 class="sec-h reveal">Five tools pretending to be <em>one company.</em></h2>
+    <p class="sec-sub reveal">A hiring tool here, an attendance app there, an HR sheet, a CRM, and a WhatsApp group holding it together. Nothing talks. Atllanta is the other way to do it.</p>
+    <div class="vs-grid">
+      <div class="vs old reveal">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> The five-app stack</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> A separate bill for every function</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Data copied by hand between apps</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Five logins, five support queues</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Priced in dollars, built for elsewhere</li>
+        </ul>
       </div>
-      <div class="mod-group">
-        <h3>Recruitment</h3>
-        <div class="mod"><span class="dot"></span><div><h4>AI matching</h4><p>Resume + JD parsing and ranked candidates with score breakdowns.</p></div></div>
-        <div class="mod"><span class="dot"></span><div><h4>Pipeline</h4><p>Shortlist, reject, and move candidates through hiring stages.</p></div></div>
-        <div class="mod"><span class="dot"></span><div><h4>Interviews</h4><p>Schedule rounds, capture feedback and decisions in one place.</p></div></div>
-      </div>
-      <div class="mod-group">
-        <h3>CRM &amp; Platform</h3>
-        <div class="mod"><span class="dot"></span><div><h4>Accounts &amp; deals</h4><p>Contacts, leads and a weighted pipeline for your sales team.</p></div></div>
-        <div class="mod"><span class="dot"></span><div><h4>AI assistant</h4><p>Ask questions across your data — permission-aware, never over-shares.</p></div></div>
-        <div class="mod"><span class="dot"></span><div><h4>Approvals, audit &amp; roles</h4><p>One approvals inbox, a full audit trail, and owner/admin/manager/member roles.</p></div></div>
+      <div class="vs new reveal">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Atllanta</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One platform</b> for hiring, people &amp; customers</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One record</b> every module reads from</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One login</b>, one inbox, one search</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>Rupees, IST, Apr–Mar</b> out of the box</li>
+        </ul>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Ready to use -->
-<section class="wrap section" id="ready">
-  <div class="grid grid-2" style="align-items:center;gap:var(--space-12)">
-    <div>
-      <div class="sec-head" style="text-align:left;margin:0 0 var(--space-6)">
-        <h2 style="margin-bottom:var(--space-3)">Ready to use — not a build project</h2>
-        <p>Atllanta is live software, not a template you have to assemble. Sign in and your workspace is there, with sensible defaults for Indian businesses.</p>
+<section id="inside">
+  <div class="wrap">
+    <div class="eyebrow reveal">What's inside</div>
+    <h2 class="sec-h reveal">Everything to run people &amp; sales — <em>day one.</em></h2>
+    <div class="bento">
+      <div class="tile big reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg></div>
+        <h4>AI recruitment</h4>
+        <p>Upload resumes and a JD — Atllanta parses skills and ranks candidates with a transparent match score. Shortlist, schedule interviews, and track the pipeline without the enterprise ATS bill.</p>
+        <div class="chips"><span>CV–JD matching</span><span>Shortlisting</span><span>Interviews</span></div>
       </div>
+      <div class="tile sm reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h4>Attendance</h4>
+        <p>Selfie + geofenced check-in, regularization, and reports — accurate, even in the field.</p>
+      </div>
+      <div class="tile sm reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></div>
+        <h4>Leave</h4>
+        <p>Balances, holidays, apply and approve — all in one inbox managers actually check.</p>
+      </div>
+      <div class="tile sm reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></div>
+        <h4>CRM &amp; pipeline</h4>
+        <p>Accounts, contacts, leads and a weighted deal pipeline for your sales team.</p>
+      </div>
+      <div class="tile sm reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <h4>Approvals &amp; audit</h4>
+        <p>One approvals inbox, a full audit trail, and clear owner/admin/manager/member roles.</p>
+      </div>
+      <div class="tile sm reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></div>
+        <h4>AI assistant</h4>
+        <p>Ask across your data — permission-aware, so it never shows what a person can't see.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="ready">
+  <div class="wrap">
+    <div class="eyebrow reveal">Ready to use</div>
+    <h2 class="sec-h reveal">Live software. <em>Not a build project.</em></h2>
+    <div class="ready-grid">
       <div class="ready-list">
-        <div class="ready-item"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Installable app.</b> <span>Add it to your phone's home screen — it opens full-screen like a native app.</span></div></div>
-        <div class="ready-item"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Works offline.</b> <span>Field staff can check in and log visits with no signal — everything syncs when they're back online.</span></div></div>
-        <div class="ready-item"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Secure by design.</b> <span>Every organization's data is isolated at the database level. Your team only ever sees your data.</span></div></div>
-        <div class="ready-item"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Built for India.</b> <span>INR, IST, an April–March fiscal year and DD/MM/YYYY dates — right out of the box.</span></div></div>
-        <div class="ready-item"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Configurable access.</b> <span>Admins choose exactly which modules each role or person can see.</span></div></div>
+        <div class="ri reveal"><span class="n">↧</span><div><b>Installable app</b><p>Add it to the home screen — full-screen, like a native app, on any phone.</p></div></div>
+        <div class="ri reveal"><span class="n">⤓</span><div><b>Works offline</b><p>Check in and log visits with no signal. Everything syncs when you're back online.</p></div></div>
+        <div class="ri reveal"><span class="n">◆</span><div><b>Isolated by org</b><p>Every organization's data is walled off at the database level. Your team sees only your data.</p></div></div>
+        <div class="ri reveal"><span class="n">₹</span><div><b>Built for India</b><p>Rupees, IST, an April–March fiscal year and DD/MM/YYYY — no configuration needed.</p></div></div>
       </div>
-    </div>
-    <div class="card" style="padding:var(--space-8)">
-      <div class="sec-head" style="text-align:left;margin:0 0 var(--space-5)">
-        <h2 style="font-size:var(--text-xl);margin-bottom:var(--space-2)">Start in three steps</h2>
+      <div class="ready-panel reveal">
+        <div class="big">Up and running in <em>an afternoon.</em></div>
+        <p>No implementation team, no onboarding invoice.</p>
+        <div class="steps">
+          <div><i>01</i> Create your workspace — provisioned instantly on sign-up.</div>
+          <div><i>02</i> Invite your team, set roles, switch on the modules you need.</div>
+          <div><i>03</i> Post a job or run today's attendance — same day.</div>
+        </div>
+        <a class="btn btn-blue" style="width:100%;margin-top:26px" href="/login">Create your workspace</a>
       </div>
-      <div class="ready-list">
-        <div class="ready-item"><span class="tick">1</span><div><b>Create your workspace</b><br><span>Sign up and your organization is provisioned instantly.</span></div></div>
-        <div class="ready-item"><span class="tick">2</span><div><b>Invite your team</b><br><span>Add people, set roles, turn on the modules you need.</span></div></div>
-        <div class="ready-item"><span class="tick">3</span><div><b>Go</b><br><span>Post a job and match candidates, or run today's attendance — same afternoon.</span></div></div>
-      </div>
-      <a class="btn btn-primary" style="width:100%;margin-top:var(--space-6)" href="/login">Create your workspace</a>
     </div>
   </div>
 </section>
 
-<!-- Pricing -->
-<section class="band" id="pricing">
-  <div class="wrap section">
-    <div class="sec-head">
-      <h2>Simple pricing</h2>
-      <p>Start free while you evaluate. Move up when your team grows. No per-module surprises.</p>
-    </div>
-    <div class="price-grid">
-      <div class="price">
+<section class="pricing" id="pricing">
+  <div class="wrap">
+    <div class="eyebrow reveal">Pricing</div>
+    <h2 class="sec-h reveal">Start free. Pay when it's <em>running your business.</em></h2>
+    <div class="prices">
+      <div class="price reveal">
         <h3>Pilot</h3>
         <div class="amt">Free</div>
-        <div class="desc">Everything you need to try Atllanta with a small team.</div>
+        <div class="d">Everything you need to try Atllanta with a small team.</div>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Full recruitment + People modules</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Recruitment + People modules</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> AI CV–JD matching</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Installable app + offline</li>
         </ul>
         <a class="btn btn-ghost" href="/login">Start free</a>
       </div>
-      <div class="price featured">
-        <span class="tag">Most popular</span>
+      <div class="price hot reveal">
+        <span class="flag">Most popular</span>
         <h3>Growth</h3>
-        <div class="amt">Let's talk<small></small></div>
-        <div class="desc">For teams running hiring, HR and CRM together, day to day.</div>
+        <div class="amt">Let's talk</div>
+        <div class="d">For teams running hiring, HR and CRM together, every day.</div>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Everything in Pilot</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> CRM, pipeline &amp; approvals inbox</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> AI assistant + audit log</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Email &amp; notifications</li>
         </ul>
-        <a class="btn btn-primary" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Growth%20plan">Talk to us</a>
+        <a class="btn btn-blue" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Growth%20plan">Talk to us</a>
       </div>
-      <div class="price">
+      <div class="price reveal">
         <h3>Enterprise</h3>
         <div class="amt">Custom</div>
-        <div class="desc">Vertical packs, custom workflows and onboarding support.</div>
+        <div class="d">Vertical packs, custom workflows and onboarding support.</div>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Everything in Growth</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Industry vertical packs</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Onboarding &amp; priority support</li>
         </ul>
-        <a class="btn btn-ghost" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Enterprise">Contact sales</a>
+        <a class="btn btn-ghost" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Enterprise">Contact us</a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Final CTA -->
-<section class="wrap section">
-  <div class="cta-band">
-    <h2>Put your whole operation in one place</h2>
-    <p>Hiring, people, and customers — one login, one afternoon to get going. Start free and see it working with your own team.</p>
-    <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="/login">Start free</a>
-      <a class="btn btn-ghost btn-lg" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20demo">Book a demo</a>
-      <a class="btn btn-ghost btn-lg" href="tel:+918073163762">Call us</a>
+<section class="cta">
+  <div class="wrap">
+    <div class="cta-card reveal">
+      <h2>Put your whole operation <em>in one place.</em></h2>
+      <p>Hiring, people, and customers — one login, one afternoon to get going. Start free, with your own team.</p>
+      <div class="cta-actions">
+        <a class="btn btn-blue btn-lg" href="/login">Start free</a>
+        <a class="btn btn-ghost btn-lg" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20demo">Book a demo</a>
+      </div>
     </div>
-    <p style="margin-top:var(--space-5);color:rgba(255,255,255,0.9);font-size:var(--text-sm)">
-      Talk to us: <a href="mailto:anchansachinv99@gmail.com" style="color:#fff;font-weight:600">anchansachinv99@gmail.com</a>
-      &nbsp;·&nbsp; <a href="tel:+918073163762" style="color:#fff;font-weight:600">+91&nbsp;80731&nbsp;63762</a>
-    </p>
   </div>
 </section>
 
-<!-- Footer -->
-<footer class="lp-foot">
-  <div class="wrap lp-foot-inner">
-    <a class="brand" href="/landing" style="font-size:var(--text-base)"><span class="brand-mark" style="width:24px;height:24px;font-size:14px">A</span> Atllanta</a>
-    <span>© <span id="yr"></span> Atllanta — Business Operating System</span>
-    <span>
-      <a href="mailto:anchansachinv99@gmail.com" style="color:var(--color-accent);font-weight:600">anchansachinv99@gmail.com</a>
-      &nbsp;·&nbsp; <a href="tel:+918073163762" style="color:var(--color-accent);font-weight:600">+91&nbsp;80731&nbsp;63762</a>
-    </span>
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top" style="font-size:15px"><span class="m" style="width:24px;height:24px;font-size:14px">A</span>Atllanta</a>
+    <span>© <span id="yr"></span> · Business Operating System</span>
+    <a href="/login" style="color:var(--blue);font-weight:600">Sign in</a>
   </div>
 </footer>
 
 <script>
-  // Respect the app's saved theme so light/dark stays consistent.
-  const t = localStorage.getItem('atllanta-theme');
-  if (t) document.documentElement.setAttribute('data-theme', t);
   document.getElementById('yr').textContent = new Date().getFullYear();
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(Math.min(i%4,3)*70)+'ms';io.observe(el)});
 </script>
 </body>
 </html>
