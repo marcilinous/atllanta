@@ -101,6 +101,58 @@
   .float.f1{top:-18px;right:-6px}
   .float.f2{bottom:-16px;left:-22px}
 
+  /* Hero entrance animation */
+  .mock-app{animation:mockIn .9s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes mockIn{from{opacity:0;transform:perspective(1400px) rotateY(-15deg) rotateX(6deg) translateY(24px)}to{opacity:1;transform:perspective(1400px) rotateY(-9deg) rotateX(3deg)}}
+  .mock .rows .row{opacity:0;animation:rowIn .5s ease forwards}
+  .mock .rows .row:nth-child(1){animation-delay:.55s}
+  .mock .rows .row:nth-child(2){animation-delay:.68s}
+  .mock .rows .row:nth-child(3){animation-delay:.81s}
+  .mock .rows .row:nth-child(4){animation-delay:.94s}
+  @keyframes rowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+  .float{opacity:0;animation:floatIn .55s cubic-bezier(.2,.7,.2,1) forwards}
+  .float.f1{animation-delay:1.05s}
+  .float.f2{animation-delay:1.25s}
+  @keyframes floatIn{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.mock-app,.mock .rows .row,.float{animation-duration:.01ms;opacity:1}}
+
+  /* Product tour gallery */
+  .tour{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .tour-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,340px);gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 0 18px;margin-top:40px;scrollbar-width:thin}
+  .tour-strip::-webkit-scrollbar{height:8px}
+  .tour-strip::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px}
+  .screen{scroll-snap-align:start;background:#fff;border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--sh-md);overflow:hidden;display:flex;flex-direction:column}
+  .screen .st{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--soft)}
+  .screen .st i{width:8px;height:8px;border-radius:50%;background:#e0e3ea}
+  .screen .st span{margin-left:8px;font-size:11px;color:var(--faint)}
+  .screen .sb{padding:16px;min-height:236px}
+  .screen .sh{font-family:var(--disp);font-weight:700;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .screen .sh .pin{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+  .screen .cap{padding:12px 16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+  .cand{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)}
+  .cand:last-child{border-bottom:none}
+  .cand .av{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--disp)}
+  .cand .nm{font-size:11.5px;font-weight:600;width:66px;flex:none}
+  .cand .bar{flex:1;height:6px;border-radius:3px;background:var(--soft2);overflow:hidden}
+  .cand .bar b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--violet));width:0;animation:grow 1.1s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes grow{to{width:var(--w)}}
+  .cand .pct{font-family:var(--disp);font-weight:700;font-size:12px;width:36px;text-align:right;color:var(--accent)}
+  .kb{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .kb .kcol{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px}
+  .kb .kcol h5{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px;font-weight:700;font-family:var(--disp)}
+  .kb .deal{background:#fff;border:1px solid var(--line);border-radius:7px;padding:8px;margin-bottom:6px}
+  .kb .deal span{font-size:10px;color:var(--muted)}
+  .kb .deal b{display:block;font-family:var(--disp);font-weight:700;color:var(--ink);font-size:11.5px;margin-top:2px}
+  .lv{display:flex;align-items:center;gap:9px;padding:11px 0;border-bottom:1px solid var(--line2)}
+  .lv:last-child{border-bottom:none}
+  .lv .av{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--disp)}
+  .lv .info{font-size:11.5px}.lv .info b{font-weight:600;display:block}.lv .info span{color:var(--faint);font-size:10px}
+  .lv .act{margin-left:auto;display:flex;gap:6px}
+  .lv .act b{width:26px;height:26px;border-radius:7px;display:grid;place-items:center}
+  .lv .act b.ok{background:var(--green-soft);color:var(--green)}
+  .lv .act b.no{background:#fbeaea;color:#c0392b}
+  .lv .act b svg{width:14px;height:14px}
+
   /* generic section */
   section{padding:84px 0}
   .kicker{font-family:var(--disp);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
@@ -228,9 +280,9 @@
           <div class="mock-main">
             <div class="mock-h">Good morning, Priya</div>
             <div class="kpis">
-              <div class="kpi"><div class="l">Present</div><div class="v g">48/52</div></div>
-              <div class="kpi"><div class="l">Open roles</div><div class="v a">6</div></div>
-              <div class="kpi"><div class="l">Pipeline</div><div class="v vt">₹4.2L</div></div>
+              <div class="kpi"><div class="l">Present</div><div class="v g" data-num="48" data-suffix="/52">0/52</div></div>
+              <div class="kpi"><div class="l">Open roles</div><div class="v a" data-num="6">0</div></div>
+              <div class="kpi"><div class="l">Pipeline</div><div class="v vt" data-prefix="₹" data-num="4.2" data-suffix="L" data-dec="1">₹0L</div></div>
             </div>
             <div class="rows">
               <div class="row"><span class="av" style="background:#4f46e5">RK</span><span class="nm">Ravi Kumar</span><span class="tag pr">Present</span></div>
@@ -246,6 +298,65 @@
     </div>
   </div>
 </header>
+
+<section class="tour" id="tour">
+  <div class="wrap">
+    <div class="center" style="max-width:620px">
+      <div class="kicker reveal">See it in action</div>
+      <h2 class="sec-h reveal">A look inside the product.</h2>
+      <p class="sec-sub reveal">Real screens from across the platform — hiring, sales and people, in one place.</p>
+    </div>
+    <div class="tour-strip reveal">
+
+      <div class="screen">
+        <div class="st"><i></i><i></i><i></i><span>Recruitment · candidates</span></div>
+        <div class="sb">
+          <div class="sh">Backend Engineer <span class="pin">28 matched</span></div>
+          <div class="cand"><span class="av" style="background:#4f46e5">SN</span><span class="nm">Sneha N.</span><span class="bar"><b style="--w:94%"></b></span><span class="pct">94%</span></div>
+          <div class="cand"><span class="av" style="background:#0ea371">RK</span><span class="nm">Ravi K.</span><span class="bar"><b style="--w:88%"></b></span><span class="pct">88%</span></div>
+          <div class="cand"><span class="av" style="background:#7c3aed">AM</span><span class="nm">Arjun M.</span><span class="bar"><b style="--w:81%"></b></span><span class="pct">81%</span></div>
+          <div class="cand"><span class="av" style="background:#c47f12">DP</span><span class="nm">Deepa P.</span><span class="bar"><b style="--w:73%"></b></span><span class="pct">73%</span></div>
+        </div>
+        <div class="cap">AI ranks every applicant against the JD — shortlist in minutes.</div>
+      </div>
+
+      <div class="screen">
+        <div class="st"><i></i><i></i><i></i><span>CRM · pipeline</span></div>
+        <div class="sb">
+          <div class="sh">Sales pipeline <span class="pin">₹18.4L open</span></div>
+          <div class="kb">
+            <div class="kcol"><h5>Lead</h5>
+              <div class="deal"><span>Acme Traders</span><b>₹1.2L</b></div>
+              <div class="deal"><span>Nova Retail</span><b>₹80k</b></div>
+            </div>
+            <div class="kcol"><h5>Proposal</h5>
+              <div class="deal"><span>Sunrise Ent.</span><b>₹3.5L</b></div>
+            </div>
+            <div class="kcol"><h5>Won</h5>
+              <div class="deal"><span>Metro Foods</span><b>₹2.1L</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap">Track every deal by stage, weighted to a real forecast.</div>
+      </div>
+
+      <div class="screen">
+        <div class="st"><i></i><i></i><i></i><span>People · approvals</span></div>
+        <div class="sb">
+          <div class="sh">Leave requests <span class="pin">3 pending</span></div>
+          <div class="lv"><span class="av" style="background:#c47f12">AM</span><span class="info"><b>Arjun Mehta</b><span>Casual · 2 days</span></span>
+            <span class="act"><b class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></b><b class="no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></b></span></div>
+          <div class="lv"><span class="av" style="background:#0ea371">SN</span><span class="info"><b>Sneha Nair</b><span>Sick · 1 day</span></span>
+            <span class="act"><b class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></b><b class="no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></b></span></div>
+          <div class="lv"><span class="av" style="background:#7c3aed">DP</span><span class="info"><b>Deepa P.</b><span>Earned · 3 days</span></span>
+            <span class="act"><b class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></b><b class="no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></b></span></div>
+        </div>
+        <div class="cap">Approve or reject from one inbox — leave, attendance and more.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
 
 <section class="band" id="why">
   <div class="wrap">
@@ -409,6 +520,19 @@
   document.getElementById('yr').textContent=new Date().getFullYear();
   const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
   document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(Math.min(i%3,2)*80)+'ms';io.observe(el)});
+
+  // Count up the hero KPI numbers on load.
+  const reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  document.querySelectorAll('.kpi .v[data-num]').forEach((el)=>{
+    const target=parseFloat(el.dataset.num), dec=parseInt(el.dataset.dec||'0',10);
+    const pre=el.dataset.prefix||'', suf=el.dataset.suffix||'';
+    if(reduce){el.textContent=pre+target.toFixed(dec)+suf;return;}
+    const dur=1100, t0=performance.now();
+    const step=(t)=>{const p=Math.min((t-t0)/dur,1);const e=1-Math.pow(1-p,3);
+      el.textContent=pre+(target*e).toFixed(dec)+suf;
+      if(p<1)requestAnimationFrame(step);};
+    setTimeout(()=>requestAnimationFrame(step),650);
+  });
 </script>
 </body>
 </html>
