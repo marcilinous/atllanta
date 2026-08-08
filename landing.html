@@ -3,218 +3,267 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Atllanta — Run your company on one system. Not five.</title>
-<meta name="description" content="Atllanta is the business operating system for Indian companies — hiring, attendance, leave and CRM in one platform. Installable, works offline, priced for reality.">
-<meta property="og:title" content="Atllanta — One system. Not five.">
-<meta property="og:description" content="Hiring, people and customers in one platform. Built for India, priced for reality, installable and offline-ready.">
+<title>Atllanta — One system to run your whole company</title>
+<meta name="description" content="Atllanta is the business operating system for Indian companies — hiring, attendance, leave and CRM in one clean platform. Installable, works offline, ready to use.">
+<meta property="og:title" content="Atllanta — One system to run your whole company">
+<meta property="og:description" content="Hiring, people and customers in one platform. Built for India, installable, offline-ready.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="/icon-192.svg">
-<meta name="theme-color" content="#08090c">
+<meta name="theme-color" content="#ffffff">
 <style>
   :root{
-    --bg:#08090c; --ink:#f3f5f8; --muted:#8b93a3; --faint:#525a68;
-    --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.055);
-    --blue:#5b8cff; --blue-deep:#3d6dff; --lime:#ccff02; --cyan:#43e7d0;
-    --glass:rgba(255,255,255,.04); --glassborder:rgba(255,255,255,.10);
-    --maxw:1180px;
-    --disp:'Space Grotesk',-apple-system,sans-serif;
-    --serif:'Instrument Serif',Georgia,serif;
+    --bg:#ffffff; --soft:#f7f8fb; --soft2:#f0f2f7; --card:#ffffff;
+    --ink:#0c0e14; --muted:#5b6272; --faint:#9096a4;
+    --line:#e9ebf1; --line-strong:#dfe2ea;
+    --accent:#4f46e5; --accent-2:#6366f1; --accent-ink:#ffffff; --accent-soft:#eef0fe;
+    --green:#0ea371; --green-soft:#e7f7f0; --amber:#c47f12; --violet:#7c3aed;
+    --sh-sm:0 1px 2px rgba(12,14,20,.06),0 1px 3px rgba(12,14,20,.04);
+    --sh-md:0 8px 24px -8px rgba(12,14,20,.12),0 2px 6px rgba(12,14,20,.05);
+    --sh-lg:0 30px 60px -20px rgba(24,26,54,.28),0 12px 24px -12px rgba(12,14,20,.10);
+    --r:14px; --maxw:1160px;
+    --disp:'Plus Jakarta Sans',-apple-system,sans-serif;
     --body:'Inter',-apple-system,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
-  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden;font-size:16px}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
   a{color:inherit;text-decoration:none}
-  ::selection{background:var(--blue);color:#06070a}
+  ::selection{background:var(--accent-soft)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 
-  .glow{position:fixed;inset:0;z-index:-2;pointer-events:none;
-    background:
-      radial-gradient(62vw 52vw at 82% -10%, rgba(91,140,255,.16), transparent 60%),
-      radial-gradient(50vw 46vw at 4% 8%, rgba(67,231,208,.08), transparent 62%),
-      radial-gradient(46vw 56vw at 52% 112%, rgba(91,140,255,.10), transparent 60%);}
-  .grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
-
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
-
-  nav{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line2);background:rgba(8,9,12,.62);backdrop-filter:blur(16px) saturate(140%)}
-  .nav-in{display:flex;align-items:center;height:66px;gap:26px}
-  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:-.01em}
-  .brand .m{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--blue);color:#06070a;font-weight:700;font-size:17px}
-  .nav-links{margin-left:auto;display:flex;align-items:center;gap:24px}
-  .nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color .15s}
-  .nav-links a:hover{color:var(--ink)}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 20px;border-radius:11px;
-    font-family:var(--disp);font-weight:600;font-size:14px;cursor:pointer;border:1px solid transparent;transition:transform .15s,background .15s,box-shadow .15s}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:11px;
+    font-family:var(--disp);font-weight:600;font-size:15px;cursor:pointer;border:1px solid transparent;transition:transform .14s,box-shadow .14s,background .14s,border-color .14s}
   .btn svg{width:16px;height:16px}
-  .btn-blue{background:var(--blue);color:#06070a}
-  .btn-blue:hover{transform:translateY(-1px);box-shadow:0 12px 30px -10px rgba(91,140,255,.7)}
-  .btn-ghost{border:1px solid var(--line);color:var(--ink)}
-  .btn-ghost:hover{background:rgba(255,255,255,.05)}
-  .btn-lg{height:54px;padding:0 28px;font-size:15.5px;border-radius:13px}
+  .btn-primary{background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(79,70,229,.4),inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 12px 26px -10px rgba(79,70,229,.6)}
+  .btn-ghost{background:#fff;color:var(--ink);border-color:var(--line-strong);box-shadow:var(--sh-sm)}
+  .btn-ghost:hover{background:var(--soft)}
+  .btn-lg{height:52px;padding:0 26px;font-size:16px;border-radius:12px}
 
-  .hero{padding:104px 0 30px}
-  .kicker{display:inline-flex;align-items:center;gap:10px;font-family:var(--disp);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:30px}
-  .kicker .tick{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 12px var(--blue)}
-  h1{font-family:var(--disp);font-weight:700;font-size:clamp(2.7rem,7.6vw,6.2rem);line-height:.96;letter-spacing:-.035em;max-width:15ch}
-  h1 em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue);letter-spacing:-.01em}
-  .lede{margin-top:28px;max-width:56ch;font-size:clamp(1.05rem,2vw,1.35rem);color:var(--muted);line-height:1.5}
-  .lede b{color:var(--ink);font-weight:600}
-  .hero-cta{margin-top:38px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-  .hero-note{margin-top:20px;font-size:14px;color:var(--faint)}
-  .hero-note b{color:var(--muted);font-weight:600}
+  /* Nav */
+  nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.8);backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-in{display:flex;align-items:center;height:64px;gap:24px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:800;font-size:18px;letter-spacing:-.02em}
+  .brand .m{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--violet));color:#fff;font-weight:800;font-size:16px;box-shadow:0 4px 10px -3px rgba(79,70,229,.5)}
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:22px}
+  .nav-links a{color:var(--muted);font-size:14.5px;font-weight:500;transition:color .14s}
+  .nav-links a:hover{color:var(--ink)}
 
-  .marquee{margin-top:70px;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:16px 0;overflow:hidden;white-space:nowrap;-webkit-mask-image:linear-gradient(90deg,transparent,#000 7%,#000 93%,transparent)}
-  .mtrack{display:inline-block;animation:scroll 36s linear infinite;font-family:var(--disp);font-weight:600;font-size:14.5px;letter-spacing:.03em;color:var(--faint);text-transform:uppercase}
-  .mtrack span{margin:0 24px}
-  .mtrack span b{color:var(--blue);font-weight:700}
-  @keyframes scroll{to{transform:translateX(-50%)}}
+  /* Hero */
+  .hero{padding:70px 0 40px;position:relative}
+  .hero::before{content:"";position:absolute;inset:0;z-index:-1;
+    background:radial-gradient(60vw 40vw at 70% -10%,rgba(99,102,241,.10),transparent 60%),radial-gradient(40vw 30vw at 5% 0%,rgba(124,58,237,.06),transparent 60%)}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:13px;
+    padding:6px 12px;border-radius:999px;margin-bottom:22px;border:1px solid rgba(79,70,229,.14)}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  h1{font-family:var(--disp);font-weight:800;font-size:clamp(2.3rem,4.6vw,3.7rem);line-height:1.04;letter-spacing:-.032em;max-width:15ch}
+  h1 .grad{background:linear-gradient(120deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{margin-top:22px;font-size:clamp(1.05rem,1.6vw,1.22rem);color:var(--muted);max-width:52ch}
+  .hero-cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+  .hero-trust{margin-top:22px;display:flex;gap:8px;flex-wrap:wrap}
+  .hero-trust span{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--soft);border:1px solid var(--line);padding:5px 11px;border-radius:999px}
 
-  section{padding:96px 0}
-  .eyebrow{font-family:var(--disp);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-bottom:16px}
-  .sec-h{font-family:var(--disp);font-weight:700;font-size:clamp(1.9rem,4.6vw,3.4rem);letter-spacing:-.025em;line-height:1.02;max-width:20ch}
-  .sec-h em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue)}
-  .sec-sub{margin-top:16px;color:var(--muted);max-width:56ch;font-size:16px}
+  /* Product mockup */
+  .mock{position:relative}
+  .mock-app{background:#fff;border:1px solid var(--line-strong);border-radius:18px;box-shadow:var(--sh-lg);overflow:hidden;transform:perspective(1400px) rotateY(-9deg) rotateX(3deg);transform-origin:left center}
+  .mock-top{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--soft)}
+  .mock-top i{width:10px;height:10px;border-radius:50%;background:#e0e3ea;display:inline-block}
+  .mock-top i:nth-child(1){background:#ff6058}.mock-top i:nth-child(2){background:#ffbd2e}.mock-top i:nth-child(3){background:#28c840}
+  .mock-top .u{margin-left:12px;font-size:11px;color:var(--faint);background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 10px}
+  .mock-body{display:grid;grid-template-columns:52px 1fr;min-height:330px}
+  .mock-side{background:var(--soft);border-right:1px solid var(--line);padding:14px 0;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .mock-side b{width:26px;height:26px;border-radius:8px;background:#fff;border:1px solid var(--line);display:block}
+  .mock-side b.on{background:linear-gradient(135deg,var(--accent),var(--violet));border:none}
+  .mock-main{padding:18px}
+  .mock-h{font-family:var(--disp);font-weight:700;font-size:14px;margin-bottom:14px;color:var(--ink)}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:11px}
+  .kpi .l{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .kpi .v{font-family:var(--disp);font-weight:800;font-size:19px;margin-top:3px}
+  .kpi .v.g{color:var(--green)}.kpi .v.a{color:var(--accent)}.kpi .v.vt{color:var(--violet)}
+  .rows{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .row{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--line);font-size:11.5px}
+  .row:last-child{border-bottom:none}
+  .row .av{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--disp)}
+  .row .nm{font-weight:600;color:var(--ink)}
+  .row .tag{margin-left:auto;font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .tag.pr{background:var(--green-soft);color:var(--green)}
+  .tag.lv{background:#fff4e6;color:var(--amber)}
+  .tag.mt{background:var(--accent-soft);color:var(--accent)}
+  .float{position:absolute;background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--sh-md);padding:11px 13px;display:flex;align-items:center;gap:9px}
+  .float .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff}
+  .float .t{font-size:10px;color:var(--faint);font-weight:600}
+  .float .n{font-family:var(--disp);font-weight:800;font-size:14px;line-height:1.1}
+  .float.f1{top:-18px;right:-6px}
+  .float.f2{bottom:-16px;left:-22px}
 
-  /* Problem / comparison */
-  .versus{border-top:1px solid var(--line2)}
-  .vs-grid{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
-  .vs{border-radius:20px;padding:34px;border:1px solid var(--line2)}
-  .vs.old{background:rgba(255,80,80,.03)}
-  .vs.new{background:linear-gradient(160deg,rgba(91,140,255,.10),rgba(255,255,255,.02));border-color:rgba(91,140,255,.28)}
-  .vs h3{font-family:var(--disp);font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:22px;display:flex;align-items:center;gap:10px}
-  .vs.old h3{color:#ff8080}
-  .vs.new h3{color:var(--blue)}
-  .vs ul{list-style:none;display:grid;gap:15px}
-  .vs li{display:flex;gap:12px;font-size:15.5px;color:#c9cedb;line-height:1.4}
-  .vs li svg{width:19px;height:19px;flex:none;margin-top:1px}
-  .vs.old li svg{color:#ff6b6b;opacity:.8}
-  .vs.new li svg{color:var(--blue)}
-  .vs.new li b{color:#fff;font-weight:600}
+  /* generic section */
+  section{padding:84px 0}
+  .kicker{font-family:var(--disp);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  .sec-h{font-family:var(--disp);font-weight:800;font-size:clamp(1.8rem,3.6vw,2.7rem);letter-spacing:-.028em;line-height:1.08;max-width:20ch}
+  .sec-sub{margin-top:14px;color:var(--muted);max-width:58ch;font-size:16.5px}
+  .center{text-align:center;margin:0 auto}
+  .center .sec-h,.center .sec-sub{margin-left:auto;margin-right:auto}
 
-  /* Bento modules */
-  .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-top:48px}
-  .tile{position:relative;overflow:hidden;background:var(--glass);border:1px solid var(--glassborder);border-radius:20px;padding:28px;backdrop-filter:blur(16px);transition:transform .22s,border-color .22s}
-  .tile:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.2)}
-  .tile.big{grid-column:span 3}
-  .tile.sm{grid-column:span 2}
-  .tile .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(91,140,255,.14);color:var(--blue);margin-bottom:16px}
-  .tile .ic svg{width:20px;height:20px}
-  .tile h4{font-family:var(--disp);font-weight:600;font-size:19px;letter-spacing:-.01em;margin-bottom:8px}
-  .tile p{color:var(--muted);font-size:14.5px;line-height:1.5}
-  .tile .chips{margin-top:16px;display:flex;flex-wrap:wrap;gap:7px}
-  .tile .chips span{font-size:12px;font-weight:500;color:#aab2c2;border:1px solid var(--line2);padding:4px 10px;border-radius:999px}
+  /* one-system band */
+  .band{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px}
+  .col{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px}
+  .col.bad{background:var(--soft2)}
+  .col h4{font-family:var(--disp);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:18px;display:flex;align-items:center;gap:9px}
+  .col.bad h4{color:var(--faint)}
+  .col.good h4{color:var(--accent)}
+  .col ul{list-style:none;display:grid;gap:13px}
+  .col li{display:flex;gap:11px;font-size:15px;color:#3d4453}
+  .col li svg{width:18px;height:18px;flex:none;margin-top:1px}
+  .col.bad li svg{color:var(--faint)}
+  .col.good li svg{color:var(--accent)}
+  .col.good li b{font-weight:600;color:var(--ink)}
 
-  /* Ready */
-  .ready{border-top:1px solid var(--line2)}
-  .ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin-top:40px}
-  .ready-list{display:grid;gap:20px}
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .feat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;transition:transform .18s,box-shadow .18s,border-color .18s}
+  .feat:hover{transform:translateY(-3px);box-shadow:var(--sh-md);border-color:var(--line-strong)}
+  .feat .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:16px}
+  .feat .ic svg{width:22px;height:22px}
+  .feat h3{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:-.01em;margin-bottom:7px}
+  .feat p{color:var(--muted);font-size:14.5px;line-height:1.55}
+
+  /* ready split */
+  .ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center;margin-top:12px}
+  .ready-list{display:grid;gap:22px}
   .ri{display:flex;gap:14px}
-  .ri .n{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:rgba(204,255,2,.12);color:var(--lime);font-family:var(--disp);font-weight:700;font-size:14px}
-  .ri b{font-family:var(--disp);font-weight:600;font-size:16px}
-  .ri p{color:var(--muted);font-size:14.5px;margin-top:3px;line-height:1.5}
-  .ready-panel{border-radius:22px;border:1px solid var(--glassborder);background:var(--glass);backdrop-filter:blur(16px);padding:36px}
-  .ready-panel .big{font-family:var(--disp);font-weight:700;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.02em;line-height:1.1}
-  .ready-panel .big em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue)}
-  .ready-panel p{color:var(--muted);margin-top:14px;font-size:15px}
-  .ready-panel .steps{margin-top:26px;display:grid;gap:14px}
-  .ready-panel .steps div{display:flex;gap:12px;font-size:15px}
-  .ready-panel .steps i{font-style:normal;color:var(--blue);font-family:var(--disp);font-weight:700}
+  .ri .tick{flex:none;width:26px;height:26px;border-radius:8px;background:var(--green-soft);color:var(--green);display:grid;place-items:center}
+  .ri .tick svg{width:15px;height:15px}
+  .ri b{font-family:var(--disp);font-weight:700;font-size:16px}
+  .ri p{color:var(--muted);font-size:14.5px;margin-top:2px}
+  .steps-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-md);padding:32px}
+  .steps-card .sh{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:-.02em;margin-bottom:22px}
+  .step{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+  .step:first-of-type{border-top:none;padding-top:0}
+  .step .n{flex:none;width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--disp);font-weight:700;font-size:13px}
+  .step b{font-family:var(--disp);font-weight:700;font-size:15px}
+  .step p{color:var(--muted);font-size:14px;margin-top:2px}
 
-  /* Pricing */
-  .pricing{border-top:1px solid var(--line2)}
-  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
-  .price{position:relative;border:1px solid var(--line2);border-radius:20px;padding:34px 30px;background:rgba(255,255,255,.02);display:flex;flex-direction:column}
-  .price.hot{border-color:var(--blue);background:linear-gradient(160deg,rgba(91,140,255,.12),rgba(255,255,255,.02))}
-  .price .flag{position:absolute;top:-12px;left:30px;background:var(--blue);color:#06070a;font-family:var(--disp);font-weight:700;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
-  .price h3{font-family:var(--disp);font-weight:600;font-size:16px;color:var(--muted);letter-spacing:.02em;text-transform:uppercase}
-  .price .amt{font-family:var(--disp);font-weight:700;font-size:clamp(2rem,4vw,2.8rem);letter-spacing:-.02em;margin:14px 0 6px}
-  .price .d{color:var(--muted);font-size:14px;min-height:42px;margin-bottom:22px}
-  .price ul{list-style:none;display:grid;gap:12px;margin-bottom:28px}
-  .price li{display:flex;gap:10px;font-size:14.5px;color:#d0d5e0}
-  .price li svg{width:16px;height:16px;color:var(--blue);flex:none;margin-top:2px}
+  /* pricing */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .price{background:#fff;border:1px solid var(--line);border-radius:18px;padding:32px 28px;display:flex;flex-direction:column;position:relative}
+  .price.hot{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),var(--sh-md)}
+  .price .flag{position:absolute;top:-11px;left:28px;background:var(--accent);color:#fff;font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:5px 11px;border-radius:999px}
+  .price h3{font-family:var(--disp);font-weight:700;font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .price .amt{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,3.6vw,2.5rem);letter-spacing:-.02em;margin:12px 0 4px}
+  .price .d{color:var(--muted);font-size:14px;min-height:40px;margin-bottom:22px}
+  .price ul{list-style:none;display:grid;gap:11px;margin-bottom:26px}
+  .price li{display:flex;gap:9px;font-size:14.5px;color:#3d4453}
+  .price li svg{width:16px;height:16px;color:var(--green);flex:none;margin-top:2px}
   .price .btn{margin-top:auto;width:100%}
 
-  /* CTA */
-  .cta{border-top:1px solid var(--line2)}
-  .cta-card{position:relative;overflow:hidden;text-align:center;border-radius:28px;padding:clamp(48px,8vw,90px) 28px;
-    background:linear-gradient(155deg,rgba(91,140,255,.18),rgba(67,231,208,.06));border:1px solid var(--glassborder);backdrop-filter:blur(16px)}
-  .cta-card h2{font-family:var(--disp);font-weight:700;font-size:clamp(2.1rem,5.4vw,4rem);letter-spacing:-.03em;line-height:1;max-width:18ch;margin:0 auto}
-  .cta-card h2 em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--blue)}
-  .cta-card p{margin:18px auto 0;color:var(--muted);max-width:52ch;font-size:16px}
-  .cta-actions{margin-top:34px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  /* cta */
+  .cta-card{position:relative;overflow:hidden;border-radius:26px;padding:clamp(44px,7vw,76px) 32px;text-align:center;
+    background:linear-gradient(135deg,var(--accent),var(--violet));color:#fff;box-shadow:var(--sh-lg)}
+  .cta-card::after{content:"";position:absolute;inset:0;background:radial-gradient(40vw 40vw at 80% -20%,rgba(255,255,255,.18),transparent 60%);pointer-events:none}
+  .cta-card h2{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,4.4vw,3rem);letter-spacing:-.03em;line-height:1.05;max-width:18ch;margin:0 auto;position:relative}
+  .cta-card p{margin:16px auto 0;max-width:50ch;color:rgba(255,255,255,.9);font-size:16px;position:relative}
+  .cta-actions{margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative}
+  .cta-actions .btn-primary{background:#fff;color:var(--accent);box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  .cta-actions .btn-primary:hover{background:#f3f4ff}
+  .cta-actions .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+  .cta-actions .btn-ghost:hover{background:rgba(255,255,255,.12)}
 
-  footer{border-top:1px solid var(--line2);padding:34px 0}
-  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--faint);font-size:13.5px}
+  footer{border-top:1px solid var(--line);padding:30px 0}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--faint);font-size:14px}
 
-  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1)}
   .reveal.in{opacity:1;transform:none}
 
-  @media(max-width:860px){
-    .vs-grid,.ready-grid,.prices{grid-template-columns:1fr}
-    .bento{grid-template-columns:1fr 1fr}
-    .tile.big,.tile.sm{grid-column:span 2}
+  @media(max-width:900px){
+    .hero-grid{grid-template-columns:1fr;gap:44px}
+    .mock-app{transform:none}
+    .float.f1{right:6px}.float.f2{left:6px}
+    .split,.ready-grid,.grid,.prices{grid-template-columns:1fr}
+    .grid{gap:14px}
     .nav-links a.hide{display:none}
-    .ready-grid{gap:36px}
   }
-  @media(max-width:520px){.bento{grid-template-columns:1fr}.tile.big,.tile.sm{grid-column:span 1}}
 </style>
 </head>
 <body>
-<div class="glow"></div>
-<div class="grain"></div>
 
 <nav>
   <div class="wrap nav-in">
     <a class="brand" href="#top"><span class="m">A</span>Atllanta</a>
     <div class="nav-links">
       <a class="hide" href="#why">Why</a>
-      <a class="hide" href="#inside">Inside</a>
+      <a class="hide" href="#features">Features</a>
       <a class="hide" href="#pricing">Pricing</a>
       <a href="/login">Sign in</a>
-      <a class="btn btn-blue" href="/login">Start free</a>
+      <a class="btn btn-primary" href="/login" style="height:38px;padding:0 16px;font-size:14px">Start free</a>
     </div>
   </div>
 </nav>
 
-<header class="wrap hero" id="top">
-  <div class="kicker reveal"><span class="tick"></span>Business Operating System · Built for India</div>
-  <h1 class="reveal">Run your company on one system. <em>Not five.</em></h1>
-  <p class="lede reveal">Hiring, attendance, leave and customers — <b>one login, one source of truth</b>, workflows that actually connect. Stop paying five vendors to run one business.</p>
-  <div class="hero-cta reveal">
-    <a class="btn btn-blue btn-lg" href="/login">Start free</a>
-    <a class="btn btn-ghost btn-lg" href="#why">See why it's different</a>
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <span class="badge"><span class="dot"></span>Business Operating System · for India</span>
+      <h1>One system to run <span class="grad">your whole company.</span></h1>
+      <p class="lede">Hiring, attendance, leave and customers — in one clean platform with a single login. Replace the five disconnected tools your team is stitching together.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="/login">Start free</a>
+        <a class="btn btn-ghost btn-lg" href="#features">See how it works</a>
+      </div>
+      <div class="hero-trust">
+        <span>No setup projects</span><span>Installable app</span><span>Works offline</span><span>₹ · IST · Apr–Mar</span>
+      </div>
+    </div>
+
+    <div class="mock reveal">
+      <div class="mock-app">
+        <div class="mock-top"><i></i><i></i><i></i><span class="u">app.atllanta · dashboard</span></div>
+        <div class="mock-body">
+          <div class="mock-side"><b class="on"></b><b></b><b></b><b></b><b></b></div>
+          <div class="mock-main">
+            <div class="mock-h">Good morning, Priya</div>
+            <div class="kpis">
+              <div class="kpi"><div class="l">Present</div><div class="v g">48/52</div></div>
+              <div class="kpi"><div class="l">Open roles</div><div class="v a">6</div></div>
+              <div class="kpi"><div class="l">Pipeline</div><div class="v vt">₹4.2L</div></div>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="av" style="background:#4f46e5">RK</span><span class="nm">Ravi Kumar</span><span class="tag pr">Present</span></div>
+              <div class="row"><span class="av" style="background:#0ea371">SN</span><span class="nm">Sneha Nair</span><span class="tag mt">Interview 2pm</span></div>
+              <div class="row"><span class="av" style="background:#c47f12">AM</span><span class="nm">Arjun Mehta</span><span class="tag lv">On leave</span></div>
+              <div class="row"><span class="av" style="background:#7c3aed">DP</span><span class="nm">Deepa P.</span><span class="tag pr">Present</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="float f1"><span class="ic" style="background:var(--green)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" width="15" height="15"><polyline points="20 6 9 17 4 12"/></svg></span><span><span class="t">Checked in</span><span class="n">09:02 AM</span></span></div>
+      <div class="float f2"><span class="ic" style="background:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="15" height="15"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0"/></svg></span><span><span class="t">Match score</span><span class="n">92%</span></span></div>
+    </div>
   </div>
-  <p class="hero-note reveal"><b>No setup projects.</b> Installable on your phone. Works offline in the field.</p>
 </header>
 
-<div class="marquee">
-  <div class="mtrack">
-    <span>Recruitment <b>·</b></span><span>AI matching <b>·</b></span><span>Attendance <b>·</b></span><span>Leave <b>·</b></span><span>CRM <b>·</b></span><span>Pipeline <b>·</b></span><span>Approvals <b>·</b></span><span>Audit <b>·</b></span><span>Offline-first <b>·</b></span><span>Made in India <b>·</b></span>
-    <span>Recruitment <b>·</b></span><span>AI matching <b>·</b></span><span>Attendance <b>·</b></span><span>Leave <b>·</b></span><span>CRM <b>·</b></span><span>Pipeline <b>·</b></span><span>Approvals <b>·</b></span><span>Audit <b>·</b></span><span>Offline-first <b>·</b></span><span>Made in India <b>·</b></span>
-  </div>
-</div>
-
-<section class="versus" id="why">
+<section class="band" id="why">
   <div class="wrap">
-    <div class="eyebrow reveal">The honest problem</div>
-    <h2 class="sec-h reveal">Five tools pretending to be <em>one company.</em></h2>
-    <p class="sec-sub reveal">A hiring tool here, an attendance app there, an HR sheet, a CRM, and a WhatsApp group holding it together. Nothing talks. Atllanta is the other way to do it.</p>
-    <div class="vs-grid">
-      <div class="vs old reveal">
-        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> The five-app stack</h3>
+    <div class="kicker reveal">The honest problem</div>
+    <h2 class="sec-h reveal">Five tools pretending to be one company.</h2>
+    <p class="sec-sub reveal">A hiring tool, an attendance app, an HR sheet, a CRM, and a WhatsApp group holding it together. Nothing talks. Atllanta is the other way.</p>
+    <div class="split">
+      <div class="col bad reveal">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> The five-app stack</h4>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> A separate bill for every function</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Data copied by hand between apps</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Data re-typed between apps</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Five logins, five support queues</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Priced in dollars, built for elsewhere</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Priced in dollars, built elsewhere</li>
         </ul>
       </div>
-      <div class="vs new reveal">
-        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Atllanta</h3>
+      <div class="col good reveal">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Atllanta</h4>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One platform</b> for hiring, people &amp; customers</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One record</b> every module reads from</li>
@@ -226,75 +275,76 @@
   </div>
 </section>
 
-<section id="inside">
+<section id="features">
   <div class="wrap">
-    <div class="eyebrow reveal">What's inside</div>
-    <h2 class="sec-h reveal">Everything to run people &amp; sales — <em>day one.</em></h2>
-    <div class="bento">
-      <div class="tile big reveal">
+    <div class="center" style="max-width:640px">
+      <div class="kicker reveal">What's inside</div>
+      <h2 class="sec-h reveal">Everything to run people &amp; sales.</h2>
+      <p class="sec-sub reveal">Not add-ons or upsells — these ship in the box, from day one.</p>
+    </div>
+    <div class="grid">
+      <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg></div>
-        <h4>AI recruitment</h4>
-        <p>Upload resumes and a JD — Atllanta parses skills and ranks candidates with a transparent match score. Shortlist, schedule interviews, and track the pipeline without the enterprise ATS bill.</p>
-        <div class="chips"><span>CV–JD matching</span><span>Shortlisting</span><span>Interviews</span></div>
+        <h3>AI recruitment</h3>
+        <p>Parse resumes against a JD, rank candidates with a transparent score, shortlist and schedule interviews — without the enterprise ATS bill.</p>
       </div>
-      <div class="tile sm reveal">
+      <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-        <h4>Attendance</h4>
-        <p>Selfie + geofenced check-in, regularization, and reports — accurate, even in the field.</p>
+        <h3>Attendance</h3>
+        <p>Selfie + geofenced check-in, regularization and reports — accurate even when your team is out in the field.</p>
       </div>
-      <div class="tile sm reveal">
+      <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></div>
-        <h4>Leave</h4>
-        <p>Balances, holidays, apply and approve — all in one inbox managers actually check.</p>
+        <h3>Leave</h3>
+        <p>Balances, holidays, apply and approve — in one inbox managers actually check.</p>
       </div>
-      <div class="tile sm reveal">
+      <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></div>
-        <h4>CRM &amp; pipeline</h4>
+        <h3>CRM &amp; pipeline</h3>
         <p>Accounts, contacts, leads and a weighted deal pipeline for your sales team.</p>
       </div>
-      <div class="tile sm reveal">
+      <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-        <h4>Approvals &amp; audit</h4>
-        <p>One approvals inbox, a full audit trail, and clear owner/admin/manager/member roles.</p>
+        <h3>Approvals &amp; audit</h3>
+        <p>One approvals inbox, a full audit trail, and clear owner / admin / manager / member roles.</p>
       </div>
-      <div class="tile sm reveal">
+      <div class="feat reveal">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></div>
-        <h4>AI assistant</h4>
-        <p>Ask across your data — permission-aware, so it never shows what a person can't see.</p>
+        <h3>AI assistant</h3>
+        <p>Ask questions across your data — permission-aware, so it never shows what a person can't see.</p>
       </div>
     </div>
   </div>
 </section>
 
-<section class="ready">
+<section class="band">
   <div class="wrap">
-    <div class="eyebrow reveal">Ready to use</div>
-    <h2 class="sec-h reveal">Live software. <em>Not a build project.</em></h2>
+    <div class="kicker reveal">Ready to use</div>
+    <h2 class="sec-h reveal">Live software — not a build project.</h2>
     <div class="ready-grid">
       <div class="ready-list">
-        <div class="ri reveal"><span class="n">↧</span><div><b>Installable app</b><p>Add it to the home screen — full-screen, like a native app, on any phone.</p></div></div>
-        <div class="ri reveal"><span class="n">⤓</span><div><b>Works offline</b><p>Check in and log visits with no signal. Everything syncs when you're back online.</p></div></div>
-        <div class="ri reveal"><span class="n">◆</span><div><b>Isolated by org</b><p>Every organization's data is walled off at the database level. Your team sees only your data.</p></div></div>
-        <div class="ri reveal"><span class="n">₹</span><div><b>Built for India</b><p>Rupees, IST, an April–March fiscal year and DD/MM/YYYY — no configuration needed.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Installable app</b><p>Add it to the home screen — full-screen, like a native app, on any phone.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Works offline</b><p>Check in and log visits with no signal — everything syncs on reconnect.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Isolated by organization</b><p>Every org's data is walled off at the database level. Your team sees only your data.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Built for India</b><p>Rupees, IST, April–March fiscal year and DD/MM/YYYY — no configuration.</p></div></div>
       </div>
-      <div class="ready-panel reveal">
-        <div class="big">Up and running in <em>an afternoon.</em></div>
-        <p>No implementation team, no onboarding invoice.</p>
-        <div class="steps">
-          <div><i>01</i> Create your workspace — provisioned instantly on sign-up.</div>
-          <div><i>02</i> Invite your team, set roles, switch on the modules you need.</div>
-          <div><i>03</i> Post a job or run today's attendance — same day.</div>
-        </div>
-        <a class="btn btn-blue" style="width:100%;margin-top:26px" href="/login">Create your workspace</a>
+      <div class="steps-card reveal">
+        <div class="sh">Up and running in an afternoon.</div>
+        <div class="step"><span class="n">1</span><div><b>Create your workspace</b><p>Provisioned instantly on sign-up.</p></div></div>
+        <div class="step"><span class="n">2</span><div><b>Invite your team</b><p>Set roles, switch on the modules you need.</p></div></div>
+        <div class="step"><span class="n">3</span><div><b>Go</b><p>Post a job or run today's attendance — same day.</p></div></div>
+        <a class="btn btn-primary" style="width:100%;margin-top:24px" href="/login">Create your workspace</a>
       </div>
     </div>
   </div>
 </section>
 
-<section class="pricing" id="pricing">
+<section id="pricing">
   <div class="wrap">
-    <div class="eyebrow reveal">Pricing</div>
-    <h2 class="sec-h reveal">Start free. Pay when it's <em>running your business.</em></h2>
+    <div class="center" style="max-width:620px">
+      <div class="kicker reveal">Pricing</div>
+      <h2 class="sec-h reveal">Start free. Pay when it runs your business.</h2>
+    </div>
     <div class="prices">
       <div class="price reveal">
         <h3>Pilot</h3>
@@ -314,10 +364,10 @@
         <div class="d">For teams running hiring, HR and CRM together, every day.</div>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Everything in Pilot</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> CRM, pipeline &amp; approvals inbox</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> CRM, pipeline &amp; approvals</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> AI assistant + audit log</li>
         </ul>
-        <a class="btn btn-blue" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Growth%20plan">Talk to us</a>
+        <a class="btn btn-primary" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Growth%20plan">Talk to us</a>
       </div>
       <div class="price reveal">
         <h3>Enterprise</h3>
@@ -334,13 +384,13 @@
   </div>
 </section>
 
-<section class="cta">
+<section>
   <div class="wrap">
     <div class="cta-card reveal">
-      <h2>Put your whole operation <em>in one place.</em></h2>
+      <h2>Put your whole operation in one place.</h2>
       <p>Hiring, people, and customers — one login, one afternoon to get going. Start free, with your own team.</p>
       <div class="cta-actions">
-        <a class="btn btn-blue btn-lg" href="/login">Start free</a>
+        <a class="btn btn-primary btn-lg" href="/login">Start free</a>
         <a class="btn btn-ghost btn-lg" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20demo">Book a demo</a>
       </div>
     </div>
@@ -349,16 +399,16 @@
 
 <footer>
   <div class="wrap foot">
-    <a class="brand" href="#top" style="font-size:15px"><span class="m" style="width:24px;height:24px;font-size:14px">A</span>Atllanta</a>
+    <a class="brand" href="#top" style="font-size:15px"><span class="m" style="width:24px;height:24px;font-size:13px">A</span>Atllanta</a>
     <span>© <span id="yr"></span> · Business Operating System</span>
-    <a href="/login" style="color:var(--blue);font-weight:600">Sign in</a>
+    <a href="/login" style="color:var(--accent);font-weight:600">Sign in</a>
   </div>
 </footer>
 
 <script>
-  document.getElementById('yr').textContent = new Date().getFullYear();
+  document.getElementById('yr').textContent=new Date().getFullYear();
   const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
-  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(Math.min(i%4,3)*70)+'ms';io.observe(el)});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(Math.min(i%3,2)*80)+'ms';io.observe(el)});
 </script>
 </body>
 </html>
