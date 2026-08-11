@@ -42,38 +42,31 @@ export default async function handler(req, res) {
   const db = supabaseAdmin();
   const { application_id, job_id, candidate_id } = req.body || {};
 
-  // Resolve or create the application row
-  let app;
+  // Resolve the target job + candidate ids WITHOUT writing anything yet.
+  let appId = null, jobId = job_id, candId = candidate_id;
   if (application_id) {
-    const { data } = await db
+    const { data: existing } = await db
       .from("job_applications")
       .select("id, job_id, candidate_id")
       .eq("id", application_id)
       .single();
-    app = data;
-  } else if (job_id && candidate_id) {
-    const { data } = await db
-      .from("job_applications")
-      .upsert(
-        { job_id, candidate_id },
-        { onConflict: "job_id,candidate_id" }
-      )
-      .select("id, job_id, candidate_id")
-      .single();
-    app = data;
+    if (!existing) return res.status(404).json({ error: "Application not found" });
+    appId = existing.id; jobId = existing.job_id; candId = existing.candidate_id;
   }
-  if (!app) return res.status(404).json({ error: "Application not found" });
+  if (!jobId || !candId) {
+    return res.status(400).json({ error: "application_id, or job_id and candidate_id, are required" });
+  }
 
-  // Load job + candidate + org, and verify the caller can access this client
+  // Load job + candidate + org, and AUTHORIZE before creating any row.
   const { data: job } = await db
     .from("jobs")
     .select("id, title, jd_raw_text, description, client_id, clients(id, organization_id, name)")
-    .eq("id", app.job_id)
+    .eq("id", jobId)
     .single();
   const { data: candidate } = await db
     .from("candidates")
-    .select("id, full_name, name, resume_text, resume_raw_text")
-    .eq("id", app.candidate_id)
+    .select("id, full_name, name, resume_text, resume_raw_text, org_id")
+    .eq("id", candId)
     .single();
 
   if (!job || !candidate) {
@@ -93,6 +86,25 @@ export default async function handler(req, res) {
     (["agency_admin", "super_admin"].includes(membership.role) ||
       membership.client_id === job.client_id);
   if (!allowed) return res.status(403).json({ error: "No access to this client" });
+
+  // The candidate must live in the same org as the job (no cross-org linking).
+  if (candidate.org_id && candidate.org_id !== orgId) {
+    return res.status(403).json({ error: "Candidate is not in this organization" });
+  }
+
+  // Only now — after authorization — create or resolve the application row.
+  let app;
+  if (appId) {
+    app = { id: appId, job_id: jobId, candidate_id: candId };
+  } else {
+    const { data } = await db
+      .from("job_applications")
+      .upsert({ job_id: jobId, candidate_id: candId, org_id: orgId }, { onConflict: "job_id,candidate_id" })
+      .select("id, job_id, candidate_id")
+      .single();
+    app = data;
+  }
+  if (!app) return res.status(404).json({ error: "Application not found" });
 
   const jd = job.jd_raw_text || job.description || "";
   const resume = candidate.resume_text || candidate.resume_raw_text || "";
