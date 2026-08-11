@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabaseServer.js";
+import crypto from "crypto";
 
 // Server-side event worker. Two responsibilities:
 //
@@ -547,15 +548,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST or GET" });
   }
 
-  // Accept the secret via bearer header (POST) or ?key= (some cron providers
-  // only send GET without custom headers).
+  // Fail closed: this endpoint drains the email queue via the service role, so
+  // it must never be publicly callable. Require CRON_SECRET to be configured
+  // AND presented in the Authorization header (Vercel Cron sends it there).
+  // The secret is never accepted in the query string (it would leak to logs).
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = req.headers.authorization || "";
-    const queryKey = req.query?.key || "";
-    const authorized =
-      authHeader === `Bearer ${cronSecret}` || queryKey === cronSecret;
-    if (!authorized) return res.status(401).json({ error: "Unauthorized" });
+  if (!cronSecret) {
+    return res.status(500).json({ error: "Server misconfigured: CRON_SECRET is not set" });
+  }
+  const authHeader = req.headers.authorization || "";
+  const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(cronSecret);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   const sb = supabaseAdmin();

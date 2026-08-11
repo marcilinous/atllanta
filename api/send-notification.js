@@ -36,9 +36,27 @@ export default async function handler(req, res) {
   if (!isAdmin) return res.status(403).json({ error: "Admin access required" });
 
   const { to, subject, body, channel, user_id, module, entity_type, entity_id } = req.body || {};
+  const orgId = membership.organization_id;
+
+  // Escape user-supplied text before it lands in the email's HTML body, and
+  // strip newlines from the subject (header-injection guard).
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const safeSubject = String(subject || "").replace(/[\r\n]+/g, " ").trim();
 
   if (channel === "email" || (!channel && to)) {
-    if (!to || !subject) return res.status(400).json({ error: "to and subject required for email" });
+    if (!to || !safeSubject) return res.status(400).json({ error: "to and subject required for email" });
+
+    // Recipient must belong to the caller's organization — no arbitrary sends.
+    const recipient = String(to).trim().toLowerCase();
+    const [{ data: mem }, { data: cand }] = await Promise.all([
+      sb.from("memberships").select("id").eq("organization_id", orgId).eq("email", recipient).maybeSingle(),
+      sb.from("candidates").select("id").eq("org_id", orgId).eq("email", recipient).maybeSingle(),
+    ]);
+    if (!mem && !cand) {
+      return res.status(403).json({ error: "Recipient is not a member or candidate of your organization" });
+    }
 
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey) return res.status(500).json({ error: "RESEND_API_KEY not configured" });
@@ -51,11 +69,11 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         from: process.env.RESEND_FROM || "Atllanta <notifications@atllanta.app>",
-        to,
-        subject: `[Atllanta] ${subject}`,
+        to: recipient,
+        subject: `[Atllanta] ${safeSubject}`,
         html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-          <h2 style="color:#1A1D23">${subject}</h2>
-          <div style="color:#6B7080">${body || ''}</div>
+          <h2 style="color:#1A1D23">${esc(safeSubject)}</h2>
+          <div style="color:#6B7080">${esc(body || '')}</div>
           <hr style="border:none;border-top:1px solid #E2E4E9;margin:24px 0">
           <p style="font-size:12px;color:#9CA0AB">Atllanta Business OS</p>
         </div>`,
@@ -68,12 +86,18 @@ export default async function handler(req, res) {
   }
 
   if (channel === "in_app" || !channel) {
-    if (!user_id || !subject) return res.status(400).json({ error: "user_id and subject required" });
+    if (!user_id || !safeSubject) return res.status(400).json({ error: "user_id and subject required" });
+
+    // Target user must belong to the caller's organization.
+    const { data: target } = await sb
+      .from("memberships").select("id")
+      .eq("organization_id", orgId).eq("user_id", user_id).maybeSingle();
+    if (!target) return res.status(403).json({ error: "Target user is not in your organization" });
 
     const { error } = await sb.from("notifications").insert({
-      org_id: membership.organization_id,
+      org_id: orgId,
       user_id,
-      title: subject,
+      title: safeSubject,
       body: body || null,
       module: module || "system",
       entity_type: entity_type || null,

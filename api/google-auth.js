@@ -6,6 +6,30 @@
 // POST { action: "disconnect" } → removes stored tokens
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import crypto from "crypto";
+
+// The OAuth `state` must not carry the user's session token (it would leak into
+// Google's redirect, browser history and server logs). Instead we mint a short,
+// HMAC-signed, 10-minute token that only encodes the user id, and verify it on
+// callback. Signed with a server-only secret.
+const STATE_SECRET = process.env.OAUTH_STATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+function signState(userId) {
+  const payload = Buffer.from(JSON.stringify({ uid: userId, exp: Date.now() + 10 * 60 * 1000 })).toString("base64url");
+  const sig = crypto.createHmac("sha256", STATE_SECRET).update(payload).digest("base64url");
+  return `${payload}.${sig}`;
+}
+function verifyState(state) {
+  if (!state || typeof state !== "string" || !state.includes(".")) return null;
+  const [payload, sig] = state.split(".");
+  const expected = crypto.createHmac("sha256", STATE_SECRET).update(payload).digest("base64url");
+  const a = Buffer.from(sig), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const obj = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!obj.uid || !obj.exp || obj.exp < Date.now()) return null;
+    return obj.uid;
+  } catch { return null; }
+}
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
@@ -45,6 +69,8 @@ export default async function handler(req, res) {
   if (req.method === "GET" && action === "url") {
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!token) return res.status(401).json({ error: "Missing auth token" });
+    const user = await getUserFromToken(token);
+    if (!user?.id) return res.status(401).json({ error: "Invalid session" });
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -53,18 +79,19 @@ export default async function handler(req, res) {
       scope: SCOPES.join(" "),
       access_type: "offline",
       prompt: "consent",
-      state: token,
+      state: signState(user.id),
     });
 
     return res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
   }
 
   if (req.method === "GET" && action === "callback") {
-    const { code, state: token } = req.query;
-    if (!code || !token) return res.status(400).send("Missing code or state");
+    const { code, state } = req.query;
+    if (!code || !state) return res.status(400).send("Missing code or state");
 
-    const user = await getUserFromToken(token);
-    if (!user?.id) return res.status(401).send("Invalid session");
+    const uid = verifyState(state);
+    if (!uid) return res.status(401).send("Invalid or expired session");
+    const user = { id: uid };
 
     const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",

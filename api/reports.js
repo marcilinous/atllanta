@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     let query = sb
       .from("attendance")
       .select("*, user:user_id(full_name, email)")
+      .eq("org_id", membership.organization_id)
       .gte("date", start_date)
       .lte("date", end_date)
       .order("date", { ascending: false });
@@ -71,6 +72,7 @@ export default async function handler(req, res) {
     let query = sb
       .from("leave_requests")
       .select("*, requester:user_id(full_name, email), leave_type:leave_type_id(name, code)")
+      .eq("org_id", membership.organization_id)
       .gte("start_date", start_date)
       .lte("end_date", end_date)
       .order("created_at", { ascending: false });
@@ -92,7 +94,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ records: data, summary });
 
   } else if (type === "recruitment") {
-    let jobsQuery = sb.from("jobs").select("id, title, status, created_at");
+    let jobsQuery = sb.from("jobs").select("id, title, status, created_at").eq("org_id", membership.organization_id);
     if (job_id) jobsQuery = jobsQuery.eq("id", job_id);
     else jobsQuery = jobsQuery.in("status", ["open", "on_hold"]);
 

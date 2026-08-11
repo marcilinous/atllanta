@@ -55,10 +55,12 @@ export default async function handler(req, res) {
         errors.push({ row: i + 1, error: "full_name and email required" });
         continue;
       }
+      // Only allow known roles; anything else falls back to 'member'.
+      const safeRole = ["owner", "admin", "manager", "member"].includes(row.role) ? row.role : "member";
       const result = await provisionMember(sb, {
         orgId,
         email: String(row.email).trim().toLowerCase(),
-        role: row.role,
+        role: safeRole,
         full_name: row.full_name,
         designation: row.designation,
         date_of_joining: row.date_of_joining || null,
