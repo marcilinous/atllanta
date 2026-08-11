@@ -179,6 +179,19 @@
   }
 
   .login-toggle button:hover { text-decoration: underline; }
+
+  .login-forgot { text-align: right; margin-top: calc(var(--space-2) * -1); }
+  .login-forgot button {
+    background: none; border: none; color: var(--color-accent);
+    font-size: var(--text-sm); font-weight: var(--font-weight-medium); cursor: pointer; padding: 0;
+  }
+  .login-forgot button:hover { text-decoration: underline; }
+
+  .login-success {
+    font-size: var(--text-sm); color: var(--color-success);
+    background: var(--color-success-light); padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md); margin-top: var(--space-2);
+  }
 </style>
 </head>
 <body>
@@ -201,7 +214,24 @@
       <div id="login-error" class="login-error hidden"></div>
     </form>
 
-    <div class="login-divider">or</div>
+    <div class="login-forgot"><button type="button" id="forgot-btn">Forgot password?</button></div>
+
+    <!-- Self-service password reset -->
+    <div id="forgot-section" class="hidden">
+      <p class="login-subtitle" style="margin-top: var(--space-4)">Enter your account email and we'll send you a link to reset your password.</p>
+      <form id="forgot-form" class="login-form">
+        <div>
+          <label for="forgot-email">Email</label>
+          <input type="email" id="forgot-email" autocomplete="email" required placeholder="you@company.com">
+        </div>
+        <button type="submit" class="login-btn" id="forgot-send-btn">Send reset link</button>
+        <div id="forgot-error" class="login-error hidden"></div>
+        <div id="forgot-success" class="login-success hidden"></div>
+      </form>
+      <div class="login-toggle"><button id="forgot-back-btn">← Back to sign in</button></div>
+    </div>
+
+    <div class="login-divider" id="login-divider">or</div>
 
     <button type="button" class="google-btn" id="google-btn">
       <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -227,7 +257,7 @@
       </form>
     </div>
 
-    <div class="login-toggle">
+    <div class="login-toggle" id="main-toggle">
       <span id="toggle-text">Don't have an account?</span>
       <button id="toggle-btn">Sign up</button>
     </div>
@@ -321,6 +351,49 @@ document.getElementById('google-btn').addEventListener('click', async () => {
     provider: 'google',
     options: { redirectTo: window.location.origin + '/' }
   });
+});
+
+// --- Self-service password reset ---
+const forgotSection = document.getElementById('forgot-section');
+function showForgot(on) {
+  document.getElementById('login-form').classList.toggle('hidden', on);
+  document.getElementById('login-divider').classList.toggle('hidden', on);
+  document.getElementById('google-btn').classList.toggle('hidden', on);
+  document.getElementById('signup-section').classList.add('hidden');
+  document.getElementById('main-toggle').classList.toggle('hidden', on);
+  document.querySelector('.login-forgot').classList.toggle('hidden', on);
+  forgotSection.classList.toggle('hidden', !on);
+  document.querySelector('.login-title').textContent = on ? 'Reset your password' : 'Welcome back';
+  document.querySelector('.login-subtitle').textContent = on
+    ? "We'll email you a reset link."
+    : 'Sign in to your Atllanta workspace';
+}
+document.getElementById('forgot-btn').addEventListener('click', () => showForgot(true));
+document.getElementById('forgot-back-btn').addEventListener('click', () => showForgot(false));
+
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('forgot-error');
+  const okEl = document.getElementById('forgot-success');
+  errEl.classList.add('hidden'); okEl.classList.add('hidden');
+  const btn = document.getElementById('forgot-send-btn');
+  const email = document.getElementById('forgot-email').value.trim();
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset-password',
+  });
+
+  btn.disabled = false; btn.textContent = 'Send reset link';
+  if (error && !/rate|limit/i.test(error.message)) {
+    // Only surface transport-level problems; never reveal whether an account
+    // exists (email-enumeration guard).
+    errEl.textContent = error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  okEl.textContent = "If an account exists for that email, a reset link is on its way. Check your inbox.";
+  okEl.classList.remove('hidden');
 });
 </script>
 </body>

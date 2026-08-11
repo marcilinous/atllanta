@@ -1,7 +1,8 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/login", "destination": "/login.html" }
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/reset-password", "destination": "/reset-password.html" }
   ],
   "crons": [
     { "path": "/api/event-processor", "schedule": "0 3 * * *" }
