@@ -1,0 +1,7 @@
+# Atllanta — robots.txt
+# Update the Sitemap host at domain cutover.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://atllanta.vercel.app/sitemap.xml
