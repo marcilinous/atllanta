@@ -418,7 +418,7 @@ export default async function recruitmentJobs(container) {
           const parseData = await parseResp.json();
           if (!parseResp.ok) throw new Error(parseData.error);
 
-          const extractResp = await fetch('/api/extract-candidate', {
+          const extractResp = await fetch('/api/parse-resume?action=extract-candidate', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ resume_text: parseData.text }),
