@@ -269,6 +269,24 @@
   .cta-actions .btn-primary:hover{background:#f3f4ff}
   .cta-actions .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
   .cta-actions .btn-ghost:hover{background:rgba(255,255,255,.12)}
+  /* Lead capture form (sits on the accent cta-card) */
+  .lead-form{position:relative;max-width:540px;margin:28px auto 0;text-align:left;display:flex;flex-direction:column;gap:12px}
+  .lead-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .lead-input{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);background:#fff;border:1px solid transparent;border-radius:12px;padding:13px 15px;outline:none;transition:box-shadow .15s,border-color .15s}
+  .lead-input::placeholder{color:#9096a4}
+  .lead-input:focus{border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.35)}
+  textarea.lead-input{resize:vertical;min-height:52px}
+  .lead-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  .lead-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:4px}
+  .lead-actions .btn-primary{background:#fff;color:var(--accent);box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  .lead-actions .btn-primary:hover{background:#f3f4ff}
+  .lead-actions .btn-primary:disabled{opacity:.6;cursor:default}
+  .lead-alt{color:rgba(255,255,255,.9);font-size:14px}
+  .lead-alt a{color:#fff;text-decoration:underline}
+  .lead-msg{font-size:14px;font-weight:500;min-height:20px;color:#fff}
+  .lead-msg.ok{color:#eafff4}
+  .lead-msg.err{color:#ffe4e4}
+  @media (max-width:560px){ .lead-row{grid-template-columns:1fr} }
 
   footer{border-top:1px solid var(--glass-brd);background:var(--glass-soft);backdrop-filter:blur(12px)}
   .foot-top{display:grid;grid-template-columns:1.5fr 2fr;gap:48px;padding:60px 0 44px}
@@ -552,15 +570,29 @@
   </div>
 </section>
 
-<section>
+<section id="get-started">
   <div class="wrap">
     <div class="cta-card reveal">
-      <h2>Put your whole operation in one place.</h2>
-      <p>Hiring, people, and customers — one login, one afternoon to get going. Start free, with your own team.</p>
-      <div class="cta-actions">
-        <a class="btn btn-primary btn-lg" href="/login">Start free</a>
-        <a class="btn btn-ghost btn-lg" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20demo">Book a demo</a>
-      </div>
+      <h2>See Atllanta on your own hiring.</h2>
+      <p>Tell us a little about your team and we'll set up a quick demo — bring a job description and we'll score real CVs against it, live.</p>
+      <form id="lead-form" class="lead-form" novalidate>
+        <div class="lead-row">
+          <input class="lead-input" name="company" placeholder="Company" autocomplete="organization" required>
+          <input class="lead-input" name="contact_name" placeholder="Your name" autocomplete="name">
+        </div>
+        <div class="lead-row">
+          <input class="lead-input" name="email" type="email" placeholder="Work email" autocomplete="email" required>
+          <input class="lead-input" name="phone" placeholder="Phone / WhatsApp (optional)" autocomplete="tel">
+        </div>
+        <textarea class="lead-input" name="message" rows="2" placeholder="Anything you'd like us to know? (optional)"></textarea>
+        <!-- honeypot: real people never fill this -->
+        <input class="lead-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="lead-actions">
+          <button class="btn btn-primary btn-lg" type="submit" id="lead-submit">Request a demo</button>
+          <span class="lead-alt">or <a href="/login">sign in</a></span>
+        </div>
+        <div class="lead-msg" id="lead-msg" role="status" aria-live="polite"></div>
+      </form>
     </div>
   </div>
 </section>
@@ -594,7 +626,7 @@
       <div class="fcol">
         <h5>Get started</h5>
         <a href="/login">Create workspace</a>
-        <a href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20demo">Book a demo</a>
+        <a href="#get-started">Book a demo</a>
         <a href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20sales">Contact sales</a>
       </div>
     </div>
@@ -622,6 +654,43 @@
       if(p<1)requestAnimationFrame(step);};
     setTimeout(()=>requestAnimationFrame(step),650);
   });
+
+  // Lead capture — posts to the serverless endpoint, which drops it into the
+  // founder sales tracker as an inbound lead.
+  const leadForm=document.getElementById('lead-form');
+  if(leadForm){
+    const msg=document.getElementById('lead-msg');
+    const btn=document.getElementById('lead-submit');
+    leadForm.addEventListener('submit',async(e)=>{
+      e.preventDefault();
+      msg.className='lead-msg';msg.textContent='';
+      const fd=new FormData(leadForm);
+      const company=(fd.get('company')||'').trim();
+      const email=(fd.get('email')||'').trim();
+      if(!company){msg.classList.add('err');msg.textContent='Please enter your company.';return;}
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){msg.classList.add('err');msg.textContent='Please enter a valid work email.';return;}
+      btn.disabled=true;const label=btn.textContent;btn.textContent='Sending…';
+      try{
+        const res=await fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            company,email,
+            contact_name:(fd.get('contact_name')||'').trim(),
+            phone:(fd.get('phone')||'').trim(),
+            message:(fd.get('message')||'').trim(),
+            website:(fd.get('website')||'').trim(), // honeypot
+          })});
+        if(!res.ok)throw new Error('bad status');
+        leadForm.reset();
+        msg.classList.add('ok');
+        msg.textContent="Thanks — we'll be in touch shortly to set up your demo.";
+        btn.textContent='Request sent';
+      }catch(err){
+        msg.classList.add('err');
+        msg.innerHTML='Something went wrong. Please email <a href="mailto:anchansachinv99@gmail.com" style="color:#fff;text-decoration:underline">anchansachinv99@gmail.com</a>.';
+        btn.disabled=false;btn.textContent=label;
+      }
+    });
+  }
 </script>
 </body>
 </html>
