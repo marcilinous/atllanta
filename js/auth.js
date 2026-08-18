@@ -27,6 +27,7 @@ export async function loadUserProfile() {
 
   if (membership) {
     const roleMap = { super_admin: 'owner', agency_admin: 'admin', client_admin: 'admin', client_member: 'member' };
+    membership.raw_role = membership.role;   // keep the unmapped DB role (e.g. super_admin)
     membership.role = roleMap[membership.role] || membership.role;
   }
   currentMembership = membership;

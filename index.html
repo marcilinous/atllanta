@@ -57,6 +57,11 @@
         <span class="nav-tooltip">CRM</span>
       </button>
 
+      <button class="nav-btn" data-view="sales" aria-label="Atllanta Sales" data-role="super_admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+        <span class="nav-tooltip">Atllanta Sales</span>
+      </button>
+
       <div class="sidebar-nav-bottom">
         <button class="nav-btn" data-view="settings" aria-label="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -199,6 +204,7 @@ import crmContactDetail from '/views/crm/contact-detail.js';
 import crmOpportunities from '/views/crm/opportunities.js';
 import crmOpportunityDetail from '/views/crm/opportunity-detail.js';
 import crmLeads from '/views/crm/leads.js';
+import salesLeads from '/views/sales/leads.js';
 import crmLeadDetail from '/views/crm/lead-detail.js';
 import crmSettings from '/views/crm/settings.js';
 import crmReports from '/views/crm/reports.js';
@@ -272,6 +278,11 @@ document.querySelectorAll('.nav-btn[data-role="manager"]').forEach(btn => {
 });
 document.querySelectorAll('.nav-btn[data-role="admin"]').forEach(btn => {
   if (!isAdmin) btn.style.display = 'none';
+});
+// Founder-only nav (platform operators) — gate on the unmapped DB role.
+const isSuperAdmin = membership?.raw_role === 'super_admin';
+document.querySelectorAll('.nav-btn[data-role="super_admin"]').forEach(btn => {
+  if (!isSuperAdmin) btn.style.display = 'none';
 });
 
 // Admin/HR-configurable feature access — hide sidebar modules turned off for
@@ -525,6 +536,7 @@ registerRoute('me', meView);
 registerRoute('inbox', inboxView);
 registerRoute('notifications', notificationsView);
 registerRoute('crm', crmHub);
+registerRoute('sales', salesLeads);
 registerRoute('crm/accounts', crmAccounts);
 registerRoute('crm/account', crmAccountDetail);
 registerRoute('crm/contacts', crmContacts);
