@@ -285,6 +285,16 @@ const signupForm = document.getElementById('signup-form');
 const toggleBtn = document.getElementById('toggle-btn');
 const toggleText = document.getElementById('toggle-text');
 
+// Public self-serve signup is disabled until the signup model is decided.
+// Today a signed-up user gets no org (createWorkspace() no-ops without one),
+// so we hide the entry point rather than dead-end prospects. New orgs are
+// provisioned via api/create-org. Flip this to true to re-enable signup.
+const SIGNUP_ENABLED = false;
+if (!SIGNUP_ENABLED) {
+  document.getElementById('main-toggle').classList.add('hidden');
+  signupSection.classList.add('hidden');
+}
+
 toggleBtn.addEventListener('click', () => {
   mode = mode === 'login' ? 'signup' : 'login';
   loginForm.classList.toggle('hidden', mode === 'signup');
