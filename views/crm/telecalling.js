@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser, getMembership } from '../../js/auth.js';
-import { esc, toast, loadingSkeleton } from '../../js/ui.js';
+import { esc, showError, toast, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { logCallModal } from './telecalling-common.js';
 
@@ -59,7 +59,7 @@ export default async function crmTelecalling(container) {
     if (canManage && !selectedTelecaller) { renderKpi([]); container.querySelector('#tc-list').innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-desc">Pick a telecaller to see their call book.</div></div>`; return; }
     container.querySelector('#tc-list').innerHTML = loadingSkeleton(6);
     const { data, error } = await sb.rpc('crm_telecaller_book', { p_telecaller: canManage ? selectedTelecaller : null });
-    if (error) { toast('Could not load book: ' + error.message); return; }
+    if (error) { showError(container.querySelector('#tc-list'), 'Could not load the call book: ' + error.message, load); return; }
     book = data || [];
     // Priority: TSS renewal due first, then never-called, then oldest last-call.
     book.forEach(p => { p._due = (+p.tss_lfy > 0 && +p.tss_cfy === 0); });

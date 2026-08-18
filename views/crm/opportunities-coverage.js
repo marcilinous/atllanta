@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
-import { esc, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
+import { esc, showError, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { ownerName, canManageData, fetchAllRpc } from './common.js';
 
@@ -42,7 +42,7 @@ export default async function crmOppsCoverage(container) {
     fetchAllRpc('crm_partner_activity'),
     sb.from('users').select('id, full_name, designation, reporting_manager_id').eq('status', 'active'),
   ]);
-  if (error) { container.querySelector('#op-cards').innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-desc">Could not load opportunities.</div></div>`; return; }
+  if (error) { showError(container.querySelector('#op-tree'), 'Failed to load opportunities: ' + error.message, () => crmOppsCoverage(container)); return; }
   const data = rows || [];
   const staff = users || [];
   const lfyPresent = data.some(p => p.any_lfy > 0 || p.tp_lfy > 0 || p.tss_lfy > 0);

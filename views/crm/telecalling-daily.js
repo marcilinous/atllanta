@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser, getMembership } from '../../js/auth.js';
-import { esc, toast, loadingSkeleton } from '../../js/ui.js';
+import { esc, showError, toast, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { logCallModal, CALL_STATUS_BADGE } from './telecalling-common.js';
 
@@ -48,7 +48,7 @@ export default async function crmTelecallingDaily(container) {
       sb.from('crm_calls').select('account_id, called_at, call_status, outcome, follow_up_date')
         .eq('called_by', user.id).order('called_at', { ascending: false }).limit(4000),
     ]);
-    if (error) { toast('Could not load: ' + error.message); return; }
+    if (error) { showError(container.querySelector('#td-list'), 'Could not load the call book: ' + error.message, load); return; }
     book = rows || [];
     callByAcct = {};
     callsToday = 0;

@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser, getMembership } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
+import { esc, showError, toast, openModal, closeModal, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { routeParams, navigate } from '../../js/router.js';
@@ -41,6 +41,11 @@ export default async function crmOpportunities(container) {
       sb.from('crm_pipeline_stages').select('*').order('sort_order'),
       sb.from('crm_opportunities').select('*, account:account_id(id, name), contact:primary_contact_id(first_name, last_name)').order('created_at', { ascending: false }),
     ]);
+    const loadErr = oppRes.error || stageRes.error;
+    if (loadErr) {
+      showError(document.getElementById('board'), 'Failed to load pipeline: ' + loadErr.message, load);
+      return;
+    }
     stages = stageRes.data || [];
     opps = oppRes.data || [];
     if (!users.length) users = await fetchOrgUsers();
