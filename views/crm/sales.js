@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
-import { esc, toast, downloadCsv, loadingSkeleton } from '../../js/ui.js';
+import { esc, showError, toast, downloadCsv, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { canManageData, fetchAllRpc } from './common.js';
 
@@ -84,7 +84,7 @@ export default async function crmSales(container) {
     const key = `${dim}|${from}|${to}`;
     if (!cache[key]) {
       const { data, error } = await fetchAllRpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to });
-      if (error) { toast('Could not load sales'); return []; }
+      if (error) { return { error }; }
       cache[key] = (data || []).map(r => ({ ...r, sales_count: +r.sales_count, revenue: +r.revenue }));
     }
     return cache[key];
@@ -110,6 +110,10 @@ export default async function crmSales(container) {
 
   async function render() {
     const data = await rows();
+    if (data && data.error) {
+      showError(container.querySelector('#sl-table'), 'Could not load sales: ' + data.error.message, render);
+      return;
+    }
     const { list, catTotals, grand } = pivot(data);
     const fmt = metric === 'revenue' ? inr : num;
 

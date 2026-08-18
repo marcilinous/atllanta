@@ -1,7 +1,7 @@
 // Reusable activity timeline + logger, usable against any CRM record.
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, timeAgo, openModal, closeModal } from '../../js/ui.js';
+import { esc, showError, toast, timeAgo, openModal, closeModal } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { field, ownerName, fetchOrgUsers } from './common.js';
 
@@ -10,7 +10,7 @@ const TYPE_LABEL = { task: 'Task', call: 'Call', meeting: 'Meeting', email: 'Ema
 
 export async function renderTimeline(el, relatedType, relatedId) {
   el.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-  const [{ data }, users] = await Promise.all([
+  const [{ data, error }, users] = await Promise.all([
     sb.from('crm_activities')
       .select('*')
       .eq('related_type', relatedType)
@@ -19,6 +19,10 @@ export async function renderTimeline(el, relatedType, relatedId) {
     fetchOrgUsers(),
   ]);
 
+  if (error) {
+    showError(el, 'Failed to load activity: ' + error.message, () => renderTimeline(el, relatedType, relatedId));
+    return;
+  }
   const acts = data || [];
   if (!acts.length) {
     el.innerHTML = `<div style="padding:var(--space-6);text-align:center;color:var(--color-text-tertiary);font-size:var(--text-sm)">No activity logged yet.</div>`;

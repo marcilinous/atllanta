@@ -1,5 +1,5 @@
 import { getOrg } from '../../js/auth.js';
-import { esc, loadingSkeleton } from '../../js/ui.js';
+import { esc, showError, loadingSkeleton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { fetchAllRpc, canManageData } from './common.js';
 import { downloadCsv } from '../../js/ui.js';
@@ -51,7 +51,11 @@ export default async function crmTargets(container) {
     </div>
   `;
 
-  const { data: rows } = await fetchAllRpc('crm_partner_activity');
+  const { data: rows, error } = await fetchAllRpc('crm_partner_activity');
+  if (error) {
+    showError(container.querySelector('#tg-list'), 'Failed to load targets: ' + error.message, () => crmTargets(container));
+    return;
+  }
   const data = rows || [];
 
   // classify

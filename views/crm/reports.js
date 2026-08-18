@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv, formatDate } from '../../js/ui.js';
+import { esc, showError, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv, formatDate } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { navigate } from '../../js/router.js';
 import { fetchOrgUsers, canManageData } from './common.js';
@@ -111,7 +111,11 @@ export default async function crmReports(container) {
   container.querySelector('#import-report')?.addEventListener('click', openImport);
 
   async function load() {
-    const { data } = await sb.from('crm_report_imports').select('*').order('created_at', { ascending: false });
+    const { data, error } = await sb.from('crm_report_imports').select('*').order('created_at', { ascending: false });
+    if (error) {
+      showError(container.querySelector('#reports-list'), 'Failed to load reports: ' + error.message, load);
+      return;
+    }
     imports = data || [];
     render();
   }
