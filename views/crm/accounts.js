@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv } from '../../js/ui.js';
+import { esc, toast, showError, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -52,12 +52,18 @@ export default async function crmAccounts(container) {
     const pageSize = 1000;
     let fromIdx = 0;
     const all = [];
+    let firstError = null;
     for (;;) {
       const { data, error } = await sb.from('crm_accounts').select('*').order('name').range(fromIdx, fromIdx + pageSize - 1);
-      if (error || !data || !data.length) break;
+      if (error) { if (fromIdx === 0) firstError = error; break; }
+      if (!data || !data.length) break;
       all.push(...data);
       if (data.length < pageSize) break;
       fromIdx += pageSize;
+    }
+    if (firstError) {
+      showError(document.getElementById('account-list'), 'Failed to load partners: ' + firstError.message, load);
+      return;
     }
     accounts = all;
     buildFilters();

@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, formatDate, initials, avColor } from '../../js/ui.js';
+import { esc, toast, showError, openModal, closeModal, formatDate, initials, avColor } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 
@@ -63,6 +63,11 @@ export default async function leaveBalances(container) {
     sb.from('leave_balances').select('*, leave_type:leave_type_id(name, code, is_paid)').eq('user_id', user.id).eq('year', currentYear),
     sb.from('leave_types').select('id, name, code').eq('is_active', true).order('name'),
   ]);
+
+  if (myBalResult.error) {
+    showError(container, 'Failed to load leave balances: ' + myBalResult.error.message, () => leaveBalances(container));
+    return;
+  }
 
   const myBalances = myBalResult.data || [];
   const leaveTypes = typesResult.data || [];

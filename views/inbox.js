@@ -1,6 +1,6 @@
 import sb from '../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../js/auth.js';
-import { esc, toast, formatDate, initials, avColor, openModal, closeModal, timeAgo } from '../js/ui.js';
+import { esc, toast, showError, formatDate, initials, avColor, openModal, closeModal, timeAgo } from '../js/ui.js';
 import { logAction } from '../js/audit.js';
 import { publishEvent } from '../js/events.js';
 import { isFeatureAllowed } from '../js/features.js';
@@ -116,7 +116,7 @@ export default async function inboxView(container) {
     const { data: requests, error } = await query.limit(50);
 
     if (error) {
-      content.innerHTML = `<div class="card"><div class="card-body" style="color:var(--color-error)">Failed to load: ${esc(error.message)}</div></div>`;
+      showError(content, 'Failed to load leave requests: ' + error.message, renderLeaveApprovals);
       return;
     }
 
@@ -242,7 +242,7 @@ export default async function inboxView(container) {
     const { data: regs, error } = await query.limit(50);
 
     if (error) {
-      content.innerHTML = `<div class="card"><div class="card-body" style="color:var(--color-error)">Failed to load: ${esc(error.message)}</div></div>`;
+      showError(content, 'Failed to load regularizations: ' + error.message, renderRegularizations);
       return;
     }
 
@@ -375,7 +375,7 @@ export default async function inboxView(container) {
     const { data: tickets, error } = await q;
 
     if (error) {
-      content.innerHTML = `<div class="card"><div class="card-body" style="color:var(--color-error)">Failed to load: ${esc(error.message)}</div></div>`;
+      showError(content, 'Failed to load tickets: ' + error.message, renderHelpdesk);
       return;
     }
 

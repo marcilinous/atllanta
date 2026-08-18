@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv } from '../../js/ui.js';
+import { esc, toast, showError, openModal, closeModal, downloadCsv, loadingSkeleton, parseCsv } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 import { navigate } from '../../js/router.js';
@@ -42,10 +42,14 @@ export default async function crmContacts(container) {
   async function load() {
     if (!users.length) users = await fetchOrgUsers();
     if (!accounts.length) accounts = await fetchAccountsLite();
-    const { data } = await sb
+    const { data, error } = await sb
       .from('crm_contacts')
       .select('*, account:account_id(id, name)')
       .order('created_at', { ascending: false });
+    if (error) {
+      showError(document.getElementById('contact-list'), 'Failed to load contacts: ' + error.message, load);
+      return;
+    }
     contacts = data || [];
     render();
   }
