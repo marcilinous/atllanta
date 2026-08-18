@@ -1,5 +1,5 @@
 import sb from '../../js/supabase.js';
-import { esc, toast, scoreBar, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor } from '../../js/ui.js';
+import { esc, toast, showError, scoreBar, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor } from '../../js/ui.js';
 import { getOrg } from '../../js/auth.js';
 import { navigate } from '../../js/router.js';
 import { publishEvent } from '../../js/events.js';
@@ -55,7 +55,6 @@ export default async function recruitmentJobs(container) {
       sb.from('jobs').select('*').eq(orgCol, cid).order('created_at', { ascending: false }),
       sb.from('candidates').select('*').eq(orgCol, cid).order('created_at', { ascending: false }),
     ]);
-    if (jErr) toast('Failed to load jobs: ' + jErr.message);
     if (cErr) toast('Failed to load candidates: ' + cErr.message);
     jobs = j || [];
     candidates = c || [];
@@ -67,9 +66,14 @@ export default async function recruitmentJobs(container) {
     } else {
       applications = [];
     }
+    return jErr;
   }
 
-  await loadData();
+  const loadErr = await loadData();
+  if (loadErr) {
+    showError(container, 'Failed to load jobs: ' + loadErr.message, () => recruitmentJobs(container));
+    return;
+  }
   await loadOrgMembers();
 
   let searchTerm = '';

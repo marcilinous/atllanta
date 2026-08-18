@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, formatDate, initials, avColor, timeAgo } from '../../js/ui.js';
+import { esc, toast, showError, openModal, closeModal, formatDate, initials, avColor, timeAgo } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
 import { logAction } from '../../js/audit.js';
 
@@ -69,7 +69,7 @@ export default async function leaveApprovals(container) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    toast('Failed to load requests: ' + error.message);
+    showError(container, 'Failed to load requests: ' + error.message, () => leaveApprovals(container));
     return;
   }
 

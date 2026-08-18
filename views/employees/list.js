@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg, getMembership, getUser } from '../../js/auth.js';
-import { esc, toast, openModal, closeModal, initials, avColor } from '../../js/ui.js';
+import { esc, toast, showError, openModal, closeModal, initials, avColor } from '../../js/ui.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 
@@ -71,6 +71,13 @@ export default async function employeeList(container) {
         created_at: m.created_at,
       }));
     }
+  }
+
+  // A real load failure that recovered nothing should show an error with retry,
+  // not a misleading "no employees" empty state.
+  if (usersErr && !allEmployees.length) {
+    showError(container, 'Failed to load employees: ' + usersErr.message, () => employeeList(container));
+    return;
   }
 
   const deptSelect = document.getElementById('emp-dept-filter');

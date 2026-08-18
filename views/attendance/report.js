@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getUser, getOrg, getMembership } from '../../js/auth.js';
-import { esc, toast, formatDate, initials, avColor } from '../../js/ui.js';
+import { esc, toast, showError, formatDate, initials, avColor } from '../../js/ui.js';
 
 export default async function attendanceReport(container) {
   const user = getUser();
@@ -65,7 +65,11 @@ export default async function attendanceReport(container) {
       .eq('org_id', org.id).eq('status', 'active').order('full_name');
     if (filterDept) userQuery = userQuery.eq('department_id', filterDept);
     const { data: users, error: usersErr } = await userQuery;
-    if (usersErr) { console.error(usersErr); }
+    if (usersErr) {
+      console.error(usersErr);
+      showError(document.getElementById('rpt-body'), 'Failed to load the report: ' + usersErr.message, loadAndRender);
+      return;
+    }
     const teamUsers = users || [];
 
     const userIds = teamUsers.map(u => u.id);
