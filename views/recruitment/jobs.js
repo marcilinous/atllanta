@@ -107,12 +107,12 @@ export default async function recruitmentJobs(container) {
 
         const candRows = sorted.map(a => {
           const c = candidates.find(x => x.id === a.candidate_id);
-          return `<div class="table-row" style="display:grid;grid-template-columns:1fr 120px 120px 80px;align-items:center;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border-light);cursor:pointer" data-act="candidate-detail" data-cand-id="${a.candidate_id}" data-app-id="${a.id}">
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
+          return `<div class="table-row job-cand-grid" style="align-items:center;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border-light);cursor:pointer" data-act="candidate-detail" data-cand-id="${a.candidate_id}" data-app-id="${a.id}">
+            <div style="display:flex;align-items:center;gap:var(--space-3);min-width:0">
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(c?.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(c?.full_name)}</div>
-              <div>
-                <div style="font-weight:var(--font-weight-medium)">${esc(c?.full_name || 'Unknown')}</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(c?.email || c?.phone || '')}</div>
+              <div style="min-width:0">
+                <div style="font-weight:var(--font-weight-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c?.full_name || 'Unknown')}</div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c?.email || c?.phone || '')}</div>
               </div>
             </div>
             <div>${scoreBar(a.match_score)}</div>
@@ -139,7 +139,7 @@ export default async function recruitmentJobs(container) {
             ${sorted.length ? `
               <div style="overflow-x:auto">
               <div style="border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;min-width:480px">
-                <div style="display:grid;grid-template-columns:1fr 120px 120px 80px;padding:var(--space-2) var(--space-4);background:var(--color-bg-secondary);font-size:var(--text-xs);color:var(--color-text-secondary);font-weight:var(--font-weight-medium);text-transform:uppercase;letter-spacing:0.05em">
+                <div class="job-cand-grid" style="padding:var(--space-2) var(--space-4);background:var(--color-bg-secondary);font-size:var(--text-xs);color:var(--color-text-secondary);font-weight:var(--font-weight-medium);text-transform:uppercase;letter-spacing:0.05em">
                   <div>Name</div><div>Score</div><div>Stage</div><div></div>
                 </div>
                 ${candRows}

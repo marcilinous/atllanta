@@ -664,6 +664,16 @@ select.form-input { cursor: pointer; }
   .crm-cols-2 { grid-template-columns: 1fr; }
 }
 
+/* Recruitment candidate rows: name + score + stage + action.
+   Fixed columns crush the name on phones, so narrow them on small screens. */
+.job-cand-grid {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px 80px;
+}
+@media (max-width: 640px) {
+  .job-cand-grid { grid-template-columns: 1fr 64px 92px 44px; column-gap: var(--space-1); }
+}
+
 /* ── AI Panel ────────────────────────────── */
 .ai-panel {
   position: fixed;
