@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Atllanta — One system to run your whole company</title>
 <meta name="description" content="Atllanta is the business operating system for Indian companies — hiring, attendance, leave and CRM in one clean platform. Installable, works offline, ready to use.">
-<link rel="canonical" href="https://atllanta.vercel.app/landing">
+<link rel="canonical" href="https://atllanta.vercel.app/">
 <!-- Open Graph / social share. NOTE: update the absolute URLs below at domain cutover (task: SEO base URL). -->
 <meta property="og:site_name" content="Atllanta">
 <meta property="og:title" content="Atllanta — One system to run your whole company">
 <meta property="og:description" content="Hiring, people and customers in one platform. Built for India, installable, offline-ready.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://atllanta.vercel.app/landing">
+<meta property="og:url" content="https://atllanta.vercel.app/">
 <meta property="og:image" content="https://atllanta.vercel.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -27,6 +27,25 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="icon" href="/icon-192.svg">
 <meta name="theme-color" content="#ffffff">
+<!-- Send already-signed-in visitors (and Google OAuth callbacks) straight to the app.
+     Only loads auth when a stored token or an OAuth callback is present, so anonymous
+     visitors get the marketing page with no extra weight. -->
+<script src="/js/config.js"></script>
+<script>
+(function(){
+  try{
+    var hasTok = Object.keys(localStorage).some(function(k){ return /^sb-.*-auth-token$/.test(k) && localStorage.getItem(k); });
+    var isCb = location.hash.indexOf('access_token') > -1;
+    if(!hasTok && !isCb) return;
+    var s = document.createElement('script'); s.type = 'module';
+    s.textContent = "import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';"
+      + "const c = window.ATLLANTA_CONFIG;"
+      + "if (c && c.SUPABASE_URL) { const sb = createClient(c.SUPABASE_URL, c.SUPABASE_ANON_KEY);"
+      + "const { data:{ session } } = await sb.auth.getSession(); if (session) location.replace('/app'); }";
+    document.head.appendChild(s);
+  }catch(e){}
+})();
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -35,7 +54,7 @@
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web, Android",
   "description": "Atllanta is the business operating system for Indian companies — AI hiring, attendance, leave and CRM in one clean platform. Installable and works offline.",
-  "url": "https://atllanta.vercel.app/landing",
+  "url": "https://atllanta.vercel.app/",
   "image": "https://atllanta.vercel.app/og-image.png",
   "inLanguage": "en-IN",
   "offers": { "@type": "Offer", "priceCurrency": "INR", "price": "0" }
