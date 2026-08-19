@@ -94,33 +94,33 @@ test.describe('PWA', () => {
 
 test.describe('App Shell Structure', () => {
   test('index.html has correct structure', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.locator('.sidebar')).toBeAttached();
     await expect(page.locator('.topbar')).toBeAttached();
     await expect(page.locator('#main-content')).toBeAttached();
   });
 
   test('sidebar has navigation buttons', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     const navBtns = page.locator('.nav-btn');
     const count = await navBtns.count();
     expect(count).toBeGreaterThanOrEqual(6);
   });
 
   test('topbar has search, notifications, and user avatar', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.locator('.search-box')).toBeAttached();
     await expect(page.locator('#notif-btn')).toBeAttached();
     await expect(page.locator('.user-avatar')).toBeAttached();
   });
 
   test('sidebar logo shows A', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.locator('.sidebar-logo')).toContainText('A');
   });
 
   test('nav buttons have tooltips', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     const tooltips = page.locator('.nav-tooltip');
     const count = await tooltips.count();
     expect(count).toBeGreaterThanOrEqual(6);
@@ -130,7 +130,7 @@ test.describe('App Shell Structure', () => {
 test.describe('Responsive Design', () => {
   test('mobile: sidebar becomes bottom nav', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
+    await page.goto('/app');
     const sidebar = page.locator('.sidebar');
     const box = await sidebar.boundingBox();
     if (box) {
@@ -141,19 +141,19 @@ test.describe('Responsive Design', () => {
 
   test('mobile: topbar center (search) is hidden', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.locator('.topbar-center')).toBeHidden();
   });
 
   test('mobile: mobile search button exists in DOM', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.locator('.mobile-search-btn')).toBeAttached();
   });
 
   test('mobile: no horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/');
+    await page.goto('/app');
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
@@ -161,7 +161,7 @@ test.describe('Responsive Design', () => {
 
   test('desktop: sidebar is on the left', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/');
+    await page.goto('/app');
     await page.evaluate(() => document.getElementById('app').classList.remove('hidden'));
     const sidebar = page.locator('.sidebar');
     const box = await sidebar.boundingBox();
@@ -201,7 +201,7 @@ test.describe('Static Assets', () => {
 
 test.describe('Navigation', () => {
   test('clicking nav buttons updates hash', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     await page.evaluate(() => {
       document.getElementById('app').classList.remove('hidden');
       document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
@@ -220,7 +220,7 @@ test.describe('Navigation', () => {
   });
 
   test('nav button gets active class on click', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     await page.evaluate(() => {
       document.getElementById('app').classList.remove('hidden');
       document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
@@ -238,7 +238,7 @@ test.describe('Navigation', () => {
   });
 
   test('nav buttons have correct data-view attributes', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app');
     const views = await page.evaluate(() =>
       [...document.querySelectorAll('.nav-btn[data-view]')].map(b => b.dataset.view)
     );
