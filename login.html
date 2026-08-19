@@ -276,7 +276,7 @@ const cfg = window.ATLLANTA_CONFIG;
 const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
 const { data: { session } } = await sb.auth.getSession();
-if (session) { window.location.href = '/'; }
+if (session) { window.location.href = '/app'; }
 
 let mode = 'login';
 const loginForm = document.getElementById('login-form');
@@ -326,7 +326,7 @@ loginForm.addEventListener('submit', async (e) => {
     errEl.classList.remove('hidden');
     return;
   }
-  window.location.href = '/';
+  window.location.href = '/app';
 });
 
 signupForm.addEventListener('submit', async (e) => {
@@ -353,7 +353,7 @@ signupForm.addEventListener('submit', async (e) => {
     errEl.classList.remove('hidden');
     return;
   }
-  window.location.href = '/';
+  window.location.href = '/app';
 });
 
 document.getElementById('google-btn').addEventListener('click', async () => {

@@ -2,7 +2,7 @@
 <!-- Update the host at domain cutover. Public, indexable pages only. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://atllanta.vercel.app/landing</loc>
+    <loc>https://atllanta.vercel.app/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>

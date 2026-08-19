@@ -3,614 +3,783 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Atllanta — Business OS</title>
+<title>Atllanta — One system to run your whole company</title>
+<meta name="description" content="Atllanta is the business operating system for Indian companies — hiring, attendance, leave and CRM in one clean platform. Installable, works offline, ready to use.">
+<link rel="canonical" href="https://atllanta.vercel.app/">
+<!-- Open Graph / social share. NOTE: update the absolute URLs below at domain cutover (task: SEO base URL). -->
+<meta property="og:site_name" content="Atllanta">
+<meta property="og:title" content="Atllanta — One system to run your whole company">
+<meta property="og:description" content="Hiring, people and customers in one platform. Built for India, installable, offline-ready.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://atllanta.vercel.app/">
+<meta property="og:image" content="https://atllanta.vercel.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Atllanta — one system to run your whole company. AI hiring, attendance & leave, CRM.">
+<meta property="og:locale" content="en_IN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Atllanta — One system to run your whole company">
+<meta name="twitter:description" content="Hiring, people and customers in one platform. Built for India, installable, offline-ready.">
+<meta name="twitter:image" content="https://atllanta.vercel.app/og-image.png">
+<meta name="twitter:image:alt" content="Atllanta — one system to run your whole company.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/tokens.css">
-<link rel="stylesheet" href="/css/base.css">
-<link rel="stylesheet" href="/css/layout.css">
-<link rel="stylesheet" href="/css/components.css">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2563EB">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="/icon-192.svg">
+<meta name="theme-color" content="#ffffff">
+<!-- Send already-signed-in visitors (and Google OAuth callbacks) straight to the app.
+     Only loads auth when a stored token or an OAuth callback is present, so anonymous
+     visitors get the marketing page with no extra weight. -->
+<script src="/js/config.js"></script>
+<script>
+(function(){
+  try{
+    var hasTok = Object.keys(localStorage).some(function(k){ return /^sb-.*-auth-token$/.test(k) && localStorage.getItem(k); });
+    var isCb = location.hash.indexOf('access_token') > -1;
+    if(!hasTok && !isCb) return;
+    var s = document.createElement('script'); s.type = 'module';
+    s.textContent = "import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';"
+      + "const c = window.ATLLANTA_CONFIG;"
+      + "if (c && c.SUPABASE_URL) { const sb = createClient(c.SUPABASE_URL, c.SUPABASE_ANON_KEY);"
+      + "const { data:{ session } } = await sb.auth.getSession(); if (session) location.replace('/app'); }";
+    document.head.appendChild(s);
+  }catch(e){}
+})();
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Atllanta",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, Android",
+  "description": "Atllanta is the business operating system for Indian companies — AI hiring, attendance, leave and CRM in one clean platform. Installable and works offline.",
+  "url": "https://atllanta.vercel.app/",
+  "image": "https://atllanta.vercel.app/og-image.png",
+  "inLanguage": "en-IN",
+  "offers": { "@type": "Offer", "priceCurrency": "INR", "price": "0" }
+}
+</script>
+<style>
+  :root{
+    --bg:#ffffff; --soft:#f7f8fb; --soft2:#f0f2f7; --card:#ffffff;
+    --ink:#0c0e14; --muted:#5b6272; --faint:#9096a4;
+    --line:#e9ebf1; --line-strong:#dfe2ea;
+    --accent:#4f46e5; --accent-2:#6366f1; --accent-ink:#ffffff; --accent-soft:#eef0fe;
+    --green:#0ea371; --green-soft:#e7f7f0; --amber:#c47f12; --violet:#7c3aed; --pink:#db2777; --sky:#0284c7;
+    --grad:linear-gradient(120deg,#4f46e5,#7c3aed 55%,#0ea5e9);
+    --glass:rgba(255,255,255,.58); --glass-brd:rgba(255,255,255,.8); --glass-soft:rgba(255,255,255,.4);
+    --sh-sm:0 1px 2px rgba(12,14,20,.06),0 1px 3px rgba(12,14,20,.04);
+    --sh-md:0 8px 24px -8px rgba(12,14,20,.12),0 2px 6px rgba(12,14,20,.05);
+    --sh-lg:0 30px 60px -20px rgba(24,26,54,.28),0 12px 24px -12px rgba(12,14,20,.10);
+    --r:14px; --maxw:1160px;
+    --disp:'Plus Jakarta Sans',-apple-system,sans-serif;
+    --body:'Inter',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:#f7f8ff;color:var(--ink);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--accent-soft)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  /* Ambient gradient mesh — gives the glass something to refract. */
+  .mesh{position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(50vw 42vw at 10% 6%, rgba(99,102,241,.20), transparent 60%),
+      radial-gradient(46vw 40vw at 90% 2%, rgba(124,58,237,.16), transparent 60%),
+      radial-gradient(52vw 46vw at 74% 96%, rgba(14,165,233,.15), transparent 62%),
+      radial-gradient(42vw 42vw at 4% 92%, rgba(236,72,153,.10), transparent 60%);}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:11px;
+    font-family:var(--disp);font-weight:600;font-size:15px;cursor:pointer;border:1px solid transparent;transition:transform .14s,box-shadow .14s,background .14s,border-color .14s}
+  .btn svg{width:16px;height:16px}
+  .btn-primary{background:var(--grad);color:#fff;box-shadow:0 6px 18px -6px rgba(99,70,229,.5),inset 0 1px 0 rgba(255,255,255,.22)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 16px 30px -10px rgba(99,70,229,.6)}
+  .btn-ghost{background:var(--glass);color:var(--ink);border-color:var(--glass-brd);backdrop-filter:blur(10px);box-shadow:var(--sh-sm)}
+  .btn-ghost:hover{background:var(--soft)}
+  .btn-lg{height:52px;padding:0 26px;font-size:16px;border-radius:12px}
+
+  /* Nav */
+  nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.8);backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line)}
+  .nav-in{display:flex;align-items:center;height:64px;gap:24px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:800;font-size:18px;letter-spacing:-.02em}
+  .brand .m{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--violet));color:#fff;font-weight:800;font-size:16px;box-shadow:0 4px 10px -3px rgba(79,70,229,.5)}
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:22px}
+  .nav-links a{color:var(--muted);font-size:14.5px;font-weight:500;transition:color .14s}
+  .nav-links a:hover{color:var(--ink)}
+
+  /* Hero */
+  .hero{padding:70px 0 40px;position:relative}
+  .hero::before{content:"";position:absolute;inset:0;z-index:-1;
+    background:radial-gradient(60vw 40vw at 70% -10%,rgba(99,102,241,.10),transparent 60%),radial-gradient(40vw 30vw at 5% 0%,rgba(124,58,237,.06),transparent 60%)}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:13px;
+    padding:6px 12px;border-radius:999px;margin-bottom:22px;border:1px solid rgba(79,70,229,.14)}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  h1{font-family:var(--disp);font-weight:800;font-size:clamp(2.3rem,4.6vw,3.7rem);line-height:1.04;letter-spacing:-.032em;max-width:15ch}
+  h1 .grad{background:linear-gradient(120deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{margin-top:22px;font-size:clamp(1.05rem,1.6vw,1.22rem);color:var(--muted);max-width:52ch}
+  .hero-cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+  .hero-trust{margin-top:22px;display:flex;gap:8px;flex-wrap:wrap}
+  .hero-trust span{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--soft);border:1px solid var(--line);padding:5px 11px;border-radius:999px}
+
+  /* Product mockup */
+  .mock{position:relative}
+  .mock-app{background:#fff;border:1px solid var(--line-strong);border-radius:18px;box-shadow:var(--sh-lg);overflow:hidden;transform:perspective(1400px) rotateY(-9deg) rotateX(3deg);transform-origin:left center}
+  .mock-top{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--soft)}
+  .mock-top i{width:10px;height:10px;border-radius:50%;background:#e0e3ea;display:inline-block}
+  .mock-top i:nth-child(1){background:#ff6058}.mock-top i:nth-child(2){background:#ffbd2e}.mock-top i:nth-child(3){background:#28c840}
+  .mock-top .u{margin-left:12px;font-size:11px;color:var(--faint);background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 10px}
+  .mock-body{display:grid;grid-template-columns:52px 1fr;min-height:330px}
+  .mock-side{background:var(--soft);border-right:1px solid var(--line);padding:14px 0;display:flex;flex-direction:column;align-items:center;gap:14px}
+  .mock-side b{width:26px;height:26px;border-radius:8px;background:#fff;border:1px solid var(--line);display:block}
+  .mock-side b.on{background:linear-gradient(135deg,var(--accent),var(--violet));border:none}
+  .mock-main{padding:18px}
+  .mock-h{font-family:var(--disp);font-weight:700;font-size:14px;margin-bottom:14px;color:var(--ink)}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:11px}
+  .kpi .l{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .kpi .v{font-family:var(--disp);font-weight:800;font-size:19px;margin-top:3px}
+  .kpi .v.g{color:var(--green)}.kpi .v.a{color:var(--accent)}.kpi .v.vt{color:var(--violet)}
+  .rows{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .row{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--line);font-size:11.5px}
+  .row:last-child{border-bottom:none}
+  .row .av{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--disp)}
+  .row .nm{font-weight:600;color:var(--ink)}
+  .row .tag{margin-left:auto;font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .tag.pr{background:var(--green-soft);color:var(--green)}
+  .tag.lv{background:#fff4e6;color:var(--amber)}
+  .tag.mt{background:var(--accent-soft);color:var(--accent)}
+  .float{position:absolute;background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--sh-md);padding:11px 13px;display:flex;align-items:center;gap:9px}
+  .float .ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff}
+  .float .t{font-size:10px;color:var(--faint);font-weight:600}
+  .float .n{font-family:var(--disp);font-weight:800;font-size:14px;line-height:1.1}
+  .float.f1{top:-18px;right:-6px}
+  .float.f2{bottom:-16px;left:-22px}
+
+  /* Hero entrance animation */
+  .mock-app{animation:mockIn .9s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes mockIn{from{opacity:0;transform:perspective(1400px) rotateY(-15deg) rotateX(6deg) translateY(24px)}to{opacity:1;transform:perspective(1400px) rotateY(-9deg) rotateX(3deg)}}
+  .mock .rows .row{opacity:0;animation:rowIn .5s ease forwards}
+  .mock .rows .row:nth-child(1){animation-delay:.55s}
+  .mock .rows .row:nth-child(2){animation-delay:.68s}
+  .mock .rows .row:nth-child(3){animation-delay:.81s}
+  .mock .rows .row:nth-child(4){animation-delay:.94s}
+  @keyframes rowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+  .float{opacity:0;animation:floatIn .55s cubic-bezier(.2,.7,.2,1) forwards}
+  .float.f1{animation-delay:1.05s}
+  .float.f2{animation-delay:1.25s}
+  @keyframes floatIn{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.mock-app,.mock .rows .row,.float{animation-duration:.01ms;opacity:1}}
+
+  /* Product tour gallery */
+  .tour{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .tour-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,340px);gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 0 18px;margin-top:40px;scrollbar-width:thin}
+  .tour-strip::-webkit-scrollbar{height:8px}
+  .tour-strip::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px}
+  .screen{scroll-snap-align:start;background:#fff;border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--sh-md);overflow:hidden;display:flex;flex-direction:column}
+  .screen .st{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--soft)}
+  .screen .st i{width:8px;height:8px;border-radius:50%;background:#e0e3ea}
+  .screen .st span{margin-left:8px;font-size:11px;color:var(--faint)}
+  .screen .sb{padding:16px;min-height:236px}
+  .screen .sh{font-family:var(--disp);font-weight:700;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .screen .sh .pin{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+  .screen .cap{padding:12px 16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+  .cand{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line2)}
+  .cand:last-child{border-bottom:none}
+  .cand .av{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--disp)}
+  .cand .nm{font-size:11.5px;font-weight:600;width:66px;flex:none}
+  .cand .bar{flex:1;height:6px;border-radius:3px;background:var(--soft2);overflow:hidden}
+  .cand .bar b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--violet));width:0;animation:grow 1.1s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes grow{to{width:var(--w)}}
+  .cand .pct{font-family:var(--disp);font-weight:700;font-size:12px;width:36px;text-align:right;color:var(--accent)}
+  .kb{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .kb .kcol{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px}
+  .kb .kcol h5{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px;font-weight:700;font-family:var(--disp)}
+  .kb .deal{background:#fff;border:1px solid var(--line);border-radius:7px;padding:8px;margin-bottom:6px}
+  .kb .deal span{font-size:10px;color:var(--muted)}
+  .kb .deal b{display:block;font-family:var(--disp);font-weight:700;color:var(--ink);font-size:11.5px;margin-top:2px}
+  .lv{display:flex;align-items:center;gap:9px;padding:11px 0;border-bottom:1px solid var(--line2)}
+  .lv:last-child{border-bottom:none}
+  .lv .av{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;font-family:var(--disp)}
+  .lv .info{font-size:11.5px}.lv .info b{font-weight:600;display:block}.lv .info span{color:var(--faint);font-size:10px}
+  .lv .act{margin-left:auto;display:flex;gap:6px}
+  .lv .act b{width:26px;height:26px;border-radius:7px;display:grid;place-items:center}
+  .lv .act b.ok{background:var(--green-soft);color:var(--green)}
+  .lv .act b.no{background:#fbeaea;color:#c0392b}
+  .lv .act b svg{width:14px;height:14px}
+
+  /* generic section */
+  section{padding:84px 0}
+  .kicker{font-family:var(--disp);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  .sec-h{font-family:var(--disp);font-weight:800;font-size:clamp(1.8rem,3.6vw,2.7rem);letter-spacing:-.028em;line-height:1.08;max-width:20ch}
+  .sec-sub{margin-top:14px;color:var(--muted);max-width:58ch;font-size:16.5px}
+  .center{text-align:center;margin:0 auto}
+  .center .sec-h,.center .sec-sub{margin-left:auto;margin-right:auto}
+
+  /* one-system band */
+  .band{background:var(--glass-soft);backdrop-filter:blur(8px);border-top:1px solid var(--glass-brd);border-bottom:1px solid var(--glass-brd)}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px}
+  .col{background:var(--glass);backdrop-filter:blur(16px) saturate(150%);border:1px solid var(--glass-brd);border-radius:16px;padding:28px}
+  .col.bad{background:rgba(255,255,255,.32)}
+  .col.good{background:linear-gradient(160deg,rgba(99,102,241,.16),rgba(255,255,255,.5));border-color:rgba(99,102,241,.3)}
+  .col h4{font-family:var(--disp);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:18px;display:flex;align-items:center;gap:9px}
+  .col.bad h4{color:var(--faint)}
+  .col.good h4{color:var(--accent)}
+  .col ul{list-style:none;display:grid;gap:13px}
+  .col li{display:flex;gap:11px;font-size:15px;color:#3d4453}
+  .col li svg{width:18px;height:18px;flex:none;margin-top:1px}
+  .col.bad li svg{color:var(--faint)}
+  .col.good li svg{color:var(--accent)}
+  .col.good li b{font-weight:600;color:var(--ink)}
+
+  /* vs the big suite */
+  .vs{margin-top:40px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--card);box-shadow:var(--sh-md)}
+  .vs-row{display:grid;grid-template-columns:1fr 1fr}
+  .vs-head .c{padding:15px 22px;font-family:var(--disp);font-weight:700;font-size:14px;display:flex;align-items:center;gap:9px}
+  .vs-head .c:first-child{color:#b0464d}
+  .vs-head .c:last-child{color:#0a8f63}
+  .vs-head .tagpill{margin-left:auto;font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--accent);padding:3px 10px;border-radius:999px}
+  .vs-body .c{padding:14px 22px;font-size:15px;border-top:1px solid var(--line);display:flex;gap:11px;align-items:flex-start;line-height:1.4}
+  .vs-body .c:first-child{color:var(--muted);border-right:1px solid var(--line)}
+  .vs-body .c:last-child{background:rgba(14,163,113,.055);color:var(--ink);font-weight:500}
+  .vs .x{color:#c8474e;font-weight:700;flex-shrink:0;line-height:1.3}
+  .vs .k{color:#0a8f63;flex-shrink:0}
+  .vs .k svg{width:16px;height:16px;display:block;margin-top:2px}
+
+  /* founder / early-access band */
+  .fnd{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  .fnd .card{background:var(--glass);backdrop-filter:blur(16px) saturate(150%);border:1px solid var(--glass-brd);border-radius:16px;padding:24px}
+  .fnd .card .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:14px}
+  .fnd .card .ic svg{width:20px;height:20px}
+  .fnd .card h4{font-family:var(--disp);font-weight:700;font-size:16.5px}
+  .fnd .card p{color:var(--muted);font-size:14.5px;margin-top:6px;line-height:1.5}
+
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .feat{background:var(--glass);backdrop-filter:blur(16px) saturate(150%);border:1px solid var(--glass-brd);border-radius:16px;padding:26px;transition:transform .18s,box-shadow .18s,border-color .18s;box-shadow:0 1px 2px rgba(60,60,120,.05)}
+  .feat:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
+  .feat .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:16px}
+  .feat:nth-child(1) .ic{background:#ecedfe;color:#4f46e5}
+  .feat:nth-child(2) .ic{background:#e2f6ef;color:#0ea371}
+  .feat:nth-child(3) .ic{background:#fce8f2;color:#db2777}
+  .feat:nth-child(4) .ic{background:#e4f2fc;color:#0284c7}
+  .feat:nth-child(5) .ic{background:#f0ebfd;color:#7c3aed}
+  .feat:nth-child(6) .ic{background:#fdf1e2;color:#c47f12}
+  .feat .ic svg{width:22px;height:22px}
+  .feat h3{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:-.01em;margin-bottom:7px}
+  .feat p{color:var(--muted);font-size:14.5px;line-height:1.55}
+
+  /* ready split */
+  .ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center;margin-top:12px}
+  .ready-list{display:grid;gap:22px}
+  .ri{display:flex;gap:14px}
+  .ri .tick{flex:none;width:26px;height:26px;border-radius:8px;background:var(--green-soft);color:var(--green);display:grid;place-items:center}
+  .ri .tick svg{width:15px;height:15px}
+  .ri b{font-family:var(--disp);font-weight:700;font-size:16px}
+  .ri p{color:var(--muted);font-size:14.5px;margin-top:2px}
+  .steps-card{background:var(--glass);backdrop-filter:blur(18px) saturate(150%);border:1px solid var(--glass-brd);border-radius:18px;box-shadow:var(--glass-sh,var(--sh-md));padding:32px}
+  .steps-card .sh{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:-.02em;margin-bottom:22px}
+  .step{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+  .step:first-of-type{border-top:none;padding-top:0}
+  .step .n{flex:none;width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--disp);font-weight:700;font-size:13px}
+  .step b{font-family:var(--disp);font-weight:700;font-size:15px}
+  .step p{color:var(--muted);font-size:14px;margin-top:2px}
+
+  /* pricing */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .price{background:var(--glass);backdrop-filter:blur(16px) saturate(150%);border:1px solid var(--glass-brd);border-radius:18px;padding:32px 28px;display:flex;flex-direction:column;position:relative}
+  .price.hot{border-color:rgba(99,102,241,.5);background:linear-gradient(160deg,rgba(99,102,241,.14),rgba(255,255,255,.55));box-shadow:0 0 0 4px rgba(99,102,241,.14),var(--sh-md)}
+  .price .flag{position:absolute;top:-11px;left:28px;background:var(--accent);color:#fff;font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:5px 11px;border-radius:999px}
+  .price h3{font-family:var(--disp);font-weight:700;font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .price .amt{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,3.6vw,2.5rem);letter-spacing:-.02em;margin:12px 0 4px}
+  .price .d{color:var(--muted);font-size:14px;min-height:40px;margin-bottom:22px}
+  .price ul{list-style:none;display:grid;gap:11px;margin-bottom:26px}
+  .price li{display:flex;gap:9px;font-size:14.5px;color:#3d4453}
+  .price li svg{width:16px;height:16px;color:var(--green);flex:none;margin-top:2px}
+  .price .btn{margin-top:auto;width:100%}
+
+  /* cta */
+  .cta-card{position:relative;overflow:hidden;border-radius:26px;padding:clamp(44px,7vw,76px) 32px;text-align:center;
+    background:linear-gradient(135deg,var(--accent),var(--violet));color:#fff;box-shadow:var(--sh-lg)}
+  .cta-card::after{content:"";position:absolute;inset:0;background:radial-gradient(40vw 40vw at 80% -20%,rgba(255,255,255,.18),transparent 60%);pointer-events:none}
+  .cta-card h2{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,4.4vw,3rem);letter-spacing:-.03em;line-height:1.05;max-width:18ch;margin:0 auto;position:relative}
+  .cta-card p{margin:16px auto 0;max-width:50ch;color:rgba(255,255,255,.9);font-size:16px;position:relative}
+  .cta-actions{margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative}
+  .cta-actions .btn-primary{background:#fff;color:var(--accent);box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  .cta-actions .btn-primary:hover{background:#f3f4ff}
+  .cta-actions .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+  .cta-actions .btn-ghost:hover{background:rgba(255,255,255,.12)}
+  /* Lead capture form (sits on the accent cta-card) */
+  .lead-form{position:relative;max-width:540px;margin:28px auto 0;text-align:left;display:flex;flex-direction:column;gap:12px}
+  .lead-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .lead-input{width:100%;font-family:var(--body);font-size:15px;color:var(--ink);background:#fff;border:1px solid transparent;border-radius:12px;padding:13px 15px;outline:none;transition:box-shadow .15s,border-color .15s}
+  .lead-input::placeholder{color:#9096a4}
+  .lead-input:focus{border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.35)}
+  textarea.lead-input{resize:vertical;min-height:52px}
+  .lead-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  .lead-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:4px}
+  .lead-actions .btn-primary{background:#fff;color:var(--accent);box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+  .lead-actions .btn-primary:hover{background:#f3f4ff}
+  .lead-actions .btn-primary:disabled{opacity:.6;cursor:default}
+  .lead-alt{color:rgba(255,255,255,.9);font-size:14px}
+  .lead-alt a{color:#fff;text-decoration:underline}
+  .lead-msg{font-size:14px;font-weight:500;min-height:20px;color:#fff}
+  .lead-msg.ok{color:#eafff4}
+  .lead-msg.err{color:#ffe4e4}
+  @media (max-width:560px){ .lead-row{grid-template-columns:1fr} }
+
+  footer{border-top:1px solid var(--glass-brd);background:var(--glass-soft);backdrop-filter:blur(12px)}
+  .foot-top{display:grid;grid-template-columns:1.5fr 2fr;gap:48px;padding:60px 0 44px}
+  .foot-brand .brand{font-size:19px;margin-bottom:16px}
+  .foot-brand .about{color:var(--muted);font-size:14.5px;max-width:40ch;line-height:1.65}
+  .foot-contact{margin-top:20px;display:flex;flex-direction:column;gap:7px}
+  .foot-contact a{font-size:14px;color:var(--ink);font-weight:500;transition:color .15s}
+  .foot-contact a:hover{color:var(--accent)}
+  .foot-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  .fcol h5{font-family:var(--disp);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:14px;font-weight:700}
+  .fcol a{display:block;color:var(--muted);font-size:14.5px;padding:6px 0;transition:color .15s,transform .15s}
+  .fcol a:hover{color:var(--accent);transform:translateX(2px)}
+  .foot-bot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:22px 0;border-top:1px solid var(--line);color:var(--faint);font-size:13px}
+  .foot-bot .made{display:inline-flex;align-items:center;gap:7px}
+  @media(max-width:800px){.foot-top{grid-template-columns:1fr;gap:36px}.foot-cols{grid-template-columns:1fr 1fr}}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.2,.7,.2,1),transform .6s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(max-width:900px){
+    .hero-grid{grid-template-columns:1fr;gap:44px}
+    .mock-app{transform:none}
+    .float.f1{right:6px}.float.f2{left:6px}
+    .split,.ready-grid,.grid,.prices{grid-template-columns:1fr}
+    .grid{gap:14px}
+    .nav-links a.hide{display:none}
+  }
+</style>
 </head>
 <body>
+<div class="mesh"></div>
 
-<div id="app" class="app hidden">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-logo">A</div>
-
-    <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
-      <button class="nav-btn active" data-view="dashboard" aria-label="Dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span class="nav-tooltip">Dashboard</span>
-      </button>
-      <button class="nav-btn" data-view="me" aria-label="Me">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span class="nav-tooltip">Me</span>
-      </button>
-      <button class="nav-btn" data-view="inbox" aria-label="Inbox">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <span class="nav-tooltip">Inbox</span>
-      </button>
-      <button class="nav-btn" data-view="people" aria-label="People">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span class="nav-tooltip">People</span>
-      </button>
-      <button class="nav-btn" data-view="reports" aria-label="Reports" data-role="manager">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <span class="nav-tooltip">Reports</span>
-      </button>
-      <button class="nav-btn" data-view="documents" aria-label="Documents">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <span class="nav-tooltip">Documents</span>
-      </button>
-      <button class="nav-btn" data-view="finance" aria-label="Finance">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        <span class="nav-tooltip">Finance</span>
-      </button>
-      <button class="nav-btn" data-view="crm" aria-label="CRM">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M18 9l-5 5-3-3-4 4"/></svg>
-        <span class="nav-tooltip">CRM</span>
-      </button>
-
-      <button class="nav-btn" data-view="sales" aria-label="Atllanta Sales" data-role="super_admin">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
-        <span class="nav-tooltip">Atllanta Sales</span>
-      </button>
-
-      <div class="sidebar-nav-bottom">
-        <button class="nav-btn" data-view="settings" aria-label="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span class="nav-tooltip">Settings</span>
-        </button>
-        <button class="nav-btn" data-view="admin" aria-label="Admin" data-role="admin">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span class="nav-tooltip">Admin</span>
-        </button>
-      </div>
-    </nav>
-  </aside>
-
-  <!-- Topbar -->
-  <header class="topbar">
-    <div class="topbar-left">
-      <span class="topbar-org" id="topbar-org-name">Atllanta</span>
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><span class="m">A</span>Atllanta</a>
+    <div class="nav-links">
+      <a class="hide" href="#why">Why</a>
+      <a class="hide" href="#features">Features</a>
+      <a class="hide" href="#pricing">Pricing</a>
+      <a href="/login">Sign in</a>
+      <a class="btn btn-primary" href="/login" style="height:38px;padding:0 16px;font-size:14px">Start free</a>
     </div>
-    <div class="topbar-center">
-      <div class="search-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="global-search" placeholder="Search... (Ctrl+K)" autocomplete="off" aria-label="Global search">
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <span class="badge"><span class="dot"></span>Business Operating System · for India</span>
+      <h1>One system to run <span class="grad">your whole company.</span></h1>
+      <p class="lede">Hiring, attendance, leave and customers — in one clean platform with a single login. Replace the five disconnected tools your team is stitching together.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="/login">Start free</a>
+        <a class="btn btn-ghost btn-lg" href="#features">See how it works</a>
+      </div>
+      <div class="hero-trust">
+        <span>No setup projects</span><span>Installable app</span><span>Works offline</span><span>₹ · IST · Apr–Mar</span>
       </div>
     </div>
-    <div class="topbar-right">
-      <button class="topbar-icon-btn mobile-search-btn" id="mobile-search-btn" title="Search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      </button>
-      <button class="topbar-icon-btn" id="ai-toggle-btn" title="AI Assistant">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
-      </button>
-      <button class="sync-pill hidden" id="sync-pill" title="Items waiting to sync">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.7"/><path d="M21 3v6h-6"/></svg>
-        <span id="sync-pill-text">0</span>
-      </button>
-      <button class="topbar-icon-btn hidden" id="install-btn" title="Install app">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      </button>
-      <button class="topbar-icon-btn" id="notif-btn" title="Notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span class="notif-dot hidden" id="notif-dot"></span>
-      </button>
-      <div class="dropdown">
-        <div class="user-avatar" id="user-avatar" style="background:var(--color-accent)">?</div>
-        <div class="user-menu hidden" id="user-menu">
-          <div class="user-menu-header">
-            <div class="name" id="menu-name">—</div>
-            <div class="email" id="menu-email">—</div>
+
+    <div class="mock reveal">
+      <div class="mock-app">
+        <div class="mock-top"><i></i><i></i><i></i><span class="u">app.atllanta · dashboard</span></div>
+        <div class="mock-body">
+          <div class="mock-side"><b class="on"></b><b></b><b></b><b></b><b></b></div>
+          <div class="mock-main">
+            <div class="mock-h">Good morning, Priya</div>
+            <div class="kpis">
+              <div class="kpi"><div class="l">Present</div><div class="v g" data-num="48" data-suffix="/52">0/52</div></div>
+              <div class="kpi"><div class="l">Open roles</div><div class="v a" data-num="6">0</div></div>
+              <div class="kpi"><div class="l">Pipeline</div><div class="v vt" data-prefix="₹" data-num="4.2" data-suffix="L" data-dec="1">₹0L</div></div>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="av" style="background:#4f46e5">RK</span><span class="nm">Ravi Kumar</span><span class="tag pr">Present</span></div>
+              <div class="row"><span class="av" style="background:#0ea371">SN</span><span class="nm">Sneha Nair</span><span class="tag mt">Interview 2pm</span></div>
+              <div class="row"><span class="av" style="background:#c47f12">AM</span><span class="nm">Arjun Mehta</span><span class="tag lv">On leave</span></div>
+              <div class="row"><span class="av" style="background:#7c3aed">DP</span><span class="nm">Deepa P.</span><span class="tag pr">Present</span></div>
+            </div>
           </div>
-          <div class="user-menu-divider"></div>
-          <button class="user-menu-item" onclick="location.hash='#/settings'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Settings
-          </button>
-          <button class="user-menu-item" id="theme-toggle-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            <span id="theme-label">Dark Mode</span>
-          </button>
-          <div class="user-menu-divider"></div>
-          <button class="user-menu-item danger" id="logout-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Sign out
-          </button>
         </div>
       </div>
+      <div class="float f1"><span class="ic" style="background:var(--green)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" width="15" height="15"><polyline points="20 6 9 17 4 12"/></svg></span><span><span class="t">Checked in</span><span class="n">09:02 AM</span></span></div>
+      <div class="float f2"><span class="ic" style="background:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="15" height="15"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0"/></svg></span><span><span class="t">Match score</span><span class="n">92%</span></span></div>
     </div>
-  </header>
+  </div>
+</header>
 
-  <!-- Content -->
-  <main class="content" id="main-content">
-    <div class="empty-state">
-      <div class="skeleton skeleton-heading"></div>
-      <div class="skeleton skeleton-text" style="width:80%"></div>
-      <div class="skeleton skeleton-text" style="width:60%"></div>
+<section class="tour" id="tour">
+  <div class="wrap">
+    <div class="center" style="max-width:620px">
+      <div class="kicker reveal">See it in action</div>
+      <h2 class="sec-h reveal">A look inside the product.</h2>
+      <p class="sec-sub reveal">Real screens from across the platform — hiring, sales and people, in one place.</p>
     </div>
-  </main>
-</div>
+    <div class="tour-strip reveal">
 
-<!-- Toast -->
-<div class="toast" id="toast"><span class="toast-dot"></span><span id="toast-msg"></span></div>
+      <div class="screen">
+        <div class="st"><i></i><i></i><i></i><span>Recruitment · candidates</span></div>
+        <div class="sb">
+          <div class="sh">Backend Engineer <span class="pin">28 matched</span></div>
+          <div class="cand"><span class="av" style="background:#4f46e5">SN</span><span class="nm">Sneha N.</span><span class="bar"><b style="--w:94%"></b></span><span class="pct">94%</span></div>
+          <div class="cand"><span class="av" style="background:#0ea371">RK</span><span class="nm">Ravi K.</span><span class="bar"><b style="--w:88%"></b></span><span class="pct">88%</span></div>
+          <div class="cand"><span class="av" style="background:#7c3aed">AM</span><span class="nm">Arjun M.</span><span class="bar"><b style="--w:81%"></b></span><span class="pct">81%</span></div>
+          <div class="cand"><span class="av" style="background:#c47f12">DP</span><span class="nm">Deepa P.</span><span class="bar"><b style="--w:73%"></b></span><span class="pct">73%</span></div>
+        </div>
+        <div class="cap">AI ranks every applicant against the JD — shortlist in minutes.</div>
+      </div>
+
+      <div class="screen">
+        <div class="st"><i></i><i></i><i></i><span>CRM · pipeline</span></div>
+        <div class="sb">
+          <div class="sh">Sales pipeline <span class="pin">₹18.4L open</span></div>
+          <div class="kb">
+            <div class="kcol"><h5>Lead</h5>
+              <div class="deal"><span>Acme Traders</span><b>₹1.2L</b></div>
+              <div class="deal"><span>Nova Retail</span><b>₹80k</b></div>
+            </div>
+            <div class="kcol"><h5>Proposal</h5>
+              <div class="deal"><span>Sunrise Ent.</span><b>₹3.5L</b></div>
+            </div>
+            <div class="kcol"><h5>Won</h5>
+              <div class="deal"><span>Metro Foods</span><b>₹2.1L</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap">Track every deal by stage, weighted to a real forecast.</div>
+      </div>
+
+      <div class="screen">
+        <div class="st"><i></i><i></i><i></i><span>People · approvals</span></div>
+        <div class="sb">
+          <div class="sh">Leave requests <span class="pin">3 pending</span></div>
+          <div class="lv"><span class="av" style="background:#c47f12">AM</span><span class="info"><b>Arjun Mehta</b><span>Casual · 2 days</span></span>
+            <span class="act"><b class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></b><b class="no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></b></span></div>
+          <div class="lv"><span class="av" style="background:#0ea371">SN</span><span class="info"><b>Sneha Nair</b><span>Sick · 1 day</span></span>
+            <span class="act"><b class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></b><b class="no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></b></span></div>
+          <div class="lv"><span class="av" style="background:#7c3aed">DP</span><span class="info"><b>Deepa P.</b><span>Earned · 3 days</span></span>
+            <span class="act"><b class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></b><b class="no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg></b></span></div>
+        </div>
+        <div class="cap">Approve or reject from one inbox — leave, attendance and more.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="band" id="why">
+  <div class="wrap">
+    <div class="kicker reveal">The honest problem</div>
+    <h2 class="sec-h reveal">Five tools pretending to be one company.</h2>
+    <p class="sec-sub reveal">A hiring tool, an attendance app, an HR sheet, a CRM, and a WhatsApp group holding it together. Nothing talks. Atllanta is the other way.</p>
+    <div class="split">
+      <div class="col bad reveal">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> The five-app stack</h4>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> A separate bill for every function</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Data re-typed between apps</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Five logins, five support queues</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Priced in dollars, built elsewhere</li>
+        </ul>
+      </div>
+      <div class="col good reveal">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg> Atllanta</h4>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One platform</b> for hiring, people &amp; customers</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One record</b> every module reads from</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>One login</b>, one inbox, one search</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg> <b>Rupees, IST, Apr–Mar</b> out of the box</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="center" style="max-width:640px">
+      <div class="kicker reveal">What's inside</div>
+      <h2 class="sec-h reveal">Everything to run people &amp; sales.</h2>
+      <p class="sec-sub reveal">Not add-ons or upsells — these ship in the box, from day one.</p>
+    </div>
+    <div class="grid">
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg></div>
+        <h3>AI recruitment</h3>
+        <p>Parse resumes against a JD, rank candidates with a transparent score, shortlist and schedule interviews — without the enterprise ATS bill.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Attendance</h3>
+        <p>Selfie + geofenced check-in, regularization and reports — accurate even when your team is out in the field.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></div>
+        <h3>Leave</h3>
+        <p>Balances, holidays, apply and approve — in one inbox managers actually check.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></div>
+        <h3>CRM &amp; pipeline</h3>
+        <p>Accounts, contacts, leads and a weighted deal pipeline for your sales team.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <h3>Approvals &amp; audit</h3>
+        <p>One approvals inbox, a full audit trail, and clear owner / admin / manager / member roles.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg></div>
+        <h3>AI assistant</h3>
+        <p>Ask questions across your data — permission-aware, so it never shows what a person can't see.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="center" style="max-width:660px">
+      <div class="kicker reveal">Weighing a bigger suite?</div>
+      <h2 class="sec-h reveal">Everything you'll use. None of the bloat.</h2>
+      <p class="sec-sub reveal">The big all-in-one platforms hand you forty apps, a setup project, and a bill that climbs per seat and per module. Here's the same job — right-sized, and built for how you actually work.</p>
+    </div>
+    <div class="vs reveal">
+      <div class="vs-row vs-head"><div class="c">The big all-in-one suite</div><div class="c">Atllanta<span class="tagpill">Focused</span></div></div>
+      <div class="vs-body">
+        <div class="vs-row"><div class="c"><span class="x">–</span>Dozens of apps; you'll use a handful</div><div class="c"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>The four that matter, done well</div></div>
+        <div class="vs-row"><div class="c"><span class="x">–</span>Per-user, per-module pricing that climbs</div><div class="c"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>Simple pricing, per company</div></div>
+        <div class="vs-row"><div class="c"><span class="x">–</span>Weeks of setup — often a paid partner</div><div class="c"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>Live in an afternoon, no consultant</div></div>
+        <div class="vs-row"><div class="c"><span class="x">–</span>One-size-fits-all; you bend to the software</div><div class="c"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>Configurable — with custom options on request</div></div>
+        <div class="vs-row"><div class="c"><span class="x">–</span>Cloud-only; assumes constant signal</div><div class="c"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>Works offline, installs as an app</div></div>
+        <div class="vs-row"><div class="c"><span class="x">–</span>Support through a ticket queue</div><div class="c"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>Talk to the people who build it</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="center" style="max-width:640px">
+      <div class="kicker reveal">Why get in now</div>
+      <h2 class="sec-h reveal">Being early is the advantage.</h2>
+      <p class="sec-sub reveal">Atllanta is young — and for you, that's the upside. You work with the people who build it, and the product bends around your team, not the other way round.</p>
+    </div>
+    <div class="fnd">
+      <div class="card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h4>A direct line</h4>
+        <p>Your questions and fixes go straight to the people who build the product — no tiers, no ticket queue, no call-centre script.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+        <h4>Shaped around you</h4>
+        <p>Fields, stages and reports configure to how your team runs — and if you need something specific, we build it as a custom option.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h4>Founder pricing, locked in</h4>
+        <p>Come in early and keep early-customer pricing as you grow. Free to pilot — no card, no commitment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="kicker reveal">Ready to use</div>
+    <h2 class="sec-h reveal">Live software — not a build project.</h2>
+    <div class="ready-grid">
+      <div class="ready-list">
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Installable app</b><p>Add it to the home screen — full-screen, like a native app, on any phone.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Works offline</b><p>Check in and log visits with no signal — everything syncs on reconnect.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Isolated by organization</b><p>Every org's data is walled off at the database level. Your team sees only your data.</p></div></div>
+        <div class="ri reveal"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Built for India</b><p>Rupees, IST, April–March fiscal year and DD/MM/YYYY — no configuration.</p></div></div>
+      </div>
+      <div class="steps-card reveal">
+        <div class="sh">Up and running in an afternoon.</div>
+        <div class="step"><span class="n">1</span><div><b>Create your workspace</b><p>Provisioned instantly on sign-up.</p></div></div>
+        <div class="step"><span class="n">2</span><div><b>Invite your team</b><p>Set roles, switch on the modules you need.</p></div></div>
+        <div class="step"><span class="n">3</span><div><b>Go</b><p>Post a job or run today's attendance — same day.</p></div></div>
+        <a class="btn btn-primary" style="width:100%;margin-top:24px" href="/login">Create your workspace</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="center" style="max-width:620px">
+      <div class="kicker reveal">Pricing</div>
+      <h2 class="sec-h reveal">Start free. Pay when it runs your business.</h2>
+    </div>
+    <div class="prices">
+      <div class="price reveal">
+        <h3>Pilot</h3>
+        <div class="amt">Free</div>
+        <div class="d">Everything you need to try Atllanta with a small team.</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Recruitment + People modules</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> AI CV–JD matching</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Installable app + offline</li>
+        </ul>
+        <a class="btn btn-ghost" href="/login">Start free</a>
+      </div>
+      <div class="price hot reveal">
+        <span class="flag">Most popular</span>
+        <h3>Growth</h3>
+        <div class="amt">Let's talk</div>
+        <div class="d">For teams running hiring, HR and CRM together, every day.</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Everything in Pilot</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> CRM, pipeline &amp; approvals</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> AI assistant + audit log</li>
+        </ul>
+        <a class="btn btn-primary" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Growth%20plan">Talk to us</a>
+      </div>
+      <div class="price reveal">
+        <h3>Enterprise</h3>
+        <div class="amt">Custom</div>
+        <div class="d">Vertical packs, custom workflows and onboarding support.</div>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Everything in Growth</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Industry vertical packs</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Onboarding &amp; priority support</li>
+        </ul>
+        <a class="btn btn-ghost" href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20Enterprise">Contact us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="get-started">
+  <div class="wrap">
+    <div class="cta-card reveal">
+      <h2>See Atllanta on your own hiring.</h2>
+      <p>Tell us a little about your team and we'll set up a quick demo — bring a job description and we'll score real CVs against it, live.</p>
+      <form id="lead-form" class="lead-form" novalidate>
+        <div class="lead-row">
+          <input class="lead-input" name="company" placeholder="Company" autocomplete="organization" required>
+          <input class="lead-input" name="contact_name" placeholder="Your name" autocomplete="name">
+        </div>
+        <div class="lead-row">
+          <input class="lead-input" name="email" type="email" placeholder="Work email" autocomplete="email" required>
+          <input class="lead-input" name="phone" placeholder="Phone / WhatsApp (optional)" autocomplete="tel">
+        </div>
+        <textarea class="lead-input" name="message" rows="2" placeholder="Anything you'd like us to know? (optional)"></textarea>
+        <!-- honeypot: real people never fill this -->
+        <input class="lead-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="lead-actions">
+          <button class="btn btn-primary btn-lg" type="submit" id="lead-submit">Request a demo</button>
+          <span class="lead-alt">or <a href="/login">sign in</a></span>
+        </div>
+        <div class="lead-msg" id="lead-msg" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-top">
+    <div class="foot-brand">
+      <a class="brand" href="#top"><span class="m">A</span>Atllanta</a>
+      <p class="about">Atllanta is a business operating system for Indian companies — hiring, attendance, leave and CRM in one platform. We build software priced for reality and shaped for how teams here actually work: rupees, WhatsApp, field teams and patchy signal, all handled by default.</p>
+      <div class="foot-contact">
+        <a href="mailto:anchansachinv99@gmail.com">anchansachinv99@gmail.com</a>
+        <a href="tel:+918073163762">+91 80731 63762</a>
+      </div>
+    </div>
+    <div class="foot-cols">
+      <div class="fcol">
+        <h5>Product</h5>
+        <a href="#features">Features</a>
+        <a href="#tour">Product tour</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/login">Sign in</a>
+      </div>
+      <div class="fcol">
+        <h5>Company</h5>
+        <a href="#why">Why Atllanta</a>
+        <a href="#ready">Ready to use</a>
+        <a href="mailto:anchansachinv99@gmail.com?subject=About%20Atllanta">About us</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+      </div>
+      <div class="fcol">
+        <h5>Get started</h5>
+        <a href="/login">Create workspace</a>
+        <a href="#get-started">Book a demo</a>
+        <a href="mailto:anchansachinv99@gmail.com?subject=Atllanta%20sales">Contact sales</a>
+      </div>
+    </div>
+  </div>
+  <div class="wrap foot-bot">
+    <span>© <span id="yr"></span> Atllanta — a product by Sachin V Anchan. All rights reserved.</span>
+    <span class="made">Made in India · ₹ · IST · Apr–Mar</span>
+  </div>
+</footer>
 
 <script>
-  const t = localStorage.getItem('atllanta-theme');
-  if (t) document.documentElement.setAttribute('data-theme', t);
-</script>
-<script src="/js/config.js"></script>
-<script type="module">
-import sb from '/js/supabase.js';
-import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
-import { registerRoute, initRouter, navigate } from '/js/router.js';
-import { loadFeatureAccess, isFeatureAllowed, FEATURES, setCrmEnabled, setPartnerPack } from '/js/features.js';
-import { onUnreadChange, onNewNotification, notifTarget, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
-import { initGlobalSearch } from '/js/search.js';
-import { initAIPanel, toggleAIPanel } from '/js/ai.js';
-import { startEventProcessor } from '/js/event-processor.js';
-import { initOutbox, onOutboxChange } from '/js/outbox.js';
-import { registerOutboxHandlers } from '/js/outbox-handlers.js';
+  document.getElementById('yr').textContent=new Date().getFullYear();
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(Math.min(i%3,2)*80)+'ms';io.observe(el)});
 
-// Views
-import dashboard from '/views/dashboard.js';
-import meView from '/views/me/index.js';
-import employeeList from '/views/employees/list.js';
-import attendanceDashboard from '/views/attendance/dashboard.js';
-import leaveApply from '/views/leave/apply.js';
-import recruitmentJobs from '/views/recruitment/jobs.js';
-import interviewsView from '/views/recruitment/interviews.js';
-import settingsOrg from '/views/settings/org.js';
-import settingsUsers from '/views/settings/users.js';
-import settingsAccess from '/views/settings/access.js';
-import departmentsView from '/views/settings/departments.js';
-import integrationsView from '/views/settings/integrations.js';
-import employeeProfile from '/views/employees/profile.js';
-import employeeImport from '/views/employees/import.js';
-import checkinView from '/views/attendance/checkin.js';
-import attendanceReport from '/views/attendance/report.js';
-import regularizeView from '/views/attendance/regularize.js';
-import attendanceLocations from '/views/attendance/locations.js';
-import hrAttendanceConsole from '/views/hr/attendance-console.js';
-import leaveSettings from '/views/leave/settings.js';
-import candidateProfile from '/views/recruitment/candidate-profile.js';
-import shortlistView from '/views/recruitment/shortlist.js';
-import uploadResumes from '/views/recruitment/upload-resumes.js';
-import matcherView from '/views/recruitment/matcher.js';
-import aiAssistant from '/views/ai/assistant.js';
-import auditLog from '/views/audit/log.js';
-import leaveCalendar from '/views/leave/calendar.js';
-import leaveBalances from '/views/leave/balances.js';
-import leaveApprovals from '/views/leave/approvals.js';
-import leaveReport from '/views/leave/report.js';
-import jobDetail from '/views/recruitment/job-detail.js';
-import orgChart from '/views/employees/orgchart.js';
-import approvalsInbox from '/views/approvals.js';
-import inboxView from '/views/inbox.js';
-import notificationsView from '/views/notifications.js';
-import crmHub from '/views/crm/index.js';
-import crmAccounts from '/views/crm/accounts.js';
-import crmAccountDetail from '/views/crm/account-detail.js';
-import crmContacts from '/views/crm/contacts.js';
-import crmContactDetail from '/views/crm/contact-detail.js';
-import crmOpportunities from '/views/crm/opportunities.js';
-import crmOpportunityDetail from '/views/crm/opportunity-detail.js';
-import crmLeads from '/views/crm/leads.js';
-import salesLeads from '/views/sales/leads.js';
-import crmLeadDetail from '/views/crm/lead-detail.js';
-import crmSettings from '/views/crm/settings.js';
-import crmReports from '/views/crm/reports.js';
-import crmCoverage from '/views/crm/coverage.js';
-import crmSales from '/views/crm/sales.js';
-import crmOppsCoverage from '/views/crm/opportunities-coverage.js';
-import crmTargets from '/views/crm/targets.js';
-import crmVisits from '/views/crm/visits.js';
-import crmTelecalling from '/views/crm/telecalling.js';
-import crmTelecallingDaily from '/views/crm/telecalling-daily.js';
-import crmReport from '/views/reports/crm.js';
-import onboarding from '/views/onboarding.js';
-import reportsView from '/views/reports/index.js';
-import documentsView from '/views/documents/index.js';
-import financeView from '/views/finance/index.js';
-import adminView from '/views/admin/index.js';
-import announcementsView from '/views/announcements/index.js';
-import helpdeskView from '/views/helpdesk/index.js';
-import helpdeskSettingsView from '/views/helpdesk/settings.js';
-import recruitmentReport from '/views/reports/recruitment.js';
-import helpdeskReport from '/views/reports/helpdesk.js';
-import teamPlanner from '/views/reports/planner.js';
-import expenseReport from '/views/reports/expenses.js';
-import expenseCategoriesView from '/views/finance/categories.js';
-import assetsView from '/views/people/assets.js';
-import lettersView from '/views/people/letters.js';
-import lifecycleView from '/views/people/lifecycle.js';
-import peopleHub from '/views/people/index.js';
-import profileSettings from '/views/settings/profile.js';
-
-const session = await checkSession();
-if (!session) throw new Error('Not authenticated');
-
-const profile = await loadUserProfile();
-const org = getOrg();
-const user = getUser();
-const membership = getMembership();
-
-document.getElementById('app').classList.remove('hidden');
-document.getElementById('topbar-org-name').textContent = org?.name || 'Atllanta';
-document.getElementById('menu-name').textContent = user?.user_metadata?.full_name || user?.email || '—';
-document.getElementById('menu-email').textContent = user?.email || '—';
-
-const initials = (user?.user_metadata?.full_name || user?.email || '?').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
-document.getElementById('user-avatar').textContent = initials;
-
-const colors = ['#2563EB', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0891B2'];
-let hash = 0;
-for (const c of (user?.email || '')) hash = (hash * 31 + c.charCodeAt(0)) | 0;
-document.getElementById('user-avatar').style.background = colors[Math.abs(hash) % colors.length];
-
-document.getElementById('user-avatar').addEventListener('click', () => {
-  document.getElementById('user-menu').classList.toggle('hidden');
-});
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.dropdown')) {
-    document.getElementById('user-menu').classList.add('hidden');
-  }
-});
-
-document.getElementById('logout-btn').addEventListener('click', logout);
-
-// Role-based nav visibility
-const userRole = membership?.role || 'member';
-const isManager = ['owner', 'admin', 'manager'].includes(userRole);
-const isAdmin = ['owner', 'admin'].includes(userRole);
-
-document.querySelectorAll('.nav-btn[data-role="manager"]').forEach(btn => {
-  if (!isManager) btn.style.display = 'none';
-});
-document.querySelectorAll('.nav-btn[data-role="admin"]').forEach(btn => {
-  if (!isAdmin) btn.style.display = 'none';
-});
-// Founder-only nav (platform operators) — gate on the unmapped DB role.
-const isSuperAdmin = membership?.raw_role === 'super_admin';
-document.querySelectorAll('.nav-btn[data-role="super_admin"]').forEach(btn => {
-  if (!isSuperAdmin) btn.style.display = 'none';
-});
-
-// Admin/HR-configurable feature access — hide sidebar modules turned off for
-// this user (admins bypass). Loaded before the router so the first route is
-// gated too.
-setCrmEnabled(org?.crm_enabled);
-setPartnerPack(org?.partner_crm_enabled);
-await loadFeatureAccess({ orgId: org?.id, userId: user?.id, role: userRole, isAdmin });
-FEATURES.forEach(f => {
-  if (f.locked || isFeatureAllowed(f.key)) return;
-  document.querySelectorAll(`.nav-btn[data-view="${f.key}"]`).forEach(btn => { btn.style.display = 'none'; });
-});
-if (!isFeatureAllowed('ai')) {
-  document.getElementById('ai-toggle-btn')?.style.setProperty('display', 'none');
-}
-
-// Offline outbox — queue field writes (check-in, …) when signal drops and
-// replay them on reconnect. Register handlers before wiring the flush triggers
-// so a job queued in an earlier session flushes no matter which view is open.
-registerOutboxHandlers();
-initOutbox();
-const syncPill = document.getElementById('sync-pill');
-const syncText = document.getElementById('sync-pill-text');
-onOutboxChange(({ count, syncing }) => {
-  syncPill.classList.toggle('hidden', count === 0);
-  syncPill.classList.toggle('syncing', syncing);
-  syncText.textContent = syncing ? 'Syncing…' : String(count);
-  syncPill.title = count ? `${count} item${count === 1 ? '' : 's'} waiting to sync` : 'All synced';
-});
-
-// Install prompt (Android/Chrome). iOS installs via Share → Add to Home Screen.
-let deferredInstall = null;
-const installBtn = document.getElementById('install-btn');
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredInstall = e;
-  installBtn.classList.remove('hidden');
-});
-installBtn.addEventListener('click', async () => {
-  if (!deferredInstall) return;
-  deferredInstall.prompt();
-  await deferredInstall.userChoice;
-  deferredInstall = null;
-  installBtn.classList.add('hidden');
-});
-window.addEventListener('appinstalled', () => { installBtn.classList.add('hidden'); });
-
-// Dark mode
-const savedTheme = localStorage.getItem('atllanta-theme');
-if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
-function updateThemeLabel() {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  document.getElementById('theme-label').textContent = isDark ? 'Light Mode' : 'Dark Mode';
-}
-updateThemeLabel();
-document.getElementById('theme-toggle-btn').addEventListener('click', () => {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const next = isDark ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('atllanta-theme', next);
-  updateThemeLabel();
-});
-
-document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
-  btn.addEventListener('click', () => navigate(btn.dataset.view));
-});
-
-onUnreadChange(count => {
-  const dot = document.getElementById('notif-dot');
-  dot.textContent = count > 9 ? '9+' : String(count);
-  dot.classList.toggle('hidden', count === 0);
-});
-fetchUnreadCount();
-subscribeRealtime();
-startEventProcessor();
-
-initGlobalSearch();
-initAIPanel();
-document.getElementById('ai-toggle-btn').addEventListener('click', toggleAIPanel);
-
-// Mobile search overlay
-document.getElementById('mobile-search-btn').addEventListener('click', () => {
-  let overlay = document.querySelector('.mobile-search-overlay');
-  if (overlay) { overlay.remove(); return; }
-
-  overlay = document.createElement('div');
-  overlay.className = 'mobile-search-overlay';
-  overlay.innerHTML = `
-    <div class="search-header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" width="20" height="20"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="mobile-search-input" placeholder="Search employees, candidates, jobs..." autofocus>
-      <button class="btn btn-ghost btn-sm" id="mobile-search-close" style="flex-shrink:0">Cancel</button>
-    </div>
-    <div class="mobile-search-results" id="mobile-search-results"></div>
-  `;
-  document.body.appendChild(overlay);
-
-  const mInput = overlay.querySelector('#mobile-search-input');
-  const mResults = overlay.querySelector('#mobile-search-results');
-  let mTimer = null;
-
-  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-  async function mSearch(q) {
-    const orgObj = getOrg();
-    if (!orgObj) return;
-    const pat = `%${q}%`;
-    const [{ data: u }, { data: c }, { data: j }] = await Promise.all([
-      sb.from('users').select('id, full_name, email, designation').or(`full_name.ilike.${pat},email.ilike.${pat}`).limit(5),
-      sb.from('candidates').select('id, full_name, email').or(`full_name.ilike.${pat},email.ilike.${pat}`).limit(5),
-      sb.from('jobs').select('id, title, status').or(`title.ilike.${pat}`).limit(5),
-    ]);
-    const sections = [];
-    if (u?.length) sections.push(`<div style="padding:var(--space-1) var(--space-2);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase">Employees</div>${u.map(x => `<div class="search-item" data-nav="employees/profile?id=${x.id}">${esc(x.full_name)}<span style="color:var(--color-text-tertiary);margin-left:var(--space-2);font-size:var(--text-xs)">${esc(x.email||'')}</span></div>`).join('')}`);
-    if (c?.length) sections.push(`<div style="padding:var(--space-1) var(--space-2);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase">Candidates</div>${c.map(x => `<div class="search-item" data-nav="recruitment/candidate?id=${x.id}">${esc(x.full_name)}<span style="color:var(--color-text-tertiary);margin-left:var(--space-2);font-size:var(--text-xs)">${esc(x.email||'')}</span></div>`).join('')}`);
-    if (j?.length) sections.push(`<div style="padding:var(--space-1) var(--space-2);font-size:var(--text-xs);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase">Jobs</div>${j.map(x => `<div class="search-item" data-nav="recruitment/job?id=${x.id}">${esc(x.title)}<span class="badge badge-${x.status==='open'?'success':'neutral'}" style="margin-left:var(--space-2)">${x.status}</span></div>`).join('')}`);
-    mResults.innerHTML = sections.length ? sections.join('<div style="height:1px;background:var(--color-border-light);margin:var(--space-2) 0"></div>') : `<div style="text-align:center;padding:var(--space-6);color:var(--color-text-tertiary)">No results for "${esc(q)}"</div>`;
-    mResults.querySelectorAll('.search-item').forEach(item => {
-      item.addEventListener('click', () => { navigate(item.dataset.nav); overlay.remove(); });
-    });
-  }
-
-  mInput.addEventListener('input', () => {
-    clearTimeout(mTimer);
-    const q = mInput.value.trim();
-    if (q.length < 2) { mResults.innerHTML = ''; return; }
-    mTimer = setTimeout(() => mSearch(q), 300);
+  // Count up the hero KPI numbers on load.
+  const reduce=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  document.querySelectorAll('.kpi .v[data-num]').forEach((el)=>{
+    const target=parseFloat(el.dataset.num), dec=parseInt(el.dataset.dec||'0',10);
+    const pre=el.dataset.prefix||'', suf=el.dataset.suffix||'';
+    if(reduce){el.textContent=pre+target.toFixed(dec)+suf;return;}
+    const dur=1100, t0=performance.now();
+    const step=(t)=>{const p=Math.min((t-t0)/dur,1);const e=1-Math.pow(1-p,3);
+      el.textContent=pre+(target*e).toFixed(dec)+suf;
+      if(p<1)requestAnimationFrame(step);};
+    setTimeout(()=>requestAnimationFrame(step),650);
   });
 
-  overlay.querySelector('#mobile-search-close').addEventListener('click', () => overlay.remove());
-});
-
-// Notification panel
-const notifBtn = document.getElementById('notif-btn');
-let notifPanel = null;
-
-notifBtn.addEventListener('click', async () => {
-  if (notifPanel && !notifPanel.classList.contains('hidden')) {
-    notifPanel.classList.add('hidden');
-    return;
-  }
-
-  if (!notifPanel) {
-    notifPanel = document.createElement('div');
-    notifPanel.className = 'notif-panel hidden';
-    notifPanel.innerHTML = `
-      <div class="notif-panel-header">
-        <span>Notifications</span>
-        <button class="btn btn-ghost btn-sm" id="notif-mark-all">Mark all read</button>
-      </div>
-      <div class="notif-list" id="notif-list"></div>
-      <div class="notif-panel-footer">
-        <button class="btn btn-ghost btn-sm" id="notif-view-all">View all notifications</button>
-      </div>
-    `;
-    document.querySelector('.topbar-right').appendChild(notifPanel);
-
-    document.getElementById('notif-mark-all').addEventListener('click', async () => {
-      await markAllRead();
-      loadNotifList();
-    });
-
-    document.getElementById('notif-view-all').addEventListener('click', () => {
-      notifPanel.classList.add('hidden');
-      navigate('notifications');
-    });
-
-    document.addEventListener('click', (e) => {
-      if (notifPanel && !e.target.closest('#notif-btn') && !e.target.closest('.notif-panel')) {
-        notifPanel.classList.add('hidden');
+  // Lead capture — posts to the serverless endpoint, which drops it into the
+  // founder sales tracker as an inbound lead.
+  const leadForm=document.getElementById('lead-form');
+  if(leadForm){
+    const msg=document.getElementById('lead-msg');
+    const btn=document.getElementById('lead-submit');
+    leadForm.addEventListener('submit',async(e)=>{
+      e.preventDefault();
+      msg.className='lead-msg';msg.textContent='';
+      const fd=new FormData(leadForm);
+      const company=(fd.get('company')||'').trim();
+      const email=(fd.get('email')||'').trim();
+      if(!company){msg.classList.add('err');msg.textContent='Please enter your company.';return;}
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){msg.classList.add('err');msg.textContent='Please enter a valid work email.';return;}
+      btn.disabled=true;const label=btn.textContent;btn.textContent='Sending…';
+      try{
+        const res=await fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            company,email,
+            contact_name:(fd.get('contact_name')||'').trim(),
+            phone:(fd.get('phone')||'').trim(),
+            message:(fd.get('message')||'').trim(),
+            website:(fd.get('website')||'').trim(), // honeypot
+          })});
+        if(!res.ok)throw new Error('bad status');
+        leadForm.reset();
+        msg.classList.add('ok');
+        msg.textContent="Thanks — we'll be in touch shortly to set up your demo.";
+        btn.textContent='Request sent';
+      }catch(err){
+        msg.classList.add('err');
+        msg.innerHTML='Something went wrong. Please email <a href="mailto:anchansachinv99@gmail.com" style="color:#fff;text-decoration:underline">anchansachinv99@gmail.com</a>.';
+        btn.disabled=false;btn.textContent=label;
       }
     });
   }
-
-  await loadNotifList();
-  notifPanel.classList.remove('hidden');
-});
-
-// Live-refresh the panel if it's open when a new notification arrives.
-onNewNotification(() => {
-  if (notifPanel && !notifPanel.classList.contains('hidden')) loadNotifList();
-});
-
-async function loadNotifList() {
-  const notifs = await fetchNotifications(15);
-  const listEl = document.getElementById('notif-list');
-  if (!notifs.length) {
-    listEl.innerHTML = `<div class="notif-empty">No notifications yet</div>`;
-    return;
-  }
-
-  const moduleIcons = {
-    leave: '\u{1F333}', attendance: '\u{1F551}', recruitment: '\u{1F4BC}', people: '\u{1F465}',
-    helpdesk: '\u{1F3AB}', finance: '\u{1F4B0}', platform: '\u{1F4E2}', system: '\u{2699}', crm: '\u{1F3AF}',
-  };
-  const moduleColors = {
-    leave: 'var(--color-success-light)', attendance: 'var(--color-info-light)',
-    recruitment: 'var(--color-warning-light)', people: 'var(--color-accent-light)',
-    helpdesk: 'var(--color-info-light)', finance: 'var(--color-warning-light)',
-    platform: 'var(--color-accent-light)', system: 'var(--color-bg-tertiary)', crm: 'var(--color-accent-light)',
-  };
-
-  function esc(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
-    );
-  }
-
-  function ago(d) {
-    const s = Math.floor((Date.now() - new Date(d)) / 1000);
-    if (s < 60) return 'just now';
-    if (s < 3600) return Math.floor(s / 60) + 'm ago';
-    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-    return Math.floor(s / 86400) + 'd ago';
-  }
-
-  listEl.innerHTML = notifs.map(n => `
-    <div class="notif-item ${n.status === 'unread' ? 'unread' : ''}" data-notif-id="${n.id}"
-      data-module="${esc(n.module || '')}" data-entity-type="${esc(n.entity_type || '')}"
-      data-entity-id="${esc(n.entity_id || '')}" data-title="${esc(n.title || '')}">
-      <div class="notif-icon" style="background:${moduleColors[n.module] || 'var(--color-bg-tertiary)'}">${moduleIcons[n.module] || '\u{1F514}'}</div>
-      <div class="notif-content">
-        <div class="notif-title">${esc(n.title)}</div>
-        ${n.body ? `<div class="notif-body">${esc(n.body)}</div>` : ''}
-        <div class="notif-time">${ago(n.sent_at)}</div>
-      </div>
-    </div>
-  `).join('');
-
-  listEl.querySelectorAll('.notif-item').forEach(item => {
-    item.addEventListener('click', async () => {
-      if (item.classList.contains('unread')) {
-        item.classList.remove('unread');
-        await markRead(item.dataset.notifId);
-      }
-      const target = notifTarget({
-        module: item.dataset.module,
-        entity_type: item.dataset.entityType,
-        entity_id: item.dataset.entityId || null,
-        title: item.dataset.title,
-      });
-      notifPanel.classList.add('hidden');
-      navigate(target);
-    });
-  });
-}
-
-// Route registrations
-registerRoute('dashboard', dashboard);
-registerRoute('me', meView);
-registerRoute('inbox', inboxView);
-registerRoute('notifications', notificationsView);
-registerRoute('crm', crmHub);
-registerRoute('sales', salesLeads);
-registerRoute('crm/accounts', crmAccounts);
-registerRoute('crm/account', crmAccountDetail);
-registerRoute('crm/contacts', crmContacts);
-registerRoute('crm/contact', crmContactDetail);
-registerRoute('crm/opportunities', crmOpportunities);
-registerRoute('crm/opportunity', crmOpportunityDetail);
-registerRoute('crm/leads', crmLeads);
-registerRoute('crm/lead', crmLeadDetail);
-registerRoute('crm/settings', crmSettings);
-registerRoute('crm/reports', crmReports);
-registerRoute('crm/coverage', crmCoverage);
-registerRoute('crm/sales', crmSales);
-registerRoute('crm/opps', crmOppsCoverage);
-registerRoute('crm/targets', crmTargets);
-registerRoute('crm/visits', crmVisits);
-registerRoute('crm/telecalling', crmTelecalling);
-registerRoute('crm/telecalling/daily', crmTelecallingDaily);
-registerRoute('people', peopleHub);
-registerRoute('employees', employeeList);
-registerRoute('attendance', attendanceDashboard);
-registerRoute('leave', leaveApply);
-registerRoute('recruitment', recruitmentJobs);
-registerRoute('recruitment/jobs', recruitmentJobs);
-registerRoute('recruitment/interviews', interviewsView);
-registerRoute('settings', profileSettings);
-registerRoute('settings/org', settingsOrg);
-registerRoute('settings/users', settingsUsers);
-registerRoute('settings/access', settingsAccess);
-registerRoute('settings/departments', departmentsView);
-registerRoute('settings/integrations', integrationsView);
-registerRoute('employees/profile', employeeProfile);
-registerRoute('employees/import', employeeImport);
-registerRoute('attendance/checkin', checkinView);
-registerRoute('attendance/report', attendanceReport);
-registerRoute('attendance/regularize', regularizeView);
-registerRoute('attendance/locations', attendanceLocations);
-registerRoute('attendance/hr', hrAttendanceConsole);
-registerRoute('leave/settings', leaveSettings);
-registerRoute('recruitment/candidate', candidateProfile);
-registerRoute('recruitment/shortlist', shortlistView);
-registerRoute('recruitment/upload', uploadResumes);
-registerRoute('recruitment/matcher', matcherView);
-registerRoute('leave/calendar', leaveCalendar);
-registerRoute('leave/balances', leaveBalances);
-registerRoute('leave/approvals', leaveApprovals);
-registerRoute('leave/report', leaveReport);
-registerRoute('recruitment/job', jobDetail);
-registerRoute('ai', aiAssistant);
-registerRoute('audit', auditLog);
-registerRoute('employees/orgchart', orgChart);
-registerRoute('approvals', approvalsInbox);
-registerRoute('onboarding', onboarding);
-registerRoute('reports', reportsView);
-registerRoute('documents', documentsView);
-registerRoute('finance', financeView);
-registerRoute('admin', adminView);
-registerRoute('announcements', announcementsView);
-registerRoute('helpdesk', helpdeskView);
-registerRoute('helpdesk/settings', helpdeskSettingsView);
-registerRoute('reports/recruitment', recruitmentReport);
-registerRoute('reports/crm', crmReport);
-registerRoute('reports/helpdesk', helpdeskReport);
-registerRoute('reports/planner', teamPlanner);
-registerRoute('reports/expenses', expenseReport);
-registerRoute('finance/categories', expenseCategoriesView);
-registerRoute('assets', assetsView);
-registerRoute('letters', lettersView);
-registerRoute('lifecycle', lifecycleView);
-
-initRouter(document.getElementById('main-content'));
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
-}
 </script>
 </body>
 </html>
