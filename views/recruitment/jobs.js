@@ -47,6 +47,12 @@ export default async function recruitmentJobs(container) {
   let jobs = [];
   let candidates = [];
   let applications = [];
+  // Declared here, with the rest of the view state, because loadOrgMembers()
+  // reads it and is awaited well above the spot this used to sit. A `let`
+  // below that call left the binding in the temporal dead zone, so every load
+  // of this page threw "Cannot access 'orgMembers' before initialization" and
+  // the skeletons never resolved.
+  let orgMembers = [];
 
   const orgCol = org ? 'org_id' : 'client_id';
 
@@ -229,7 +235,6 @@ export default async function recruitmentJobs(container) {
   });
 
   // ── Load org members for hiring manager dropdown ──
-  let orgMembers = [];
   async function loadOrgMembers() {
     if (orgMembers.length) return;
     const { data: members } = await sb.from('memberships')
