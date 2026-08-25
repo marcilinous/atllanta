@@ -238,23 +238,41 @@ const recipes = {
     const { job_id, candidate_id, org_id, application_id } = event.payload;
 
     const [{ data: job }, { data: candidate }] = await Promise.all([
-      sb.from("jobs").select("title, created_by").eq("id", job_id).single(),
+      sb.from("jobs").select("title, created_by, hiring_manager_id").eq("id", job_id).single(),
       sb.from("candidates").select("full_name").eq("id", candidate_id).maybeSingle(),
     ]);
 
     const candidateName = candidate?.full_name || "A candidate";
     const jobTitle = job?.title || "a position";
 
-    if (job?.created_by) {
+    // The assigned hiring manager is the one who actually schedules the
+    // interview, so they get the action item. Fall back to whoever created the
+    // job only when no manager is assigned — before this, the manager was
+    // never told at all and the notice went to the job's author instead.
+    const owner = job?.hiring_manager_id || job?.created_by;
+    if (owner) {
       await createNotification(sb, {
         org_id,
-        user_id: job.created_by,
+        user_id: owner,
         title: "Candidate shortlisted — schedule interview",
         body: `${candidateName} has been shortlisted for ${jobTitle}. Please schedule an interview.`,
         module: "recruitment",
         entity_type: "job_application",
         entity_id: application_id || candidate_id,
       }, true);
+    }
+
+    // Keep the job's author in the loop when they are not the manager.
+    if (job?.created_by && job.created_by !== owner) {
+      await createNotification(sb, {
+        org_id,
+        user_id: job.created_by,
+        title: "Candidate shortlisted",
+        body: `${candidateName} shortlisted for ${jobTitle}.`,
+        module: "recruitment",
+        entity_type: "job_application",
+        entity_id: application_id || candidate_id,
+      });
     }
 
     const { data: hrUsers } = await sb
@@ -264,7 +282,7 @@ const recipes = {
       .in("role", ["owner", "admin"]);
     if (hrUsers?.length) {
       const notifications = hrUsers
-        .filter((u) => u.id !== job?.created_by && u.id !== event.actor_id)
+        .filter((u) => u.id !== owner && u.id !== job?.created_by && u.id !== event.actor_id)
         .map((u) => ({
           org_id,
           user_id: u.id,

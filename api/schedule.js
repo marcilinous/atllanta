@@ -77,7 +77,7 @@ export default async function handler(req, res) {
 
     const { data: app } = await db
       .from("job_applications")
-      .select("id, job_id, interview_at, schedule_expires_at")
+      .select("id, job_id, candidate_id, interview_at, schedule_expires_at")
       .eq("schedule_token", token)
       .single();
     if (!app) return res.status(404).json({ error: "Invalid link" });
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
 
     // Fetch candidate, job, org info for the calendar event
     const [{ data: job }, { data: cand }] = await Promise.all([
-      db.from("jobs").select("title, client_id").eq("id", app.job_id).single(),
+      db.from("jobs").select("title, client_id, hiring_manager_id").eq("id", app.job_id).single(),
       db.from("candidates").select("full_name, name, email").eq("id", app.candidate_id).single(),
     ]);
 
