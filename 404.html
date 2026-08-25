@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page not found — Atllanta</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/icon-192.svg">
+<meta name="theme-color" content="#fbf9f5">
+<style>
+  :root{
+    --bg:#fbf9f5; --ink:#1a1712; --muted:#6b6355; --line:#ece7dc;
+    --accent:#1f6e52; --accent-2:#2f9068; --card:#fffdf9;
+    --disp:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+    --body:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{min-height:100vh;display:grid;place-items:center;padding:24px;
+    font-family:var(--body);color:var(--ink);background:var(--bg);
+    background-image:
+      radial-gradient(48vw 42vw at 4% 0%, rgba(47,144,104,.18), transparent 62%),
+      radial-gradient(44vw 38vw at 98% -4%, rgba(228,196,140,.28), transparent 60%),
+      radial-gradient(46vw 46vw at -4% 100%, rgba(226,214,190,.4), transparent 62%);
+    -webkit-font-smoothing:antialiased}
+  .card{max-width:520px;text-align:center;background:rgba(255,253,248,.7);
+    backdrop-filter:blur(18px) saturate(185%);border:1px solid rgba(255,255,255,.8);
+    border-radius:20px;padding:48px 36px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 24px 60px -24px rgba(46,38,22,.28)}
+  .brand{display:inline-flex;align-items:center;gap:10px;font-family:var(--disp);
+    font-weight:800;font-size:18px;letter-spacing:-.02em;margin-bottom:28px}
+  .m{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+    font-weight:800;font-size:16px}
+  .code{font-family:var(--disp);font-weight:800;font-size:clamp(3.5rem,12vw,5.5rem);
+    line-height:1;letter-spacing:-.04em;
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  h1{font-family:var(--disp);font-weight:700;font-size:1.4rem;letter-spacing:-.02em;margin:14px 0 8px}
+  p{color:var(--muted);font-size:15px;line-height:1.6;max-width:38ch;margin:0 auto 28px}
+  .actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;height:46px;padding:0 22px;border-radius:12px;
+    font-family:var(--disp);font-weight:600;font-size:15px;text-decoration:none;
+    border:1px solid transparent;transition:transform .14s,box-shadow .14s,background .14s}
+  .btn-primary{background:linear-gradient(120deg,var(--accent),var(--accent-2));color:#fff;
+    box-shadow:0 6px 18px -6px rgba(31,110,82,.5)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 16px 30px -10px rgba(31,110,82,.6)}
+  .btn-ghost{background:var(--card);color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{background:#f4f1ea}
+</style>
+</head>
+<body>
+  <main class="card">
+    <span class="brand"><span class="m">A</span>Atllanta</span>
+    <div class="code">404</div>
+    <h1>This page wandered off.</h1>
+    <p>The link may be broken or the page may have moved. Let's get you back to where you were headed.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="/">Back to home</a>
+      <a class="btn btn-ghost" href="/app">Open the app</a>
+      <a class="btn btn-ghost" href="/login">Sign in</a>
+    </div>
+  </main>
+</body>
+</html>
