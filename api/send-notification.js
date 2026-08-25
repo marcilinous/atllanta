@@ -105,7 +105,7 @@ export default async function handler(req, res) {
     });
 
     const emailResult = await emailResp.json();
-    if (!emailResp.ok) return res.status(502).json({ error: "Email send failed", details: emailResult });
+    if (!emailResp.ok) return res.status(502).json({ error: resendError(emailResult), details: emailResult });
     return res.status(200).json({ sent: true, id: emailResult.id });
   }
 
@@ -138,6 +138,14 @@ export default async function handler(req, res) {
 }
 
 // ── Candidate outreach ──────────────────────────────────────────────
+
+// Resend puts the useful part in `message` (e.g. "The atllanta.app domain is
+// not verified"). Surfacing only "Email send failed" leaves whoever pressed
+// send with nothing to act on, so lift it into the error string.
+function resendError(result) {
+  const detail = result?.message || result?.name || "";
+  return detail ? `Email send failed — ${detail}` : "Email send failed";
+}
 
 function escapeHtml(s) {
   return String(s == null ? "" : s)
@@ -346,7 +354,7 @@ async function handleCandidateOutreach(req, res, sb, user) {
 
   const emailResult = await emailResp.json().catch(() => ({}));
   if (!emailResp.ok) {
-    return res.status(502).json({ error: "Email send failed", details: emailResult });
+    return res.status(502).json({ error: resendError(emailResult), details: emailResult });
   }
 
   // Now that a real invite is out, start the clock on the link.
