@@ -1,4 +1,5 @@
 import { supabaseAsUser, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { logGroqGeneration } from "../lib/langfuse.js";
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
@@ -30,7 +31,8 @@ async function getUserFromToken(token) {
   return resp.json();
 }
 
-async function callGroq(key, messages, maxTokens = 700) {
+async function callGroq(key, messages, maxTokens = 700, trace = {}) {
+  const startTime = Date.now();
   const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -38,7 +40,20 @@ async function callGroq(key, messages, maxTokens = 700) {
   });
   if (!resp.ok) throw new Error("Groq API error: " + (await resp.text()));
   const result = await resp.json();
-  return result.choices?.[0]?.message?.content || "";
+  const output = result.choices?.[0]?.message?.content || "";
+  await logGroqGeneration({
+    name: trace.name || "ai-query",
+    model: GROQ_MODEL,
+    input: messages,
+    output,
+    usage: result.usage,
+    startTime,
+    endTime: Date.now(),
+    userId: trace.userId,
+    metadata: trace.metadata,
+    modelParameters: { temperature: 0.2, max_tokens: maxTokens },
+  });
+  return output;
 }
 
 export default async function handler(req, res) {
@@ -97,7 +112,7 @@ If the question isn't about this data, reply with a short plain-text answer inst
     plan = await callGroq(groqKey, [
       { role: "system", content: planPrompt },
       { role: "user", content: query },
-    ], 300);
+    ], 300, { name: "ai-query.plan", userId: user.id, metadata: { role, query } });
   } catch (e) {
     return res.status(502).json({ error: e.message });
   }
@@ -133,7 +148,7 @@ If the question isn't about this data, reply with a short plain-text answer inst
     answer = await callGroq(groqKey, [
       { role: "system", content: `You are Atllanta AI. Answer the user's question in 1-3 short sentences using ONLY the JSON rows provided (already filtered to what the user may see). State counts where relevant. Do not invent data. If rows are empty, say nothing matched.` },
       { role: "user", content: `Question: ${query}\n\nRows (${(data || []).length} total, up to 20 shown):\n${JSON.stringify(sample)}` },
-    ], 400);
+    ], 400, { name: "ai-query.answer", userId: user.id, metadata: { role, dataset: intent.dataset, rows: (data || []).length } });
   } catch {
     answer = `Found ${(data || []).length} ${intent.dataset.replace(/_/g, " ")} record${(data || []).length === 1 ? "" : "s"}.`;
   }
