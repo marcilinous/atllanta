@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, toast, scoreBar, stagePill, openModal, closeModal } from '../../js/ui.js';
 import { routeParams, navigate } from '../../js/router.js';
+import { openInterviewQuestions } from './interview-questions.js';
 import { publishEvent } from '../../js/events.js';
 import { logAction } from '../../js/audit.js';
 
@@ -81,6 +82,7 @@ export default async function shortlistView(container) {
             <td>
               <div style="display:flex;gap:var(--space-1)">
                 ${a.status !== 'shortlisted' && a.status !== 'rejected' ? `<button class="btn btn-primary btn-sm" data-shortlist="${a.id}">Shortlist</button>` : ''}
+                ${a.status !== 'rejected' ? `<button class="btn btn-secondary btn-sm" data-questions="${a.id}">${a.interview_questions?.questions?.length ? 'Interview Qs' : 'Prep Qs'}</button>` : ''}
                 ${a.status !== 'rejected' ? `<button class="btn btn-ghost btn-sm" data-reject="${a.id}" style="color:var(--color-error)">Reject</button>` : ''}
                 <button class="btn btn-ghost btn-sm" data-view-candidate="${a.candidate_id}">Profile</button>
               </div>
@@ -159,6 +161,25 @@ export default async function shortlistView(container) {
           closeModal();
           toast('Candidate rejected');
           shortlistView(container);
+        });
+      });
+    });
+
+    container.querySelectorAll('[data-questions]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const app = apps.find(a => a.id === btn.dataset.questions);
+        if (!app) return;
+        openInterviewQuestions({
+          applicationId: app.id,
+          candidateName: app.candidate?.full_name || 'Candidate',
+          jobTitle: job.title,
+          existing: app.interview_questions,
+          existingAt: app.interview_questions_at,
+          onGenerated: (guide) => {
+            // Keep the in-memory row current so re-opening reads it back free.
+            app.interview_questions = guide;
+            app.interview_questions_at = guide.generated_at;
+          },
         });
       });
     });

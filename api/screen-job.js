@@ -4,6 +4,13 @@
 // method=ai  → Groq LLM scoring (costs 1 credit per candidate)
 // method=python → keyword + TF-IDF algorithmic scoring (free)
 // Returns: { results: [{ application_id, candidate_name, score, error? }], credits_used }
+//
+// POST /api/screen-job?action=interview-questions
+// Generates a candidate-specific interview guide for one application, grounded
+// in that candidate's resume, the job's JD, and the gaps screening already
+// found. Costs 1 credit per generation; a cached guide is returned free.
+// Body: { application_id, regenerate?: boolean }
+// Returns: { questions, focus_areas, generated_at, cached, credits_used }
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
@@ -226,6 +233,11 @@ export default async function handler(req, res) {
   if (!user?.id) return res.status(401).json({ error: "Invalid or expired session — please log in again" });
 
   const db = supabaseAdmin();
+
+  if (req.query?.action === "interview-questions") {
+    return handleInterviewQuestions(req, res, db, user);
+  }
+
   const { job_id, mode, application_ids, method } = req.body || {};
   if (!job_id) return res.status(400).json({ error: "job_id is required" });
 
@@ -406,4 +418,232 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
   }
 
   return res.status(200).json({ results, credits_used: creditsUsed, credits_remaining: creditsRemaining, method: useAI ? "ai" : "python" });
+}
+
+// ── Candidate-specific interview questions ──────────────────────────
+//
+// Screening tells you WHETHER to interview someone. This tells you WHAT to ask
+// them: questions grounded in this candidate's actual resume against this job's
+// JD, plus the gaps the screening pass already surfaced. Generic question banks
+// are the thing this replaces, so the prompt is explicit about naming real
+// employers/projects and probing real gaps.
+
+function normalizeQuestions(parsed) {
+  const CATEGORIES = [
+    "Experience deep-dive",
+    "Skill verification",
+    "Gap probe",
+    "Role fit",
+    "Motivation",
+  ];
+  const questions = (Array.isArray(parsed?.questions) ? parsed.questions : [])
+    .filter((q) => q && typeof q.question === "string" && q.question.trim())
+    .slice(0, 12)
+    .map((q) => ({
+      category: CATEGORIES.includes(q.category) ? q.category : "Role fit",
+      question: String(q.question).trim(),
+      why: typeof q.why === "string" ? q.why.trim() : "",
+      strong_answer: typeof q.strong_answer === "string" ? q.strong_answer.trim() : "",
+      follow_up: typeof q.follow_up === "string" ? q.follow_up.trim() : "",
+    }));
+
+  const focus_areas = (Array.isArray(parsed?.focus_areas) ? parsed.focus_areas : [])
+    .filter((f) => typeof f === "string" && f.trim())
+    .slice(0, 6)
+    .map((f) => f.trim());
+
+  return { questions, focus_areas };
+}
+
+async function handleInterviewQuestions(req, res, db, user) {
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: "GROQ_API_KEY is not set. Configure it in Vercel → Settings → Environment Variables." });
+  }
+
+  const { application_id, regenerate } = req.body || {};
+  if (!application_id) return res.status(400).json({ error: "application_id is required" });
+
+  const { data: app } = await db
+    .from("job_applications")
+    .select("id, job_id, candidate_id, match_score, match_summary, match_raw_response, interview_questions, interview_questions_at")
+    .eq("id", application_id)
+    .maybeSingle();
+
+  if (!app) return res.status(404).json({ error: "Application not found" });
+
+  const { data: job } = await db
+    .from("jobs")
+    .select("id, title, jd_raw_text, description, client_id, clients(id, organization_id)")
+    .eq("id", app.job_id)
+    .maybeSingle();
+
+  if (!job) return res.status(404).json({ error: "Job not found" });
+
+  const orgId = job.clients.organization_id;
+  const { data: membership } = await db
+    .from("memberships")
+    .select("id, role, client_id")
+    .eq("user_id", user.id)
+    .eq("organization_id", orgId)
+    .maybeSingle();
+
+  const allowed = membership &&
+    (["agency_admin", "super_admin"].includes(membership.role) ||
+      membership.client_id === job.client_id);
+  if (!allowed) return res.status(403).json({ error: "No access to this client" });
+
+  // A guide already exists and nobody asked for a fresh one — serve it free.
+  // Credits should only ever be spent on an actual Groq call.
+  if (!regenerate && app.interview_questions?.questions?.length) {
+    return res.status(200).json({
+      ...app.interview_questions,
+      generated_at: app.interview_questions_at,
+      cached: true,
+      credits_used: 0,
+    });
+  }
+
+  const { data: cand } = await db
+    .from("candidates")
+    .select("id, full_name, name, resume_text, resume_raw_text")
+    .eq("id", app.candidate_id)
+    .maybeSingle();
+
+  const candidateName = cand?.full_name || cand?.name || "the candidate";
+  const resume = (cand?.resume_text || cand?.resume_raw_text || "").trim();
+  if (!resume) {
+    return res.status(400).json({ error: "This candidate has no resume text — upload or paste a resume first." });
+  }
+
+  const jd = (job.jd_raw_text || job.description || "").trim();
+  if (!jd) {
+    return res.status(400).json({ error: "This job has no JD text to build questions from." });
+  }
+
+  const { data: org } = await db
+    .from("organizations")
+    .select("id, credits_balance, credit_overage_mode")
+    .eq("id", orgId)
+    .maybeSingle();
+
+  if (org?.credit_overage_mode === "hard_stop" && (org?.credits_balance ?? 0) <= 0) {
+    return res.status(402).json({ error: "Out of credits. Top up to generate interview questions." });
+  }
+
+  // Feed the screening verdict back in — the gaps it found are exactly what the
+  // interview should pressure-test.
+  const screening = [];
+  if (app.match_score != null) screening.push(`Match score: ${app.match_score}/100`);
+  if (app.match_summary) screening.push(`Assessment: ${app.match_summary}`);
+  const strengths = app.match_raw_response?.strengths;
+  const gaps = app.match_raw_response?.gaps;
+  if (Array.isArray(strengths) && strengths.length) screening.push(`Apparent strengths: ${strengths.join(", ")}`);
+  if (Array.isArray(gaps) && gaps.length) screening.push(`Apparent gaps: ${gaps.join(", ")}`);
+
+  const prompt = `You are an expert interviewer preparing a hiring manager to interview a specific candidate for a specific role.
+
+Write 8 interview questions that could ONLY have been written for THIS candidate. Every question must be anchored in something concrete from their resume — a named employer, project, tool, transition, or time gap. Reject anything you could ask a stranger ("What is your greatest weakness?", "Tell me about yourself", "Where do you see yourself in five years?").
+
+Cover this mix:
+- 3 "Experience deep-dive" — dig into specific things they claim to have built or led.
+- 2 "Skill verification" — probe a skill the JD requires and their resume asserts, deep enough that bluffing shows.
+- 2 "Gap probe" — address where the resume falls short of the JD, or an unexplained gap/short stint. Ask fairly and neutrally, not as a trap.
+- 1 "Motivation" — why this role, given their actual trajectory.
+
+JOB TITLE: ${job.title}
+
+JOB DESCRIPTION:
+${jd.slice(0, 5000)}
+
+CANDIDATE: ${candidateName}
+
+RESUME:
+${resume.slice(0, 6000)}
+
+${screening.length ? `PRIOR SCREENING RESULT:\n${screening.join("\n")}` : ""}
+
+Respond ONLY with minified JSON, no markdown fences, in this exact shape:
+{"focus_areas":["<3-5 short phrases naming what this interview must establish>"],"questions":[{"category":"Experience deep-dive|Skill verification|Gap probe|Motivation","question":"<the question, asked directly to the candidate>","why":"<one sentence: what this reveals about THIS candidate>","strong_answer":"<one sentence: what a strong answer contains>","follow_up":"<one short follow-up to ask if the answer is thin>"}]}`;
+
+  let parsed;
+  const groqStart = Date.now();
+  try {
+    const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        temperature: 0.4,
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!groqResp.ok) {
+      return res.status(502).json({ error: "Groq API error — try again in a moment." });
+    }
+
+    const groqData = await groqResp.json();
+    const raw = (groqData.choices?.[0]?.message?.content || "").replace(/```json|```/g, "").trim();
+
+    logGroqGeneration({
+      name: "interview-questions",
+      model: GROQ_MODEL,
+      input: prompt,
+      output: raw,
+      usage: groqData.usage,
+      startTime: groqStart,
+      endTime: Date.now(),
+      userId: user.id,
+      metadata: { org_id: orgId, job_id: job.id, application_id: app.id, candidate_id: app.candidate_id },
+      modelParameters: { temperature: 0.4, max_tokens: 2000 },
+    });
+
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return res.status(502).json({ error: "Could not read the model's response — try again." });
+  }
+
+  const { questions, focus_areas } = normalizeQuestions(parsed);
+  if (!questions.length) {
+    return res.status(502).json({ error: "The model returned no usable questions — try again." });
+  }
+
+  const payload = {
+    questions,
+    focus_areas,
+    generated_for: { job_title: job.title, candidate_name: candidateName },
+  };
+  const generatedAt = new Date().toISOString();
+
+  const { error: saveErr } = await db.from("job_applications").update({
+    interview_questions: payload,
+    interview_questions_at: generatedAt,
+    updated_at: generatedAt,
+  }).eq("id", app.id);
+
+  if (saveErr) {
+    return res.status(500).json({ error: "Generated the questions but could not save them: " + saveErr.message });
+  }
+
+  // Charge only after the guide is safely stored.
+  const creditsRemaining = (org?.credits_balance ?? 0) - 1;
+  await db.from("organizations").update({ credits_balance: creditsRemaining }).eq("id", orgId);
+  await db.from("credit_ledger").insert({
+    organization_id: orgId,
+    action_type: "interview_questions",
+    credits_delta: -1,
+    reference_id: app.id,
+  });
+
+  return res.status(200).json({
+    ...payload,
+    generated_at: generatedAt,
+    cached: false,
+    credits_used: 1,
+    credits_remaining: creditsRemaining,
+  });
 }

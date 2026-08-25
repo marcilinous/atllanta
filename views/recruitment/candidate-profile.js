@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, toast, scoreBar, stagePill, formatDate, initials, avColor } from '../../js/ui.js';
 import { routeParams, navigate } from '../../js/router.js';
+import { openInterviewQuestions } from './interview-questions.js';
 
 export default async function candidateProfile(container) {
   const org = getOrg();
@@ -87,13 +88,14 @@ export default async function candidateProfile(container) {
     <div class="card" style="margin-bottom:var(--space-6)">
       <div class="card-header"><span class="card-title">Job Applications</span><span style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-left:var(--space-2)">${apps.length}</span></div>
       ${apps.length ? `<div class="table-wrap"><table class="table">
-        <thead><tr><th>Job</th><th>Match Score</th><th>Method</th><th>Stage</th><th>Applied</th></tr></thead>
+        <thead><tr><th>Job</th><th>Match Score</th><th>Method</th><th>Stage</th><th>Applied</th><th>Interview</th></tr></thead>
         <tbody>${apps.map(a => `<tr>
           <td style="font-weight:var(--font-weight-medium)">${esc(a.job?.title || '—')}</td>
           <td>${scoreBar(a.match_score)}</td>
           <td><span class="badge badge-neutral">${esc(a.match_method || '—')}</span></td>
           <td>${stagePill(a.status)}</td>
           <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${formatDate(a.created_at)}</td>
+          <td><button class="btn btn-secondary btn-sm" data-questions="${a.id}">${a.interview_questions?.questions?.length ? 'View guide' : 'Prep questions'}</button></td>
         </tr>`).join('')}</tbody>
       </table></div>` : '<div class="card-body" style="text-align:center;color:var(--color-text-tertiary)">No applications</div>'}
     </div>
@@ -115,4 +117,23 @@ export default async function candidateProfile(container) {
   `;
 
   document.getElementById('back-btn').addEventListener('click', () => navigate('recruitment'));
+
+  container.querySelectorAll('[data-questions]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const app = apps.find(a => a.id === btn.dataset.questions);
+      if (!app) return;
+      openInterviewQuestions({
+        applicationId: app.id,
+        candidateName: candidate.full_name,
+        jobTitle: app.job?.title || 'this role',
+        existing: app.interview_questions,
+        existingAt: app.interview_questions_at,
+        onGenerated: (guide) => {
+          app.interview_questions = guide;
+          app.interview_questions_at = guide.generated_at;
+          btn.textContent = 'View guide';
+        },
+      });
+    });
+  });
 }
