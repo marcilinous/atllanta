@@ -9,6 +9,7 @@
 // Returns: { parsed_skills: { must_have, nice_to_have, ... } }
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { logGroqGeneration } from "../lib/langfuse.js";
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
@@ -118,6 +119,7 @@ If a field is not found, use null. For phone, include country code if visible (e
 RESUME TEXT:
 ${resume_text.slice(0, 4000)}`;
 
+  const groqStart = Date.now();
   const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -138,6 +140,16 @@ ${resume_text.slice(0, 4000)}`;
   }
 
   const groqData = await groqResp.json();
+  await logGroqGeneration({
+    name: "parse-resume.extract-candidate",
+    model: GROQ_MODEL,
+    input: prompt,
+    output: groqData.choices?.[0]?.message?.content,
+    usage: groqData.usage,
+    startTime: groqStart,
+    endTime: Date.now(),
+    modelParameters: { temperature: 0.1, max_tokens: 300 },
+  });
   let parsed;
   try {
     const raw = (groqData.choices?.[0]?.message?.content || "")
@@ -175,15 +187,17 @@ async function handleParseJD(req, res) {
 Job Description:
 ${description.slice(0, 4000)}`;
 
+  const groqStart = Date.now();
+  const messages = [
+    { role: "system", content: "You extract structured skills from job descriptions. Return valid JSON only, no markdown." },
+    { role: "user", content: prompt },
+  ];
   const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      messages: [
-        { role: "system", content: "You extract structured skills from job descriptions. Return valid JSON only, no markdown." },
-        { role: "user", content: prompt },
-      ],
+      messages,
       temperature: 0.1,
       max_tokens: 1024,
     }),
@@ -196,6 +210,17 @@ ${description.slice(0, 4000)}`;
 
   const result = await groqResp.json();
   const text = result.choices?.[0]?.message?.content || "";
+  await logGroqGeneration({
+    name: "parse-jd",
+    model: GROQ_MODEL,
+    input: messages,
+    output: text,
+    usage: result.usage,
+    startTime: groqStart,
+    endTime: Date.now(),
+    metadata: { job_id: job_id || null },
+    modelParameters: { temperature: 0.1, max_tokens: 1024 },
+  });
 
   let parsed;
   try {

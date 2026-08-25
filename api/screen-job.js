@@ -6,6 +6,7 @@
 // Returns: { results: [{ application_id, candidate_name, score, error? }], credits_used }
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { logGroqGeneration } from "../lib/langfuse.js";
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
@@ -323,6 +324,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
 {"score": <0-100 number>, "summary": "<2-3 sentence assessment>", "strengths": ["..."], "gaps": ["..."]}`;
 
       try {
+        const groqStart = Date.now();
         const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -343,6 +345,18 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
         }
 
         const groqData = await groqResp.json();
+        await logGroqGeneration({
+          name: "screen-job",
+          model: GROQ_MODEL,
+          input: prompt,
+          output: groqData.choices?.[0]?.message?.content,
+          usage: groqData.usage,
+          startTime: groqStart,
+          endTime: Date.now(),
+          userId: user.id,
+          metadata: { org_id: orgId, job_id, application_id: app.id, candidate_id: app.candidate_id },
+          modelParameters: { temperature: 0.2, max_tokens: 600 },
+        });
         const raw = (groqData.choices?.[0]?.message?.content || "")
           .replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(raw);
