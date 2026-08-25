@@ -3,6 +3,7 @@ import { esc, toast, stagePill, openModal, closeModal, getAuthToken, clientId, i
 import { getOrg, getUser } from '../../js/auth.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
+import { openCandidateOutreach } from './candidate-outreach.js';
 
 export default async function interviewsView(container) {
   const org = getOrg();
@@ -61,6 +62,23 @@ export default async function interviewsView(container) {
   const interviewApps = allApps.filter(a => ['interview_scheduled', 'interviewed'].includes(a.status));
   const schedulable = allApps.filter(a => !['rejected', 'hired', 'interviewed'].includes(a.status) && !a.interview_at);
 
+  // Count each candidate's open, still-in-the-future slots. Sending a
+  // scheduling link before any slots exist drops the candidate on an empty
+  // picker, so the invite stays disabled until there is something to choose.
+  const openSlotCount = {};
+  if (schedulable.length) {
+    const { data: openSlots, error: slotsErr } = await sb
+      .from('interview_slots')
+      .select('application_id')
+      .in('application_id', schedulable.map(a => a.id))
+      .is('booked_by', null)
+      .gte('slot_start', new Date().toISOString());
+    if (slotsErr) toast('Failed to load slots: ' + slotsErr.message);
+    (openSlots || []).forEach(s => {
+      openSlotCount[s.application_id] = (openSlotCount[s.application_id] || 0) + 1;
+    });
+  }
+
   const content = document.getElementById('interviews-content');
 
   // Schedulable candidates section
@@ -69,17 +87,38 @@ export default async function interviewsView(container) {
     section.style.cssText = 'margin-bottom:var(--space-6)';
     section.innerHTML = `
       <h3 style="font-size:var(--text-base);font-weight:var(--font-weight-semibold);margin-bottom:var(--space-3)">Ready to schedule</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+      <div class="card" style="display:grid">
         ${schedulable.map(a => {
           const c = allCands.find(x => x.id === a.candidate_id);
           const j = allJobs.find(x => x.id === a.job_id);
-          return `<button class="btn btn-secondary btn-sm" data-act="manage-slots" data-app="${a.id}">${esc(c?.full_name || 'Unknown')} · ${esc(j?.title || '')}</button>`;
+          const slots = openSlotCount[a.id] || 0;
+          return `<div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border-light);flex-wrap:wrap">
+            <div style="flex:1;min-width:160px">
+              <div style="font-weight:var(--font-weight-medium)">${esc(c?.full_name || 'Unknown')}</div>
+              <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(j?.title || '')}</div>
+            </div>
+            <span class="badge badge-${slots ? 'success' : 'neutral'}">${slots ? `${slots} open slot${slots === 1 ? '' : 's'}` : 'no slots yet'}</span>
+            <button class="btn btn-secondary btn-sm" data-act="manage-slots" data-app="${a.id}">${slots ? 'Slots' : 'Add Slots'}</button>
+            <button class="btn btn-primary btn-sm" data-act="msg" data-kind="schedule_invite" data-app="${a.id}" ${slots ? '' : 'disabled title="Add at least one open slot first"'}>Send Link</button>
+          </div>`;
         }).join('')}
       </div>`;
     content.appendChild(section);
 
     section.querySelectorAll('[data-act=manage-slots]').forEach(btn => {
       btn.addEventListener('click', () => showSlotManager(btn.dataset.app));
+    });
+
+    section.querySelectorAll('[data-act=msg]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const app = allApps.find(a => a.id === btn.dataset.app);
+        const cand = allCands.find(x => x.id === app?.candidate_id);
+        openCandidateOutreach({
+          applicationId: btn.dataset.app,
+          kind: btn.dataset.kind,
+          candidateName: cand?.full_name,
+        });
+      });
     });
   }
 
@@ -88,7 +127,7 @@ export default async function interviewsView(container) {
     content.innerHTML += `
       <div class="card" style="padding:var(--space-6);text-align:center">
         <div style="color:var(--color-text-secondary)">No interviews scheduled yet.</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-tertiary);margin-top:var(--space-2)">Assign slots to a candidate above, then send a scheduling link.</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-tertiary);margin-top:var(--space-2)">Shortlist a candidate, add slots for them, then send the scheduling link by email or WhatsApp.</div>
       </div>`;
     return;
   }
@@ -117,9 +156,9 @@ export default async function interviewsView(container) {
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" data-act="slots" data-app="${a.id}">Manage Slots</button>
+          ${a.interview_at ? `<button class="btn btn-secondary btn-sm" data-act="msg" data-kind="interview_confirmed" data-app="${a.id}">Confirm to Candidate</button>` : ''}
           <button class="btn btn-primary btn-sm" data-act="feedback" data-app="${a.id}">Feedback</button>
           <button class="btn btn-secondary btn-sm" data-act="stage" data-app="${a.id}">Stage</button>
-          ${c?.phone ? `<a class="btn btn-secondary btn-sm" href="https://wa.me/${(c.phone || '').replace(/[^\d]/g, '')}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
         </div>
       </div>`;
     list.appendChild(card);
@@ -128,6 +167,18 @@ export default async function interviewsView(container) {
 
   content.querySelectorAll('[data-act=slots]').forEach(btn => {
     btn.addEventListener('click', () => showSlotManager(btn.dataset.app));
+  });
+
+  content.querySelectorAll('[data-act=msg]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const app = allApps.find(a => a.id === btn.dataset.app);
+      const cand = allCands.find(x => x.id === app?.candidate_id);
+      openCandidateOutreach({
+        applicationId: btn.dataset.app,
+        kind: btn.dataset.kind,
+        candidateName: cand?.full_name,
+      });
+    });
   });
   content.querySelectorAll('[data-act=stage]').forEach(btn => {
     btn.addEventListener('click', () => {

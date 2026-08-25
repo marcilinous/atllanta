@@ -254,9 +254,17 @@ const HANDLERS = {
   },
 
   'recruitment.candidate.shortlisted': async (p, org) => {
-    const { data: job } = await sb.from('jobs').select('title, created_by').eq('id', p.job_id).single();
-    if (job?.created_by) {
-      await notify(org.id, job.created_by, 'Candidate shortlisted', `A candidate has been shortlisted for ${job.title || 'a position'}`, 'recruitment', 'job_application', p.application_id, true);
+    const { data: job } = await sb.from('jobs').select('title, created_by, hiring_manager_id').eq('id', p.job_id).single();
+    // The assigned hiring manager schedules the interview, so the action item
+    // goes to them; the job's author is the fallback and, when different, gets
+    // a plain heads-up. Keep this in step with the server recipe in
+    // api/event-processor.js — whichever processor claims the event first wins.
+    const owner = job?.hiring_manager_id || job?.created_by;
+    if (owner) {
+      await notify(org.id, owner, 'Candidate shortlisted — schedule interview', `A candidate has been shortlisted for ${job.title || 'a position'}. Please schedule an interview.`, 'recruitment', 'job_application', p.application_id, true);
+    }
+    if (job?.created_by && job.created_by !== owner) {
+      await notify(org.id, job.created_by, 'Candidate shortlisted', `A candidate has been shortlisted for ${job.title || 'a position'}`, 'recruitment', 'job_application', p.application_id);
     }
   },
 
