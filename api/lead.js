@@ -11,6 +11,12 @@ const cap = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default async function handler(req, res) {
+  // Liveness probe for uptime monitors: GET /api/lead → 200. Confirms the
+  // serverless layer is deploying and running. Kept DB-free so this
+  // unauthenticated path can't be used to hammer the database.
+  if (req.method === "GET") {
+    return res.status(200).json({ status: "ok", ts: Date.now() });
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
   const body = req.body || {};
