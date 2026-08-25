@@ -612,5 +612,9 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 </script>
+<!-- Vercel Web Analytics + Speed Insights (cookieless, first-party). Inert until
+     enabled in the Vercel dashboard; the scripts 404 harmlessly until then. -->
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/_vercel/speed-insights/script.js"></script>
 </body>
 </html>
