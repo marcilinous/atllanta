@@ -41,7 +41,7 @@ async function callGroq(key, messages, maxTokens = 700, trace = {}) {
   if (!resp.ok) throw new Error("Groq API error: " + (await resp.text()));
   const result = await resp.json();
   const output = result.choices?.[0]?.message?.content || "";
-  await logGroqGeneration({
+  logGroqGeneration({
     name: trace.name || "ai-query",
     model: GROQ_MODEL,
     input: messages,
