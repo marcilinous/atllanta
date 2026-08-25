@@ -140,7 +140,7 @@ ${resume_text.slice(0, 4000)}`;
   }
 
   const groqData = await groqResp.json();
-  await logGroqGeneration({
+  logGroqGeneration({
     name: "parse-resume.extract-candidate",
     model: GROQ_MODEL,
     input: prompt,
@@ -210,7 +210,7 @@ ${description.slice(0, 4000)}`;
 
   const result = await groqResp.json();
   const text = result.choices?.[0]?.message?.content || "";
-  await logGroqGeneration({
+  logGroqGeneration({
     name: "parse-jd",
     model: GROQ_MODEL,
     input: messages,

@@ -160,7 +160,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
   }
 
   const groqData = await groqResp.json();
-  await logGroqGeneration({
+  logGroqGeneration({
     name: "match",
     model: GROQ_MODEL,
     input: prompt,
