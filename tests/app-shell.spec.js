@@ -71,7 +71,8 @@ test.describe('PWA', () => {
     const manifest = await resp.json();
     expect(manifest.name).toBeTruthy();
     expect(manifest.short_name).toBeTruthy();
-    expect(manifest.start_url).toBe('/');
+    // The app moved to /app when the landing page took over the root.
+    expect(manifest.start_url).toBe('/app');
     expect(manifest.display).toBe('standalone');
     expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
   });
