@@ -15,7 +15,7 @@
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 // ── Algorithmic matching engine ─────────────────────────────────────
 

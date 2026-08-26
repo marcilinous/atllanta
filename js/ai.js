@@ -3,7 +3,7 @@ import { getUser, getOrg, getMembership } from './auth.js';
 import { esc } from './ui.js';
 import { publishEvent } from './events.js';
 
-const GROQ_MODELS = ['llama-3.3-70b-versatile'];
+const GROQ_MODELS = ['openai/gpt-oss-120b'];
 
 export function initAIPanel() {
   if (document.getElementById('ai-panel')) return;
