@@ -465,7 +465,10 @@
   .page-title { font-size: var(--text-xl); }
 
   .dash-grid, .grid-2col, .ai-layout { grid-template-columns: 1fr; gap: var(--space-4); }
+  /* Stacked on mobile the chat card has no height, so its flex:1 body (and the
+     question input below it) collapse. Give the chat card real height. */
   .ai-layout { height: auto; }
+  .ai-layout > .card:first-child { min-height: 68vh; }
   .dash-grid { margin-top: var(--space-4); }
 }
 

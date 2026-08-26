@@ -1,6 +1,6 @@
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
-import { esc, toast, scoreBar, stagePill, clientId } from '../../js/ui.js';
+import { esc, toast, scoreBar, stagePill, clientId, getAuthToken } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
 
 export default async function matcherView(container) {
@@ -30,6 +30,13 @@ export default async function matcherView(container) {
             <select class="form-input" id="match-candidates">
               <option value="all">All unmatched candidates</option>
               <option value="recent">Recent uploads (last 30 days)</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:160px">
+            <label class="form-label">Scoring</label>
+            <select class="form-input" id="match-method">
+              <option value="ai">AI (Groq) — best accuracy</option>
+              <option value="tfidf">Keyword — free, no credits</option>
             </select>
           </div>
           <button class="btn btn-primary" id="run-match" disabled>Run Match</button>
@@ -105,57 +112,76 @@ export default async function matcherView(container) {
       return;
     }
 
-    const { data: jobData, error: jobError } = await sb.from('jobs').select('parsed_skills, description').eq('id', jobId).single();
-    if (jobError) console.error('Failed to fetch job data:', jobError);
-    const jobSkills = jobData?.parsed_skills?.must_have || [];
-    const jobNiceToHave = jobData?.parsed_skills?.nice_to_have || [];
-    const allJobSkills = [...jobSkills, ...jobNiceToHave].map(s => s.toLowerCase());
-
+    const method = document.getElementById('match-method').value;
     let matched = 0;
-    for (let i = 0; i < cands.length; i++) {
-      const c = cands[i];
-      const pct = Math.round(((i + 1) / cands.length) * 100);
-      document.getElementById('match-bar').style.width = pct + '%';
-      document.getElementById('match-text').textContent = `Matching ${i + 1} of ${cands.length}: ${c.full_name}`;
 
-      const candSkills = (c.parsed_skills?.skills || []).map(s => s.toLowerCase());
-      const candText = (c.resume_text || '').toLowerCase();
-
-      let mustHaveMatch = 0;
-      jobSkills.forEach(s => {
-        if (candSkills.includes(s.toLowerCase()) || candText.includes(s.toLowerCase())) mustHaveMatch++;
-      });
-
-      let niceMatch = 0;
-      jobNiceToHave.forEach(s => {
-        if (candSkills.includes(s.toLowerCase()) || candText.includes(s.toLowerCase())) niceMatch++;
-      });
-
-      const skillsScore = jobSkills.length ? (mustHaveMatch / jobSkills.length) * 70 : 50;
-      const niceScore = jobNiceToHave.length ? (niceMatch / jobNiceToHave.length) * 30 : 15;
-      const totalScore = Math.round(skillsScore + niceScore);
-
-      const { data: existing, error: existError } = await sb.from('job_applications')
-        .select('id').eq('job_id', jobId).eq('candidate_id', c.id).maybeSingle();
-      if (existError) { console.error('Failed to check existing application:', existError); continue; }
-
-      if (existing) {
-        const { error } = await sb.from('job_applications').update({
-          match_score: totalScore,
-          match_breakdown: { skills_match: Math.round(skillsScore / 0.7), nice_to_have_match: Math.round(niceScore / 0.3), overall: totalScore },
-          match_method: 'tfidf',
-        }).eq('id', existing.id);
-        if (error) { toast('Failed to update match: ' + error.message); continue; }
-      } else {
-        const { error } = await sb.from('job_applications').insert({
-          [orgCol]: cid, job_id: jobId, candidate_id: c.id,
-          match_score: totalScore,
-          match_breakdown: { skills_match: Math.round(skillsScore / 0.7), nice_to_have_match: Math.round(niceScore / 0.3), overall: totalScore },
-          match_method: 'tfidf', status: 'applied',
-        });
-        if (error) { toast('Failed to insert match: ' + error.message); continue; }
+    if (method === 'ai') {
+      // AI (Groq) scoring — reuse /api/match, which creates the application,
+      // scores the resume against the JD via the LLM, and charges 1 credit.
+      const token = await getAuthToken();
+      for (let i = 0; i < cands.length; i++) {
+        const c = cands[i];
+        const pct = Math.round(((i + 1) / cands.length) * 100);
+        document.getElementById('match-bar').style.width = pct + '%';
+        document.getElementById('match-text').textContent = `AI scoring ${i + 1} of ${cands.length}: ${c.full_name}`;
+        try {
+          const resp = await fetch('/api/match', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: jobId, candidate_id: c.id }),
+          });
+          if (resp.status === 402) { toast('Out of AI credits — remaining candidates were not scored.'); break; }
+          if (!resp.ok) { const e = await resp.json().catch(() => ({})); console.error('AI match failed:', e); continue; }
+          matched++;
+        } catch (err) { console.error('AI match error:', err); }
       }
-      matched++;
+    } else {
+      // Keyword / TF-IDF scoring — free, client-side.
+      const { data: jobData, error: jobError } = await sb.from('jobs').select('parsed_skills, description').eq('id', jobId).single();
+      if (jobError) console.error('Failed to fetch job data:', jobError);
+      const jobSkills = jobData?.parsed_skills?.must_have || [];
+      const jobNiceToHave = jobData?.parsed_skills?.nice_to_have || [];
+
+      for (let i = 0; i < cands.length; i++) {
+        const c = cands[i];
+        const pct = Math.round(((i + 1) / cands.length) * 100);
+        document.getElementById('match-bar').style.width = pct + '%';
+        document.getElementById('match-text').textContent = `Matching ${i + 1} of ${cands.length}: ${c.full_name}`;
+
+        const candSkills = (c.parsed_skills?.skills || []).map(s => s.toLowerCase());
+        const candText = (c.resume_text || '').toLowerCase();
+
+        let mustHaveMatch = 0;
+        jobSkills.forEach(s => { if (candSkills.includes(s.toLowerCase()) || candText.includes(s.toLowerCase())) mustHaveMatch++; });
+        let niceMatch = 0;
+        jobNiceToHave.forEach(s => { if (candSkills.includes(s.toLowerCase()) || candText.includes(s.toLowerCase())) niceMatch++; });
+
+        const skillsScore = jobSkills.length ? (mustHaveMatch / jobSkills.length) * 70 : 50;
+        const niceScore = jobNiceToHave.length ? (niceMatch / jobNiceToHave.length) * 30 : 15;
+        const totalScore = Math.round(skillsScore + niceScore);
+
+        const { data: existing, error: existError } = await sb.from('job_applications')
+          .select('id').eq('job_id', jobId).eq('candidate_id', c.id).maybeSingle();
+        if (existError) { console.error('Failed to check existing application:', existError); continue; }
+
+        if (existing) {
+          const { error } = await sb.from('job_applications').update({
+            match_score: totalScore,
+            match_breakdown: { skills_match: Math.round(skillsScore / 0.7), nice_to_have_match: Math.round(niceScore / 0.3), overall: totalScore },
+            match_method: 'tfidf',
+          }).eq('id', existing.id);
+          if (error) { toast('Failed to update match: ' + error.message); continue; }
+        } else {
+          const { error } = await sb.from('job_applications').insert({
+            [orgCol]: cid, job_id: jobId, candidate_id: c.id,
+            match_score: totalScore,
+            match_breakdown: { skills_match: Math.round(skillsScore / 0.7), nice_to_have_match: Math.round(niceScore / 0.3), overall: totalScore },
+            match_method: 'tfidf', status: 'applied',
+          });
+          if (error) { toast('Failed to insert match: ' + error.message); continue; }
+        }
+        matched++;
+      }
     }
 
     toast(`${matched} candidates matched`);
