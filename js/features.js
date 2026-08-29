@@ -45,6 +45,8 @@ const CRM_SUB = {
   contacts: 'crm_contacts', contact: 'crm_contacts',
   visits: 'crm_visits',
   telecalling: 'crm_telecalling',
+  engine: 'crm_engine',
+  pjp: 'crm_pjp',
   coverage: 'crm_coverage',
   sales: 'crm_sales',
   targets: 'crm_targets',
@@ -55,6 +57,7 @@ const CRM_SUB = {
 // The RT partner vertical pack — only orgs with partner_crm_enabled see these.
 const PARTNER_FEATURES = new Set([
   'crm_visits', 'crm_telecalling', 'crm_coverage', 'crm_sales', 'crm_targets', 'crm_opps', 'crm_reports',
+  'crm_engine', 'crm_pjp',
 ]);
 // Generic CRM keys gated by crm_enabled (the standard baseline).
 const GENERIC_CRM = new Set(['crm', 'crm_leads', 'crm_pipeline', 'crm_contacts']);
