@@ -10,9 +10,8 @@ import { getOrg, getUser } from '../../js/auth.js';
 import { esc, showError, loadingSkeleton, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { canSeeOthers, canManageData } from './common.js';
-import { inr, num, SIGNALS } from './opportunity-engine.js';
+import { inr, REASONS, REASON_BY_KEY } from './to-visit.js';
 
-const META = Object.fromEntries(SIGNALS.map(s => [s.key, s]));
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const MONTH_FMT = { month: 'long', year: 'numeric' };
@@ -28,7 +27,7 @@ export default async function crmPjp(container) {
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Journey plan</h1>
-      <p class="page-subtitle">Plan each day's territory ahead of the month. Days are shaded by the opportunity waiting in that hub.</p>
+      <p class="page-subtitle">Plan each day's area ahead of the month. Days are shaded by the business needing attention there.</p>
     </div>
     <div class="card" style="margin-bottom:var(--space-5)">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
@@ -47,7 +46,7 @@ export default async function crmPjp(container) {
     <div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
         <span class="card-title">Plan adherence</span>
-        <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Visits that landed in the territory planned for that day</span>
+        <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Visits that landed in the area planned for that day</span>
       </div>
       <div id="pjp-adherence">${loadingSkeleton(3)}</div>
     </div>
@@ -60,11 +59,11 @@ export default async function crmPjp(container) {
     return;
   }
   const territories = (terr || []).filter(t => t.territory && t.territory !== '(no hub)');
-  // Shade by heat_score (winnability-weighted) but SHOW open_value: the number
-  // on the cell should be real rupees, the colour carries the priority.
-  const heatByHub = Object.fromEntries(territories.map(t => [t.territory, +t.heat_score || 0]));
+  // Both the shading and the number are the same real figure: rupees RT
+  // billed these partners in the last 12 months. Nothing is weighted.
   const valueByHub = Object.fromEntries(territories.map(t => [t.territory, +t.open_value || 0]));
-  const maxHeat = Math.max(1, ...territories.map(t => +t.heat_score || 0));
+  const heatByHub = valueByHub;
+  const maxHeat = Math.max(1, ...territories.map(t => +t.open_value || 0));
 
   // Person switcher for TL / admin — a rep only ever sees their own plan.
   if (canSeeOthers()) {
@@ -86,10 +85,10 @@ export default async function crmPjp(container) {
 
   container.querySelector('#pjp-legend').innerHTML = `
     <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
-      <span>Opportunity in the planned hub:</span>
+      <span>Business needing attention in the planned area:</span>
       ${[0.15, 0.4, 0.7, 1].map(f => `<span style="display:inline-block;width:26px;height:12px;border-radius:3px;background:color-mix(in srgb, var(--color-accent) ${Math.round(f * 70)}%, transparent)"></span>`).join('')}
       <span>low → high</span>
-      <span style="margin-left:auto">${territories.length} territories · ${inr(territories.reduce((t, x) => t + (+x.open_value || 0), 0))} open</span>
+      <span style="margin-left:auto">${territories.length} areas · ${inr(territories.reduce((t, x) => t + (+x.open_value || 0), 0))} billed in 12 months</span>
     </div>`;
 
   await render();
@@ -159,11 +158,11 @@ export default async function crmPjp(container) {
     const body = document.createElement('div');
     body.innerHTML = `
       <div class="form-group">
-        <label class="form-label">Territory for ${esc(new Date(dateKey + 'T00:00:00').toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' }))}</label>
+        <label class="form-label">Area for ${esc(new Date(dateKey + 'T00:00:00').toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' }))}</label>
         <select class="form-input" id="pd-terr">
           <option value="">— No plan —</option>
           ${territories.map(t => `<option value="${esc(t.territory)}" ${plan?.territory === t.territory ? 'selected' : ''}>
-            ${esc(t.territory)} — ${t.partners} partners, ${inr(t.open_value)} open</option>`).join('')}
+            ${esc(t.territory)} — ${t.partners} partners, ${inr(t.open_value)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -183,7 +182,7 @@ export default async function crmPjp(container) {
 
     body.querySelector('#pd-save').addEventListener('click', async () => {
       const territory = terrSel.value;
-      if (!territory) { toast('Pick a territory, or use Clear'); return; }
+      if (!territory) { toast('Pick an area, or use Clear'); return; }
       const { error } = await sb.from('crm_pjp_day_plans').upsert({
         org_id: org.id, bde_id: personId, plan_date: dateKey, territory,
         notes: body.querySelector('#pd-notes').value.trim() || null, created_by: me?.id || null,
@@ -212,31 +211,32 @@ export default async function crmPjp(container) {
       const { data, error } = await sb.rpc('crm_pjp_day_accounts', { p_territory: territory }).range(0, 199);
       if (error) { host.innerHTML = `<div style="color:var(--color-error);font-size:var(--text-sm)">${esc(error.message)}</div>`; return; }
       const list = data || [];
-      if (!list.length) { host.innerHTML = `<div class="empty-state" style="padding:var(--space-5)"><div class="empty-state-desc">No open opportunities in ${esc(territory)}.</div></div>`; return; }
+      if (!list.length) { host.innerHTML = `<div class="empty-state" style="padding:var(--space-5)"><div class="empty-state-desc">No partners needing attention in ${esc(territory)}.</div></div>`; return; }
       host.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
           <div style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold)">Who to see in ${esc(territory)}</div>
           ${canManageData() ? `<button class="btn btn-ghost btn-sm" id="pd-export">Export</button>` : ''}
         </div>
         <div class="table-wrap" style="max-height:42vh;overflow:auto"><table class="table">
-          <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Priority</th><th style="text-align:right">Last visit</th></tr></thead>
-          <tbody>${list.map(r => {
-            const m = META[r.opportunity_type] || { color: 'var(--color-text-secondary)', title: r.opportunity_type };
-            return `<tr>
+          <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Business (12 mo)</th><th style="text-align:right">Last visit</th></tr></thead>
+          <tbody>${list.map(r => `<tr>
               <td><a data-acc="${r.account_id}" style="color:var(--color-accent);cursor:pointer">${esc(r.name)}</a>
                 ${r.district_new ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(r.district_new)}</div>` : ''}</td>
-              <td><span class="badge" style="font-size:10px;background:${m.color}22;color:${m.color}">${esc(m.title)}</span>
-                <div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">${esc(r.reason || '')}</div></td>
-              <td style="text-align:right;font-weight:var(--font-weight-semibold)">${num(r.score)}</td>
+              <td>${(r.reasons || []).map(k => {
+                  const m = REASON_BY_KEY[k]; if (!m) return '';
+                  return `<span class="badge" style="font-size:10px;background:${m.color}22;color:${m.color};margin-right:4px">${esc(m.label)}</span>`;
+                }).join('')}
+                ${r.last_activation_date ? `<div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">last bought ${esc(r.last_activation_type || '')} ${esc(new Date(r.last_activation_date + 'T00:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short', year: '2-digit' }))}</div>` : ''}</td>
+              <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.value_12m)}</td>
               <td style="text-align:right;font-size:var(--text-xs);color:${(r.days_since_visit ?? 999) > 120 ? 'var(--color-warning)' : 'var(--color-text-secondary)'}">
-                ${r.days_since_visit == null ? 'never' : r.days_since_visit + 'd'}</td>
-            </tr>`;
-          }).join('')}</tbody>
+                ${r.days_since_visit == null ? 'none this year' : r.days_since_visit + 'd'}</td>
+            </tr>`).join('')}</tbody>
         </table></div>`;
       host.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${a.dataset.acc}`); }));
       host.querySelector('#pd-export')?.addEventListener('click', () => downloadCsv(`pjp_${territory}_${dateKey}.csv`,
         list.map(r => ({ Partner: r.name, 'Site ID': r.external_id || '', District: r.district_new || '',
-          Type: r.opportunity_type, Why: r.reason || '', Score: Math.round(+r.score || 0),
+          Why: (r.reasons || []).join(' '), Customers: r.customer_count ?? '',
+          'Last bought': r.last_activation_date || '', 'Business 12mo': Math.round(+r.value_12m || 0),
           'Days since visit': r.days_since_visit ?? '' }))));
     }
   }
@@ -256,7 +256,7 @@ export default async function crmPjp(container) {
     host.innerHTML = `<div class="table-wrap"><table class="table">
       <thead><tr><th>Week of</th><th style="text-align:right">Planned days</th><th style="text-align:right">Visits</th>
         <th style="text-align:right">On plan</th><th style="text-align:right">Adherence</th>
-        <th style="text-align:right">Priority on plan</th><th style="text-align:right">Priority off plan</th></tr></thead>
+        <th style="text-align:right">Business on plan</th><th style="text-align:right">Business off plan</th></tr></thead>
       <tbody>${rows.map(r => {
         const rate = r.adherence_rate == null ? null : +r.adherence_rate;
         const col = rate == null ? 'var(--color-text-tertiary)' : rate >= 70 ? 'var(--color-success)' : rate >= 40 ? 'var(--color-warning)' : 'var(--color-error)';
@@ -266,8 +266,8 @@ export default async function crmPjp(container) {
           <td style="text-align:right">${r.visits_total}</td>
           <td style="text-align:right">${r.visits_on_plan}</td>
           <td style="text-align:right;font-weight:var(--font-weight-semibold);color:${col}">${rate == null ? '—' : rate + '%'}</td>
-          <td style="text-align:right">${num(r.value_on_plan)}</td>
-          <td style="text-align:right;color:var(--color-text-secondary)">${num(r.value_off_plan)}</td>
+          <td style="text-align:right">${inr(r.value_on_plan)}</td>
+          <td style="text-align:right;color:var(--color-text-secondary)">${inr(r.value_off_plan)}</td>
         </tr>`;
       }).join('')}</tbody></table></div>`;
   }
