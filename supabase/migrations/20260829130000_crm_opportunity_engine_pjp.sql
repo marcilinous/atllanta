@@ -304,7 +304,7 @@ COMMENT ON FUNCTION crm_opportunity_features() IS
 CREATE OR REPLACE FUNCTION crm_partner_actions()
 RETURNS TABLE(
   account_id uuid, name text, external_id text, hub text, district_new text,
-  region text, owner_id uuid, telecaller text,
+  region text, owner_id uuid, telecaller text, tier text,
   reasons text[],
   customer_count integer,
   last_activation_date date, last_activation_type text, days_since_purchase integer,
@@ -315,7 +315,15 @@ RETURNS TABLE(
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
 AS $function$
-  WITH f AS (SELECT * FROM crm_opportunity_features()),
+  WITH f AS (
+    SELECT f.*, ca.tier
+    FROM crm_opportunity_features() f
+    JOIN crm_accounts ca ON ca.id = f.account_id
+    -- NA tier means inactive: not visited. Verified on live data that
+    -- tier='NA' and partner_status='Inactive' are the same 451 partners,
+    -- an exact 1:1 with no overlap into AP or Star AP.
+    WHERE COALESCE(ca.tier, '') <> 'NA'
+  ),
   r AS (
     SELECT f.account_id AS aid, 'tss_overdue' AS k FROM f
      WHERE f.last_tss_date IS NOT NULL AND f.days_since_tss > 365
@@ -331,7 +339,7 @@ AS $function$
   ),
   agg AS (SELECT r.aid, array_agg(r.k ORDER BY r.k) AS ks FROM r GROUP BY r.aid)
   SELECT f.account_id, f.name, f.external_id, f.hub, f.district_new,
-         f.region, f.owner_id, f.telecaller,
+         f.region, f.owner_id, f.telecaller, f.tier,
          agg.ks,
          f.customer_count,
          f.last_activation_date, f.last_activation_type, f.days_since_purchase,
@@ -344,7 +352,33 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION crm_partner_actions() IS
-  'One row per partner worth visiting, with the reason keys it matched. Ordered by rupees actually billed in the last 12 months.';
+  'One row per partner worth visiting, with the reason keys it matched. Inactive (tier NA) partners are excluded. Ordered by rupees actually billed.';
+
+
+-- Inactive on paper, still buying. Excluding NA from the visit list is right
+-- for 446 of the 451, but 5 billed during this financial year (4 of them in
+-- the last 90 days, Rs 323,738 in total) - their status flag is stale, not
+-- their business. Kept as its own report so the exclusion above stays clean:
+-- these need a status correction, not a visit.
+CREATE OR REPLACE FUNCTION crm_inactive_but_buying()
+RETURNS TABLE(
+  account_id uuid, name text, external_id text, hub text,
+  last_activation_date date, last_activation_type text, days_since_purchase integer,
+  value_this_fy numeric, value_12m numeric, last_visit_date date
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+  SELECT f.account_id, f.name, f.external_id, f.hub,
+         f.last_activation_date, f.last_activation_type, f.days_since_purchase,
+         f.value_this_fy, f.value_12m, f.last_visit_date
+  FROM crm_opportunity_features() f
+  JOIN crm_accounts ca ON ca.id = f.account_id
+  WHERE COALESCE(ca.tier, '') = 'NA' AND f.value_this_fy > 0
+  ORDER BY f.value_this_fy DESC;
+$function$;
+
+COMMENT ON FUNCTION crm_inactive_but_buying() IS
+  'Partners marked inactive (tier NA) that still billed this financial year - a data-hygiene report, not a visit list.';
 
 
 -- ============================================================
@@ -564,6 +598,7 @@ COMMENT ON FUNCTION crm_pjp_adherence(date, date) IS
 -- much work is a free denial-of-service lever, so take the grant away.
 REVOKE ALL ON FUNCTION crm_opportunity_features()            FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION crm_partner_actions()                 FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION crm_inactive_but_buying()             FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION crm_territory_potential()             FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION crm_pjp_day_accounts(text)            FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION crm_pjp_visit_adherence(date, date)   FROM PUBLIC, anon;
@@ -574,6 +609,7 @@ REVOKE ALL ON FUNCTION crm_report_windows()                  FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION crm_opportunity_features()          TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION crm_partner_actions()               TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION crm_inactive_but_buying()           TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION crm_territory_potential()           TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION crm_pjp_day_accounts(text)          TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION crm_pjp_visit_adherence(date, date) TO authenticated, service_role;
