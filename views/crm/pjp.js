@@ -343,7 +343,7 @@ export default async function crmPjp(container) {
         ${canManageData() ? `<button class="btn btn-ghost btn-sm" id="gd-export">Export</button>` : ''}
       </div>
       <div class="table-wrap" style="max-height:52vh;overflow:auto"><table class="table">
-        <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Gap</th><th style="text-align:right">Billed</th><th style="text-align:right">Last visit</th></tr></thead>
+        <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Gap</th><th style="text-align:right">Billed</th><th style="text-align:right">Last visit</th><th></th></tr></thead>
         <tbody>${list.map(r => {
           const dsv = r.days_since_visit;
           const stale = dsv == null || dsv > 120;
@@ -366,10 +366,18 @@ export default async function crmPjp(container) {
             <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.actual)}</td>
             <td style="text-align:right;font-size:var(--text-xs);color:${stale ? 'var(--color-warning)' : 'var(--color-text-secondary)'}">
               ${r.last_visit_date ? esc(new Date(r.last_visit_date + 'T00:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short' })) + `<div style="font-size:10px">${dsv}d ago</div>` : 'none this year'}</td>
+            <td style="text-align:right"><button class="btn btn-secondary btn-sm gd-log" data-acc="${r.account_id}">Log visit</button></td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
-    host.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${a.dataset.acc}`); }));
+    // Straight from the worklist to logging the visit — the visit form prefills
+    // to this partner, so the plan → who → logged loop closes in one place.
+    host.querySelectorAll('.gd-log').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeModal();
+      navigate(`crm/visits?account=${b.dataset.acc}`);
+    }));
+    host.querySelectorAll('a[data-acc]').forEach(a => a.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${a.dataset.acc}`); }));
     host.querySelector('#gd-export')?.addEventListener('click', () => downloadCsv(`visit_first_${plan.territory}_${dateKey}.csv`,
       list.map(r => ({ Partner: r.name, 'Site ID': r.external_id || '', District: r.district_new || '', Tier: r.tier || '',
         Why: (r.reasons || []).join(' '), Users: r.customer_count ?? '',
