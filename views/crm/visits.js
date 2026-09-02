@@ -114,6 +114,16 @@ export default async function crmVisits(container) {
       </div>
 
       <div class="form-group" style="margin:0">
+        <label class="form-label">Tally serial number</label>
+        <select class="form-input" id="v-tally-status">
+          <option value="shared">Shared — enter the number</option>
+          <option value="not_shared">Not shared by partner</option>
+          <option value="no_licence">Licence not purchased</option>
+        </select>
+        <input type="text" inputmode="numeric" autocomplete="off" class="form-input" id="v-tally-serial" placeholder="e.g. 700012345" style="margin-top:var(--space-2)">
+      </div>
+
+      <div class="form-group" style="margin:0">
         <label class="form-label">Remarks</label>
         <textarea class="form-input" id="v-remarks" rows="2" placeholder="What happened on this visit"></textarea>
       </div>
@@ -204,6 +214,20 @@ export default async function crmVisits(container) {
     }
   });
 
+  // --- Tally serial ---
+  // Collected at the shop. If the partner won't share it or hasn't bought a
+  // licence, the reason is captured instead of a blank. Digits only.
+  const tallyStatusEl = formEl.querySelector('#v-tally-status');
+  const tallySerialEl = formEl.querySelector('#v-tally-serial');
+  function syncTally() {
+    const shared = tallyStatusEl.value === 'shared';
+    tallySerialEl.style.display = shared ? '' : 'none';
+    if (!shared) tallySerialEl.value = '';
+  }
+  tallyStatusEl.addEventListener('change', syncTally);
+  tallySerialEl.addEventListener('input', () => { tallySerialEl.value = tallySerialEl.value.replace(/\D/g, ''); });
+  syncTally();
+
   // --- Save ---
   const saveBtn = formEl.querySelector('#v-save');
   saveBtn.addEventListener('click', async () => {
@@ -212,6 +236,9 @@ export default async function crmVisits(container) {
     const status = formEl.querySelector('#v-status').value;
     const outcome = formEl.querySelector('#v-outcome').value || null;
     const remarks = formEl.querySelector('#v-remarks').value.trim() || null;
+    const tallyStatus = tallyStatusEl.value;
+    const tallySerial = tallySerialEl.value.trim();
+    if (tallyStatus === 'shared' && !tallySerial) return toast('Enter the Tally serial number, or pick why it is not available');
 
     saveBtn.disabled = true;
     const label = saveBtn.textContent;
@@ -231,6 +258,8 @@ export default async function crmVisits(container) {
       visit_status: status,
       call_outcome: outcome,
       remarks,
+      tally_serial: tallyStatus === 'shared' ? tallySerial : null,
+      tally_serial_status: tallyStatus,
       lat: coords?.lat ?? null,
       lng: coords?.lng ?? null,
       location_text: coords ? `${coords.lat}, ${coords.lng}` : null,
@@ -250,6 +279,7 @@ export default async function crmVisits(container) {
       partnerInput.value = ''; meta.textContent = `${accounts.length.toLocaleString('en-IN')} partners you can log against`;
       formEl.querySelector('#v-outcome').value = '';
       formEl.querySelector('#v-remarks').value = '';
+      tallyStatusEl.value = 'shared'; syncTally();
       previewEl.style.display = 'none'; emptyEl.style.display = 'block'; fileInput.value = '';
     }
 
