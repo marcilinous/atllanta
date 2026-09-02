@@ -986,6 +986,77 @@ select.form-input { cursor: pointer; }
   margin-top: 2px;
 }
 
+/* PJP journey planner — a route-planning calendar, deliberately distinct from
+   the attendance heatmap above: taller left-aligned day cards, each planned day
+   carrying its area's own colour rather than a single-accent status wash. */
+.pjp-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  user-select: none;
+}
+
+.pjp-dow {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  padding: 0 0 2px 2px;
+}
+
+.pjp-day {
+  min-height: 84px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.pjp-day.pad { border: none; background: transparent; cursor: default; min-height: 0; }
+.pjp-day.empty:hover { border-color: var(--color-border); box-shadow: var(--shadow-sm); }
+.pjp-day.weekend.empty { background: var(--color-bg-secondary); }
+
+.pjp-day.planned {
+  border-left: 3px solid var(--hue);
+  background: color-mix(in srgb, var(--hue) 7%, var(--color-surface));
+}
+.pjp-day.planned:hover { box-shadow: var(--shadow-md); }
+
+.pjp-day.today { box-shadow: 0 0 0 2px var(--color-accent); }
+.pjp-day.locked.empty { cursor: default; opacity: 0.7; }
+.pjp-day.locked.empty:hover { border-color: var(--color-border-light); box-shadow: none; }
+
+.pjp-daynum {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+.pjp-day.today .pjp-daynum { color: var(--color-accent); }
+.pjp-lockchip { font-size: 10px; line-height: 1; }
+
+.pjp-area {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+.pjp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hue); flex-shrink: 0; }
+.pjp-meta { font-size: 10px; color: var(--color-text-tertiary); margin-top: auto; }
+.pjp-add { font-size: 11px; color: var(--color-text-tertiary); opacity: 0; transition: opacity var(--transition-fast); margin-top: auto; }
+.pjp-day.empty:hover .pjp-add { opacity: 1; }
+
 .heatmap-reg-dot {
   position: absolute;
   top: 4px;
