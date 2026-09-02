@@ -561,6 +561,20 @@ async function processBackstopEvents(sb) {
   return { processed, failed };
 }
 
+// Recompute the CRM opportunity engine's feature cache.
+//
+// The engine reads a materialised view rather than the raw report rows: doing
+// it live cost 5.7s a call, almost all of it decompressing the JSONB in
+// crm_report_rows. There is no pg_cron on this project, so this nightly pass
+// is what keeps the scores current. It is deliberately non-fatal — a failure
+// here must not cost us the event drain or the email queue, and yesterday's
+// scores are still useful (the UI shows when they were last computed).
+async function refreshOpportunityEngine(sb) {
+  const { data, error } = await sb.rpc("crm_refresh_opportunity_features");
+  if (error) return { refreshed: false, error: error.message };
+  return { refreshed: true, computed_at: data };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).json({ error: "Use POST or GET" });
@@ -587,7 +601,8 @@ export default async function handler(req, res) {
   try {
     const events = await processBackstopEvents(sb);
     const emails = await dispatchEmails(sb);
-    return res.status(200).json({ events, emails });
+    const opportunities = await refreshOpportunityEngine(sb);
+    return res.status(200).json({ events, emails, opportunities });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
