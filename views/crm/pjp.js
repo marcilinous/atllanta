@@ -60,11 +60,15 @@ export default async function crmPjp(container) {
     return;
   }
   const territories = (terr || []).filter(t => t.territory && t.territory !== '(no hub)');
-  // Both the shading and the number are the same real figure: rupees RT
-  // billed these partners in the last 12 months. Nothing is weighted.
+  // The number shown on a planned day is rupees RT billed these partners in the
+  // last 12 months. Nothing is weighted.
   const valueByHub = Object.fromEntries(territories.map(t => [t.territory, +t.open_value || 0]));
-  const heatByHub = valueByHub;
-  const maxHeat = Math.max(1, ...territories.map(t => +t.open_value || 0));
+  const partnersByHub = Object.fromEntries(territories.map(t => [t.territory, +t.partners || 0]));
+  // Colour each area distinctly so a plan reads as a route map, not a heat
+  // grid — a BDE sees at a glance which days cluster in the same area. Colour is
+  // stable per area name (hashed), so an area keeps its colour month to month.
+  const AREA_HUES = ['#2563eb', '#0f766e', '#b45309', '#7c3aed', '#be123c', '#0369a1', '#4d7c0f', '#0e7490', '#9333ea', '#c2410c'];
+  const hueFor = (name) => { let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0; return AREA_HUES[h % AREA_HUES.length]; };
 
   // Person switcher for TL / admin — a rep only ever sees their own plan.
   if (canSeeOthers()) {
@@ -84,13 +88,27 @@ export default async function crmPjp(container) {
   container.querySelector('#pjp-prev').addEventListener('click', () => { cursor.setMonth(cursor.getMonth() - 1); render(); });
   container.querySelector('#pjp-next').addEventListener('click', () => { cursor.setMonth(cursor.getMonth() + 1); render(); });
 
-  container.querySelector('#pjp-legend').innerHTML = `
-    <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
-      <span>Business needing attention in the planned area:</span>
-      ${[0.15, 0.4, 0.7, 1].map(f => `<span style="display:inline-block;width:26px;height:12px;border-radius:3px;background:color-mix(in srgb, var(--color-accent) ${Math.round(f * 70)}%, transparent)"></span>`).join('')}
-      <span>low → high</span>
-      <span style="margin-left:auto">${territories.length} areas · ${inr(territories.reduce((t, x) => t + (+x.open_value || 0), 0))} billed in 12 months</span>
-    </div>`;
+  // Legend is per-month: it names the areas actually planned and how many days
+  // each holds, colour-matched to the calendar. Built inside render().
+  function renderLegend(byDate) {
+    const counts = {};
+    Object.values(byDate).forEach(p => { counts[p.territory] = (counts[p.territory] || 0) + 1; });
+    const areas = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const host = container.querySelector('#pjp-legend');
+    if (!areas.length) {
+      host.innerHTML = `<span style="color:var(--color-text-tertiary)">No days planned yet — tap a date to name the area you'll cover.</span>`;
+      return;
+    }
+    const totalDays = areas.reduce((t, a) => t + counts[a], 0);
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+        ${areas.map(a => `<span style="display:inline-flex;align-items:center;gap:6px">
+          <span style="width:9px;height:9px;border-radius:50%;background:${hueFor(a)};flex-shrink:0"></span>
+          <span style="color:var(--color-text-secondary)">${esc(a)}</span>
+          <span style="color:var(--color-text-tertiary)">${counts[a]}d</span></span>`).join('')}
+        <span style="margin-left:auto;color:var(--color-text-tertiary)">${totalDays} day${totalDays === 1 ? '' : 's'} across ${areas.length} area${areas.length === 1 ? '' : 's'}</span>
+      </div>`;
+  }
 
   await render();
 
@@ -124,32 +142,32 @@ export default async function crmPjp(container) {
     while (cells.length % 7) cells.push(null);
 
     const today = iso(new Date());
+    // A planner grid, not a status heatmap: taller, left-aligned day cards, each
+    // planned day carrying its area's colour, name, business and partner count.
     container.querySelector('#pjp-cal').innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
-        ${DAY_LABELS.map(d => `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary);text-align:center;padding-bottom:var(--space-1)">${d}</div>`).join('')}
+      <div class="pjp-cal">
+        ${DAY_LABELS.map(d => `<div class="pjp-dow">${d}</div>`).join('')}
         ${cells.map(d => {
-          if (!d) return `<div></div>`;
+          if (!d) return `<div class="pjp-day pad"></div>`;
           const key = iso(d);
           const plan = byDate[key];
-          const heat = plan ? (heatByHub[plan.territory] || 0) / maxHeat : 0;
-          const intensity = plan ? Math.max(0.12, heat) : 0;
-          const bg = plan ? `color-mix(in srgb, var(--color-accent) ${Math.round(intensity * 70)}%, transparent)` : 'var(--color-bg-secondary)';
-          // Past ~half intensity the accent wash is saturated enough that the
-          // default and secondary text colours stop being legible on it in
-          // either theme, so flip the whole cell to inverse text.
-          const hot = intensity >= 0.5;
-          const fg = hot ? 'color:#fff' : '';
-          const subFg = hot ? 'color:rgba(255,255,255,.82)' : 'color:var(--color-text-secondary)';
           const weekend = d.getDay() === 0;
-          return `<div class="pjp-day" data-date="${key}" role="button" tabindex="0"
-            style="min-height:74px;border-radius:var(--radius-md);border:1px solid ${key === today ? 'var(--color-accent)' : 'var(--color-border-light)'};
-                   background:${bg};padding:6px;cursor:pointer;opacity:${weekend && !plan ? .5 : 1};display:flex;flex-direction:column;gap:2px;${fg}">
-            <div style="font-size:var(--text-xs);font-weight:${key === today ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)'};${subFg}">${d.getDate()}</div>
-            ${plan ? `<div style="font-size:var(--text-xs);font-weight:var(--font-weight-semibold);line-height:1.2;${fg}">${esc(plan.territory)}</div>
-                      <div style="font-size:10px;${subFg};margin-top:auto" title="Open opportunity in ${esc(plan.territory)}">${inr(valueByHub[plan.territory] || 0)}</div>` : ''}
+          const cls = ['pjp-day',
+            plan ? 'planned' : 'empty',
+            key === today ? 'today' : '',
+            weekend ? 'weekend' : '',
+            locked ? 'locked' : ''].filter(Boolean).join(' ');
+          const hue = plan ? hueFor(plan.territory) : '';
+          return `<div class="${cls}" data-date="${key}" role="button" tabindex="0" ${hue ? `style="--hue:${hue}"` : ''}>
+            <div class="pjp-daynum"><span>${d.getDate()}</span>${plan && locked ? '<span class="pjp-lockchip" title="Committed">🔒</span>' : ''}</div>
+            ${plan
+              ? `<div class="pjp-area"><span class="pjp-dot"></span>${esc(plan.territory)}</div>
+                 <div class="pjp-meta">${inr(valueByHub[plan.territory] || 0)}${partnersByHub[plan.territory] ? ` · ${partnersByHub[plan.territory]} partners` : ''}</div>`
+              : (locked ? '' : `<div class="pjp-add">+ plan</div>`)}
           </div>`;
         }).join('')}
       </div>`;
+    renderLegend(byDate);
 
     container.querySelectorAll('.pjp-day').forEach(el => {
       const plan = byDate[el.dataset.date];
