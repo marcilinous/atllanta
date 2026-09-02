@@ -89,9 +89,10 @@ export default async function crmAccountDetail(container) {
           : esc([account.industry, account.billing_city].filter(Boolean).join(' · ') || 'Account') + (ownerLabel && ownerLabel !== '—' ? ' · Owner: ' + esc(ownerLabel) : '')}</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        ${partner ? '<button class="btn btn-secondary" id="log-visit">Log visit</button>' : ''}
-        <button class="btn btn-secondary" id="log-activity">Log activity</button>
-        <button class="btn btn-primary" id="new-deal">+ Deal</button>
+        ${partner
+          ? '<button class="btn btn-secondary" id="log-visit">Log visit</button>'
+          : `<button class="btn btn-secondary" id="log-activity">Log activity</button>
+             <button class="btn btn-primary" id="new-deal">+ Deal</button>`}
       </div>
     </div>
 
@@ -140,21 +141,21 @@ export default async function crmAccountDetail(container) {
           <div id="visits-body">${renderVisits(visits)}</div>
         </div>` : ''}
 
-        <div class="card">
+        ${partner ? '' : `<div class="card">
           <div class="card-header"><span class="card-title">Opportunities (${(opps || []).length})</span></div>
           <div>${renderOpps(opps || [])}</div>
-        </div>
+        </div>`}
       </div>
     </div>
 
-    <div class="card" style="margin-top:var(--space-4)">
+    ${partner ? '' : `<div class="card" style="margin-top:var(--space-4)">
       <div class="card-header"><span class="card-title">Activity</span></div>
       <div id="activity-timeline"></div>
-    </div>
+    </div>`}
   `;
 
   container.querySelector('#back').addEventListener('click', () => navigate('crm/accounts'));
-  container.querySelector('#new-deal').addEventListener('click', () => navigate(`crm/opportunities?account=${id}`));
+  container.querySelector('#new-deal')?.addEventListener('click', () => navigate(`crm/opportunities?account=${id}`));
   container.querySelector('#log-visit')?.addEventListener('click', () => navigate(`crm/visits?account=${id}`));
   container.querySelector('#log-visit-2')?.addEventListener('click', () => navigate(`crm/visits?account=${id}`));
 
@@ -174,7 +175,7 @@ export default async function crmAccountDetail(container) {
       if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
     }));
   })();
-  container.querySelector('#log-activity').addEventListener('click', () => openActivityModal('account', id, refreshTimeline));
+  container.querySelector('#log-activity')?.addEventListener('click', () => openActivityModal('account', id, refreshTimeline));
   container.querySelector('#add-contact').addEventListener('click', openContactForm);
 
   wireContactRows();
@@ -196,7 +197,7 @@ export default async function crmAccountDetail(container) {
   }
 
   const timelineEl = container.querySelector('#activity-timeline');
-  function refreshTimeline() { renderTimeline(timelineEl, 'account', id); }
+  function refreshTimeline() { if (timelineEl) renderTimeline(timelineEl, 'account', id); }
   refreshTimeline();
 
   function renderContacts(list) {
