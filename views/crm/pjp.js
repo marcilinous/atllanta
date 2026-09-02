@@ -10,7 +10,7 @@ import { getOrg, getUser } from '../../js/auth.js';
 import { esc, showError, loadingSkeleton, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { canSeeOthers, canManageData } from './common.js';
-import { inr, REASONS, REASON_BY_KEY } from './to-visit.js';
+import { inr, REASON_BY_KEY } from './to-visit.js';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -27,7 +27,7 @@ export default async function crmPjp(container) {
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Journey plan</h1>
-      <p class="page-subtitle">Plan each day's area ahead of the month. Days are shaded by the business needing attention there.</p>
+      <p class="page-subtitle">Plan each day's area ahead of the month, then lock it. A locked day opens who to visit first — biggest untapped business at the top.</p>
     </div>
     <div class="card" style="margin-bottom:var(--space-5)">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
@@ -37,6 +37,7 @@ export default async function crmPjp(container) {
           <button class="btn btn-ghost btn-sm" id="pjp-next">→</button>
         </div>
         <div style="display:flex;gap:var(--space-2);align-items:center">
+          <span id="pjp-lock" style="display:flex;align-items:center;gap:var(--space-2)"></span>
           <select class="form-input" id="pjp-person" style="max-width:220px;height:32px;display:none"></select>
         </div>
       </div>
@@ -98,16 +99,22 @@ export default async function crmPjp(container) {
     const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     container.querySelector('#pjp-month').textContent = monthStart.toLocaleDateString('en', MONTH_FMT);
 
-    const { data: plans, error } = await sb.from('crm_pjp_day_plans')
-      .select('id, plan_date, territory, notes, bde_id')
-      .eq('bde_id', personId)
-      .gte('plan_date', iso(monthStart))
-      .lte('plan_date', iso(monthEnd));
+    const [{ data: plans, error }, { data: lockRow }] = await Promise.all([
+      sb.from('crm_pjp_day_plans')
+        .select('id, plan_date, territory, notes, bde_id')
+        .eq('bde_id', personId)
+        .gte('plan_date', iso(monthStart))
+        .lte('plan_date', iso(monthEnd)),
+      sb.from('crm_pjp_month_locks')
+        .select('id, locked_at').eq('bde_id', personId).eq('month_start', iso(monthStart)).maybeSingle(),
+    ]);
     if (error) {
       showError(container.querySelector('#pjp-cal'), 'Failed to load the plan: ' + error.message, render);
       return;
     }
     const byDate = Object.fromEntries((plans || []).map(p => [p.plan_date, p]));
+    const locked = !!lockRow;
+    renderLock(monthStart, locked, lockRow, (plans || []).length);
 
     // Monday-first grid, padded to whole weeks.
     const lead = (monthStart.getDay() + 6) % 7;
@@ -145,7 +152,18 @@ export default async function crmPjp(container) {
       </div>`;
 
     container.querySelectorAll('.pjp-day').forEach(el => {
-      const open = () => openDay(el.dataset.date, byDate[el.dataset.date]);
+      const plan = byDate[el.dataset.date];
+      // Locked month: the plan is committed, so a day no longer opens the
+      // editable planner — it opens the gap-led "who to visit first" tab. An
+      // unplanned day in a locked month has nothing to show.
+      const open = () => {
+        if (locked) {
+          if (plan) openGapDay(el.dataset.date, plan);
+          else toast('This month is locked. Unlock it to plan more days.');
+        } else {
+          openDay(el.dataset.date, plan);
+        }
+      };
       el.addEventListener('click', open);
       el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
     });
@@ -239,6 +257,107 @@ export default async function crmPjp(container) {
           'Last bought': r.last_activation_date || '', 'Business 12mo': Math.round(+r.value_12m || 0),
           'Days since visit': r.days_since_visit ?? '' }))));
     }
+  }
+
+  // ---- month lock ----
+  // The plan is a month-start commitment. Locking it freezes the days (the DB
+  // enforces this too — see crm_pjp_month_locks) and switches each day from the
+  // editable planner to the gap-led prediction.
+  function renderLock(monthStart, locked, lockRow, plannedCount) {
+    const host = container.querySelector('#pjp-lock');
+    if (!host) return;
+    if (locked) {
+      const when = lockRow?.locked_at ? new Date(lockRow.locked_at).toLocaleDateString('en', { day: 'numeric', month: 'short' }) : '';
+      host.innerHTML = `
+        <span class="badge badge-success" style="display:inline-flex;align-items:center;gap:4px" title="Committed${when ? ' ' + esc(when) : ''}">🔒 Plan locked</span>
+        <button class="btn btn-ghost btn-sm" id="pjp-unlock">Unlock</button>`;
+      host.querySelector('#pjp-unlock').addEventListener('click', () => unlockMonth(monthStart));
+    } else {
+      const can = plannedCount > 0;
+      host.innerHTML = `<button class="btn btn-secondary btn-sm" id="pjp-lockbtn" ${can ? '' : 'disabled title="Plan at least one day first"'}>Lock plan</button>`;
+      host.querySelector('#pjp-lockbtn').addEventListener('click', () => { if (can) lockMonth(monthStart); });
+    }
+  }
+
+  async function lockMonth(monthStart) {
+    const { error } = await sb.from('crm_pjp_month_locks').insert({
+      org_id: org.id, bde_id: personId, month_start: iso(monthStart), locked_by: me?.id || null,
+    });
+    if (error) { toast('Could not lock: ' + error.message); return; }
+    toast('Plan locked — days now show who to visit first');
+    render();
+  }
+
+  async function unlockMonth(monthStart) {
+    const { error } = await sb.from('crm_pjp_month_locks').delete()
+      .eq('bde_id', personId).eq('month_start', iso(monthStart));
+    if (error) { toast('Could not unlock: ' + error.message); return; }
+    toast('Plan unlocked');
+    render();
+  }
+
+  // ---- locked-day drill-down: who to visit first (gap prediction) ----
+  // Ranks the planned area's partners by rupee gap — what a partner of its size
+  // should be billing where it sits, minus what it does. The working is shown
+  // (expected, peer rate, base) so it never reads as a bare score.
+  async function openGapDay(dateKey, plan) {
+    const when = new Date(dateKey + 'T00:00:00').toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' });
+    const body = document.createElement('div');
+    body.innerHTML = `
+      <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-3)">
+        ${esc(when)} · biggest untapped business first. Gap = what this partner's size should bill here − what it does.
+      </div>
+      <div id="gd-list">${loadingSkeleton(5)}</div>`;
+    openModal(`Who to visit first — ${esc(plan.territory)}`, body);
+
+    const host = body.querySelector('#gd-list');
+    const { data, error } = await sb.rpc('crm_pjp_gap_accounts', { p_territory: plan.territory }).range(0, 299);
+    if (error) { host.innerHTML = `<div style="color:var(--color-error);font-size:var(--text-sm)">${esc(error.message)}</div>`; return; }
+    const list = data || [];
+    if (!list.length) {
+      host.innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-desc">No partners to rank in ${esc(plan.territory)}.</div></div>`;
+      return;
+    }
+    const scored = list.filter(r => r.gap != null).length;
+    host.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">
+        <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${scored.toLocaleString('en-IN')} of ${list.length.toLocaleString('en-IN')} partners scored on gap · the rest fall to billed rupees</div>
+        ${canManageData() ? `<button class="btn btn-ghost btn-sm" id="gd-export">Export</button>` : ''}
+      </div>
+      <div class="table-wrap" style="max-height:52vh;overflow:auto"><table class="table">
+        <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Gap</th><th style="text-align:right">Billed</th><th style="text-align:right">Last visit</th></tr></thead>
+        <tbody>${list.map(r => {
+          const dsv = r.days_since_visit;
+          const stale = dsv == null || dsv > 120;
+          const gapCell = r.gap == null
+            ? `<span style="color:var(--color-text-tertiary)">—</span>`
+            : `<span style="font-weight:var(--font-weight-semibold);color:var(--color-accent)" title="Expected ${inr(r.expected)} at the ${esc(r.peer_scope || '')} rate of ₹${(+r.peer_per_user || 0).toLocaleString('en-IN')}/user × ${r.customer_count} users, vs ${inr(r.actual)} billed">${inr(r.gap)}</span>
+               <div style="font-size:10px;color:var(--color-text-tertiary);font-weight:var(--font-weight-normal)">of ${inr(r.expected)} expected</div>`;
+          return `<tr>
+            <td style="font-weight:var(--font-weight-medium)">
+              <a data-acc="${r.account_id}" style="color:var(--color-accent);cursor:pointer">${esc(r.name)}</a>
+              ${r.tier === 'Star AP' ? `<span class="badge" style="font-size:9px;background:var(--color-warning)22;color:var(--color-warning);margin-left:4px">Star AP</span>` : ''}
+              ${r.district_new ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(r.district_new)}</div>` : ''}
+            </td>
+            <td>${(r.reasons || []).map(k => {
+                const m = REASON_BY_KEY[k]; if (!m) return '';
+                return `<span class="badge" style="font-size:10px;background:${m.color}22;color:${m.color};margin-right:4px">${esc(m.label)}</span>`;
+              }).join('')}
+              ${r.customer_count ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:2px">${r.customer_count} users</div>` : ''}</td>
+            <td style="text-align:right">${gapCell}</td>
+            <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.actual)}</td>
+            <td style="text-align:right;font-size:var(--text-xs);color:${stale ? 'var(--color-warning)' : 'var(--color-text-secondary)'}">
+              ${r.last_visit_date ? esc(new Date(r.last_visit_date + 'T00:00:00').toLocaleDateString('en', { day: 'numeric', month: 'short' })) + `<div style="font-size:10px">${dsv}d ago</div>` : 'none this year'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+    host.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${a.dataset.acc}`); }));
+    host.querySelector('#gd-export')?.addEventListener('click', () => downloadCsv(`visit_first_${plan.territory}_${dateKey}.csv`,
+      list.map(r => ({ Partner: r.name, 'Site ID': r.external_id || '', District: r.district_new || '', Tier: r.tier || '',
+        Why: (r.reasons || []).join(' '), Users: r.customer_count ?? '',
+        'Per user': r.per_user ?? '', 'Peer per user': r.peer_per_user ?? '', 'Peer scope': r.peer_scope || '',
+        Expected: r.expected ?? '', Gap: r.gap ?? '', Billed: Math.round(+r.actual || 0),
+        'Last visit': r.last_visit_date || '' }))));
   }
 
   // ---- adherence ----
