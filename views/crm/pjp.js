@@ -254,7 +254,7 @@ export default async function crmPjp(container) {
           ${canManageData() ? `<button class="btn btn-ghost btn-sm" id="pd-export">Export</button>` : ''}
         </div>
         <div class="table-wrap" style="max-height:42vh;overflow:auto"><table class="table">
-          <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Business (12 mo)</th><th style="text-align:right">Last visit</th></tr></thead>
+          <thead><tr><th>Partner</th><th>Why</th><th style="text-align:right">Business (12 mo)</th><th style="text-align:right">Last visit</th><th></th></tr></thead>
           <tbody>${list.map(r => `<tr>
               <td><a data-acc="${r.account_id}" style="color:var(--color-accent);cursor:pointer">${esc(r.name)}</a>
                 ${r.district_new ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(r.district_new)}</div>` : ''}</td>
@@ -266,9 +266,11 @@ export default async function crmPjp(container) {
               <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.value_12m)}</td>
               <td style="text-align:right;font-size:var(--text-xs);color:${(r.days_since_visit ?? 999) > 120 ? 'var(--color-warning)' : 'var(--color-text-secondary)'}">
                 ${r.days_since_visit == null ? 'none this year' : r.days_since_visit + 'd'}</td>
+              <td style="text-align:right"><button class="btn btn-secondary btn-sm pd-log" data-acc="${r.account_id}">Log visit</button></td>
             </tr>`).join('')}</tbody>
         </table></div>`;
-      host.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${a.dataset.acc}`); }));
+      host.querySelectorAll('.pd-log').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); closeModal(); navigate(`crm/visits?account=${b.dataset.acc}`); }));
+      host.querySelectorAll('a[data-acc]').forEach(a => a.addEventListener('click', () => { closeModal(); navigate(`crm/account?id=${a.dataset.acc}`); }));
       host.querySelector('#pd-export')?.addEventListener('click', () => downloadCsv(`pjp_${territory}_${dateKey}.csv`,
         list.map(r => ({ Partner: r.name, 'Site ID': r.external_id || '', District: r.district_new || '',
           Why: (r.reasons || []).join(' '), Customers: r.customer_count ?? '',
