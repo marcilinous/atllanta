@@ -14,10 +14,19 @@ Pitch: *Companies come for the AI hiring tool, stay for the employee management 
 
 Well past Phase 0. Substantially built out beyond the original recruitment-only scope:
 
-- **`api/`** — 13 Vercel serverless functions (kept ≤12-function limit by consolidation): matching, resume/JD parsing, ai-query, bulk-import, create-org, google-auth, schedule, reports, send-notification, event-processor, extract-candidate, screen-job.
-- **`supabase/migrations/`** — 14 migrations = the real schema (foundation multi-tenant, interview scheduling + per-candidate slots, Google OAuth/invitations, business-OS platform, expense tracking, helpdesk, asset tracking, announcements).
-- **`views/`** — recruitment, employees, attendance, leave, **plus** finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports.
-- **Infra** — Vercel + Supabase wired; PWA (`manifest.json`, `sw.js`); Playwright tests in `tests/`.
+- **`api/`** — 12 Vercel serverless functions (kept ≤12-function limit by consolidation): matching, resume/JD parsing, ai-query, bulk-import, create-org, google-auth, schedule, reports, send-notification, event-processor, extract-candidate, screen-job.
+- **`supabase/migrations/`** — ~49 migrations = the real schema (foundation multi-tenant, interview scheduling, Google OAuth/invitations, business-OS platform, expense tracking, helpdesk, asset tracking, announcements, **+ the whole CRM/partner-sales vertical**).
+- **`views/`** — recruitment, employees, attendance, leave, finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **plus `views/crm/` (24 files)**.
+- **Infra** — Vercel + Supabase wired (project `nburswxjpukntgdwuyme` = `atllanta`); PWA (`manifest.json`, `sw.js`); Playwright tests in `tests/`. Live-app changes verified against the real Supabase project, additive migrations applied there directly.
+
+### CRM / partner-sales vertical (tenant **RTcompu**, org `e8845b88-…`)
+
+A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from imported partner reports keyed on Site ID (`crm_report_*`), materialised into `crm_opportunity_features_mv` (per-partner facts: base size, billed rupees, last visit/activation, tier). All CRM reads go through `SECURITY DEFINER` RPCs that re-apply level scoping (own / reports / admin via `crm_report_ids()`, `crm_user_is_org_admin()`); MV/helpers revoked from `anon`. Key surfaces:
+
+- **PJP (`views/crm/pjp.js`)** — the one field-visit block ("Who to visit" is a tab/drill-down of it, not a separate menu card). Month calendar (route-map planner, **not** the attendance heatmap look), plan an area per day, **lock the month** (`crm_pjp_month_locks`, DB-enforced on day-plan write policies). Open a planned day → partner list; each row has a **Log visit** button → `crm/visits?account=…` (prefilled).
+- **Gap prediction** (`crm_pjp_gap_accounts`) — "who to visit first": `gap = expected − actual`, `expected = users × same-place peer-median business-per-user`. Peer group finest-that-clears-8-peers: **pincode → billing_city → district → region**, ≥25-user benchmark floor. Fact worklist (`crm_partner_actions`, reasons: tss_overdue/stopped_buying/base_no_buy/not_visited) still exists, ordered by billed rupees.
+- **Visits** (`views/crm/visits.js`) — GPS + selfie + offline outbox; captures **Tally serial** (`tally_serial` / `tally_serial_status` ∈ shared/not_shared/no_licence).
+- **Pending:** partner-wise **pincode CSV** from Sachin → load into `crm_accounts.pincode` to sharpen peer benchmarks from city to pincode level (column exists, nullable).
 
 ## 3. Source-of-Truth Files (read these, don't duplicate them here)
 
