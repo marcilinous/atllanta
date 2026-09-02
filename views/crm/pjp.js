@@ -10,13 +10,38 @@ import { getOrg, getUser } from '../../js/auth.js';
 import { esc, showError, loadingSkeleton, toast, openModal, closeModal, downloadCsv } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { canSeeOthers, canManageData } from './common.js';
-import { inr, REASON_BY_KEY } from './to-visit.js';
+import crmToVisit, { inr, REASON_BY_KEY } from './to-visit.js';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const MONTH_FMT = { month: 'long', year: 'numeric' };
 
+// PJP is one block, two tabs. Planning the month and knowing who to visit that
+// day are a single workflow — the plan says where, the worklist says who — so
+// they live under one entry, not two menu items.
 export default async function crmPjp(container) {
+  container.innerHTML = `
+    <div class="tabs" id="pjp-tabs">
+      <button class="tab active" data-tab="plan">Journey plan</button>
+      <button class="tab" data-tab="visit">Who to visit</button>
+    </div>
+    <div id="pjp-panel"></div>`;
+  const panel = container.querySelector('#pjp-panel');
+  const tabs = [...container.querySelectorAll('#pjp-tabs .tab')];
+  let current = null;
+  async function show(tab) {
+    if (tab === current) return;
+    current = tab;
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    panel.innerHTML = '';
+    if (tab === 'plan') await crmPlanner(panel);
+    else await crmToVisit(panel);
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.tab)));
+  await show('plan');
+}
+
+async function crmPlanner(container) {
   const org = getOrg();
   const me = getUser();
   if (!org) { container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div></div>`; return; }
@@ -56,7 +81,7 @@ export default async function crmPjp(container) {
   // Territory heat is month-independent — load once.
   const { data: terr, error: terrErr } = await sb.rpc('crm_territory_potential');
   if (terrErr) {
-    showError(container.querySelector('#pjp-cal'), 'Failed to load territories: ' + terrErr.message, () => crmPjp(container));
+    showError(container.querySelector('#pjp-cal'), 'Failed to load territories: ' + terrErr.message, () => crmPlanner(container));
     return;
   }
   const territories = (terr || []).filter(t => t.territory && t.territory !== '(no hub)');
