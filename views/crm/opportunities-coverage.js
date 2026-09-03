@@ -177,30 +177,52 @@ export default async function crmOpps(container) {
     clearBtn.style.display = filterKey || search ? '' : 'none';
     if (!list.length) { bodyEl.innerHTML = `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-title">Nothing here</div></div>`; return; }
 
-    bodyEl.innerHTML = `<div class="table-wrap" style="max-height:62vh;overflow:auto"><table class="table" style="font-variant-numeric:tabular-nums">
-      <thead><tr>
-        <th>Partner</th><th>District</th>
-        <th style="text-align:right">Visits</th><th style="text-align:right">Calls</th>
-        <th style="text-align:right">TP L→C</th><th style="text-align:right">TSS L→C</th>
-        <th style="text-align:right">Revenue CFY</th><th style="text-align:right">LFY</th>
-      </tr></thead>
-      <tbody>${list.slice(0, 400).map(p => `<tr>
-        <td style="font-weight:var(--font-weight-medium)"><a data-acc="${p.account_id}" style="color:var(--color-accent);cursor:pointer">${esc(p.name)}</a>
-          ${p.external_id ? `<div style="font-size:var(--text-xs);color:var(--color-text-tertiary);font-family:var(--font-mono)">${esc(p.external_id)}</div>` : ''}</td>
-        <td style="color:var(--color-text-secondary)">${p.district_new ? esc(p.district_new) : '—'}</td>
-        <td style="text-align:right">${+p.visits_me ? p.visits_me : '<span style="color:var(--color-text-tertiary)">0</span>'}</td>
-        <td style="text-align:right">${+p.calls_total ? p.calls_total : '<span style="color:var(--color-text-tertiary)">0</span>'}</td>
-        <td style="text-align:right">${delta(p.tp_lfy, p.tp_cfy)}</td>
-        <td style="text-align:right">${delta(p.tss_lfy, p.tss_cfy)}</td>
-        <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(p.rev_cfy)}</td>
-        <td style="text-align:right;color:var(--color-text-tertiary)">${inr(p.rev_lfy)}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>
+    // Money-forward worklist: revenue at stake leads, sized by a magnitude bar
+    // relative to the top partner; the reason is a pill, not a column.
+    const maxStake = Math.max(1, ...list.map(p => Math.max(+p.rev_cfy || 0, +p.rev_lfy || 0)));
+    const primaryReason = (p) => opps.find(o => (!o.lfy || lfyPresent) && o.test(p)) || null;
+    const revMark = (p) => {
+      const c = +p.rev_cfy || 0, l = +p.rev_lfy || 0;
+      const col = c < l ? 'var(--color-error)' : c > l ? 'var(--color-success)' : 'var(--color-text-tertiary)';
+      return `<span style="color:${col}">${c < l ? '▾' : c > l ? '▴' : '·'}</span>`;
+    };
+    const shown = list.slice(0, 400);
+    bodyEl.innerHTML = `<div class="opw" style="max-height:64vh;overflow:auto">${shown.map((p, i) => {
+      const r = primaryReason(p);
+      const rc = r ? r.color : 'var(--color-text-tertiary)';
+      const stake = Math.max(+p.rev_cfy || 0, +p.rev_lfy || 0);
+      const mag = Math.round((stake / maxStake) * 100);
+      const touched = p.visited_by_me || p.called_by_me;
+      const touchTxt = p.visited_by_me ? ('Visited' + (+p.visits_me ? ' ·' + p.visits_me : ''))
+        : (p.called_by_me || +p.calls_total ? ('Called' + (+p.calls_total ? ' ·' + p.calls_total : '')) : 'No visit');
+      return `<div class="opw-row" data-acc="${p.account_id}">
+        <div class="opw-rank">${i + 1}</div>
+        <div class="opw-mid">
+          <div class="opw-nameline">
+            <span class="opw-name">${esc(p.name)}</span>
+            ${p.external_id ? `<span class="opw-site">${esc(p.external_id)}</span>` : ''}
+            ${r ? `<span class="opw-pill" style="background:color-mix(in srgb, ${rc} 14%, transparent);color:${rc}">${esc(r.title)}</span>` : ''}
+          </div>
+          <div class="opw-sub">
+            <span>TP ${delta(p.tp_lfy, p.tp_cfy)}</span>
+            <span>TSS ${delta(p.tss_lfy, p.tss_cfy)}</span>
+            <span class="opw-touch"><span class="opw-tdot" style="background:${touched ? 'var(--color-success)' : 'var(--color-warning)'}"></span>${touchTxt}${p.district_new ? ' · ' + esc(p.district_new) : ''}</span>
+          </div>
+        </div>
+        <div class="opw-right">
+          <div class="opw-rev">${inr(p.rev_cfy)}</div>
+          <div class="opw-revsub">LFY ${inr(p.rev_lfy)} ${revMark(p)}</div>
+          <div class="opw-mag"><span style="width:${mag}%;background:${rc}"></span></div>
+          <div class="opw-act"><button class="btn btn-secondary btn-sm opw-log" data-acc="${p.account_id}">Log visit</button></div>
+        </div>
+      </div>`;
+    }).join('')}</div>
     <div style="padding:var(--space-3) var(--space-4);display:flex;justify-content:space-between;align-items:center;font-size:var(--text-sm);color:var(--color-text-secondary)">
-      <span>Showing ${N(Math.min(400, list.length))} of ${N(list.length)}, biggest business first.</span>
+      <span>Showing ${N(shown.length)} of ${N(list.length)}, biggest business at stake first.</span>
       ${canManageData() ? `<button class="btn btn-secondary btn-sm" id="op-export">Export</button>` : ''}
     </div>`;
-    bodyEl.querySelectorAll('[data-acc]').forEach(a => a.addEventListener('click', () => navigate(`crm/account?id=${a.dataset.acc}`)));
+    bodyEl.querySelectorAll('.opw-log').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); navigate(`crm/visits?account=${b.dataset.acc}`); }));
+    bodyEl.querySelectorAll('.opw-row').forEach(row => row.addEventListener('click', () => navigate(`crm/account?id=${row.dataset.acc}`)));
     bodyEl.querySelector('#op-export')?.addEventListener('click', () => downloadCsv(`opportunities_${filterKey || 'all'}.csv`,
       list.map(p => ({ 'Site ID': p.external_id || '', Partner: p.name, District: p.district_new || '',
         'Visits (me)': +p.visits_me || 0, Calls: +p.calls_total || 0,

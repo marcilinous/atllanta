@@ -1057,6 +1057,44 @@ select.form-input { cursor: pointer; }
 .pjp-add { font-size: 11px; color: var(--color-text-tertiary); opacity: 0; transition: opacity var(--transition-fast); margin-top: auto; }
 .pjp-day.empty:hover .pjp-add { opacity: 1; }
 
+/* Opportunities — priority worklist. A ranked, money-forward partner list:
+   revenue leads on the right with a magnitude bar, the reason is a pill on the
+   row, not a spreadsheet of columns. */
+.opw { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+.opw-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 190px;
+  gap: var(--space-4);
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.opw-row:last-child { border-bottom: none; }
+.opw-row:hover { background: var(--color-bg-secondary); }
+.opw-rank { text-align: center; font-size: var(--text-sm); font-weight: var(--font-weight-bold); color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+.opw-mid { min-width: 0; }
+.opw-nameline { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.opw-name { font-weight: var(--font-weight-semibold); font-size: var(--text-sm); }
+.opw-site { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-tertiary); }
+.opw-pill { font-size: 11px; font-weight: var(--font-weight-semibold); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.opw-sub { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-top: 5px; font-size: var(--text-xs); color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.opw-sub b { color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
+.opw-touch { display: inline-flex; align-items: center; gap: 5px; }
+.opw-tdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.opw-right { text-align: right; }
+.opw-rev { font-size: var(--text-lg); font-weight: var(--font-weight-bold); font-variant-numeric: tabular-nums; }
+.opw-revsub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 1px; font-variant-numeric: tabular-nums; }
+.opw-mag { height: 5px; border-radius: 3px; background: var(--color-bg-tertiary); overflow: hidden; margin-top: 7px; }
+.opw-mag > span { display: block; height: 100%; border-radius: 3px; }
+.opw-act { margin-top: 8px; }
+@media (max-width: 640px) {
+  .opw-row { grid-template-columns: 26px 1fr; gap: var(--space-3); }
+  .opw-right { grid-column: 2; text-align: left; margin-top: 6px; }
+  .opw-mag { max-width: 220px; }
+}
+
 .heatmap-reg-dot {
   position: absolute;
   top: 4px;
