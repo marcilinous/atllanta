@@ -39,16 +39,20 @@ export default async function crmAccountDetail(container) {
     return;
   }
 
+  // Partner mode is org-wide (the whole partner pack), same flag the rest of
+  // this view already gates on. It decides which data the page even needs:
+  // partner accounts show business tiles + visits; generic ones show deals.
+  const partner = hasPartnerPack();
+  const none = Promise.resolve({ data: [] });
   const [{ data: contacts }, { data: opps }, users, { data: salesData }, { data: visitData }] = await Promise.all([
     sb.from('crm_contacts').select('*').eq('account_id', id).order('created_at', { ascending: false }),
-    sb.from('crm_opportunities').select('*, stage:stage_id(name, is_won, is_lost)').eq('account_id', id).order('created_at', { ascending: false }),
+    partner ? none : sb.from('crm_opportunities').select('*, stage:stage_id(name, is_won, is_lost)').eq('account_id', id).order('created_at', { ascending: false }),
     fetchOrgUsers(),
-    sb.from('crm_report_rows').select('data').eq('account_id', id).ilike('report_type', 'Sales').limit(3000),
-    sb.from('crm_visits').select('id, visited_at, visited_by_name, visit_status, call_outcome, remarks, selfie_path').eq('account_id', id).order('visited_at', { ascending: false }).limit(12),
+    partner ? sb.from('crm_report_rows').select('data').eq('account_id', id).ilike('report_type', 'Sales').limit(3000) : none,
+    partner ? sb.from('crm_visits').select('id, visited_at, visited_by_name, visit_status, call_outcome, remarks, selfie_path').eq('account_id', id).order('visited_at', { ascending: false }).limit(12) : none,
   ]);
   const ownerLabel = account.owner_id ? ownerName(users, account.owner_id) : null;
   const visits = visitData || [];
-  const partner = hasPartnerPack();
 
   // Business summary from this partner's Sales (activation) rows: TP (New),
   // TSS and activation revenue, current fiscal year vs last.
