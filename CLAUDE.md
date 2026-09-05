@@ -16,8 +16,12 @@ Well past Phase 0. Substantially built out beyond the original recruitment-only 
 
 - **`api/`** — 12 Vercel serverless functions (kept ≤12-function limit by consolidation): matching, resume/JD parsing, ai-query, bulk-import, create-org, google-auth, schedule, reports, send-notification, event-processor, extract-candidate, screen-job.
 - **`supabase/migrations/`** — ~49 migrations = the real schema (foundation multi-tenant, interview scheduling, Google OAuth/invitations, business-OS platform, expense tracking, helpdesk, asset tracking, announcements, **+ the whole CRM/partner-sales vertical**).
-- **`views/`** — recruitment, employees, attendance, leave, finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **plus `views/crm/` (24 files)**.
+- **`views/`** — recruitment, employees, attendance, leave, finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **`views/analytics/` (Metabase-style self-serve BI)**, **plus `views/crm/` (24 files)**.
 - **Infra** — Vercel + Supabase wired (project `nburswxjpukntgdwuyme` = `atllanta`); PWA (`manifest.json`, `sw.js`); Playwright tests in `tests/`. Live-app changes verified against the real Supabase project, additive migrations applied there directly.
+
+### Analytics (self-serve BI, Metabase-inspired)
+
+Gated by the `analytics` feature (admins toggle per-org; defaults to managers/admins, sidebar `data-role="manager"`). Two org-scoped tables — `analytics_questions` (a saved query: `spec` JSONB + `viz`, `mode` builder|sql) and `analytics_dashboards` (`cards` JSONB = ordered {question_id,w} grid). Model catalogue in `js/analytics/models.js`; the **visual builder** aggregates RLS-scoped rows client-side (`js/analytics/engine.js`), the **SQL mode** runs through `analytics_run_sql(text,int)` — a **SECURITY INVOKER** RPC (RLS stays enforced) guarded to a single read-only SELECT/WITH, catalog-blocked, timeout + row-capped. Six chart types in pure CSS/SVG (`js/analytics/charts.js`, no libraries). Routes `analytics`, `analytics/question`, `analytics/dashboard`. **No new Vercel function** (stayed at 12/12).
 
 ### CRM / partner-sales vertical (tenant **RTcompu**, org `e8845b88-…`)
 
