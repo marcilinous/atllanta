@@ -166,7 +166,7 @@ export default async function questionEditor(container) {
     bodyEl.innerHTML = `
       <div class="card"><div class="card-body">
         <div class="form-group" style="margin:0">
-          <label class="form-label">Read-only SQL <span style="color:var(--color-text-tertiary);font-weight:400">— SELECT / WITH only; rows limited to what you may see</span></label>
+          <label class="form-label">SQL <span style="color:var(--color-text-tertiary);font-weight:400">— read-only (SELECT)</span></label>
           <textarea class="form-input" id="sql-text" spellcheck="false" style="font-family:var(--font-mono);min-height:140px;resize:vertical" placeholder="select status, count(*) as n from crm_opportunities group by status order by n desc">${esc(q.spec.sql || '')}</textarea>
         </div>
         <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-3)">
@@ -427,7 +427,7 @@ async function manageAlerts(q, org) {
   const render = async () => {
     const { data: existing } = await sb.from('analytics_alerts').select('*').eq('question_id', q.id).order('created_at', { ascending: false });
     body.innerHTML = `
-      <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin:0 0 var(--space-3)">Scheduled reports are emailed to you at your data scope. Alerts email you when a metric crosses a threshold. Delivery runs on the daily server job.</p>
+      <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin:0 0 var(--space-3)">Get this question emailed to you on a schedule, or when a metric crosses a threshold.</p>
       <div class="form-group"><label class="form-label">Type</label>
         <select class="form-input" id="al-kind">
           <option value="schedule">📅 Scheduled report (email me)</option>

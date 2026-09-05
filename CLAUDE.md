@@ -67,6 +67,7 @@ A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from i
 - Tables: `snake_case` plural. Columns: `snake_case`. JS files: `kebab-case`. JS functions: `camelCase`. CSS classes: `kebab-case`. Events: `module.entity.action`.
 - `const` by default, `let` when needed, never `var`. `async/await` over `.then()`. Early returns over nesting.
 - Commits: imperative, short. Branches: `feature/…`, `fix/…`, `chore/…`.
+- **Product copy (Sachin, 2026-09):** don't explain the internal working/architecture to end users in the UI — no "runs in your browser / in-memory / RLS-scoped / compiled to SQL / on the daily job" style notes. Keep UI microcopy functional and outcome-focused; mechanics belong in code comments and docs, not on screen.
 
 ## 7. Do NOT Build (until named trigger)
 

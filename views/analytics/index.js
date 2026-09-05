@@ -32,7 +32,7 @@ export default async function analyticsHome(container) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-6);flex-wrap:wrap">
       <div>
         <h1 style="font-size:var(--text-2xl);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-1)">Analytics</h1>
-        <p style="font-size:var(--text-base);color:var(--color-text-secondary);margin:0">Explore your data, save questions, and build dashboards. Everything respects what you're allowed to see.</p>
+        <p style="font-size:var(--text-base);color:var(--color-text-secondary);margin:0">Explore your data, save questions, and build dashboards.</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
         <button class="btn btn-secondary" id="new-dashboard">+ Dashboard</button>

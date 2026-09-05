@@ -76,10 +76,10 @@ const PRESETS = [
 export function mountLab(rootEl, getResult) {
   rootEl.innerHTML = `
     <details style="margin-top:var(--space-4)">
-      <summary style="cursor:pointer;font-weight:var(--font-weight-medium);color:var(--color-text-primary)">⚡ Local analysis (DuckDB, in-browser)</summary>
+      <summary style="cursor:pointer;font-weight:var(--font-weight-medium);color:var(--color-text-primary)">⚡ Explore this result</summary>
       <div class="card" style="margin-top:var(--space-3)"><div class="card-body">
-        <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-bottom:var(--space-3);display:flex;gap:6px;align-items:flex-start">
-          <span>🔒</span><span>Runs entirely in your browser on the <b>current result only</b> — no new data is fetched, and nothing is stored. Query the in-memory table <code>data</code>.</span>
+        <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-bottom:var(--space-3)">
+          Slice, pivot and re-aggregate the current result with SQL. Table name: <code>data</code>.
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--space-2)">
           ${PRESETS.map((p, i) => `<button class="btn btn-ghost btn-sm" data-preset="${i}">${esc(p.label)}</button>`).join('')}
