@@ -2,10 +2,10 @@
 // as any of six chart types, and save it as a reusable question.
 //
 // One editor, two modes (like Metabase's notebook + native query): the visual
-// builder assembles a spec that engine.js aggregates client-side over
-// RLS-scoped rows; the SQL mode runs through the analytics_run_sql RPC, which
-// is also RLS-enforced. Neither can surface a row the user couldn't see in the
-// UI.
+// builder assembles a spec the semantic-layer compiler turns into SQL; the SQL
+// mode runs the user's own read-only SELECT. Both go through the
+// analytics_run_sql RPC (SECURITY INVOKER), so neither can surface a row the
+// user couldn't see in the UI.
 
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
@@ -13,6 +13,7 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { navigate, routeParams } from '../../js/router.js';
 import { MODELS, AGGREGATIONS, GRANULARITIES, getModel, getField, operatorsForType } from '../../js/analytics/models.js';
 import { runBuilder, runSql } from '../../js/analytics/engine.js';
+import { measureAlias, measureLabelFor } from '../../js/analytics/compiler.js';
 import { renderChart, VIZ_TYPES, CHART_THEMES } from '../../js/analytics/charts.js';
 
 const firstModel = Object.keys(MODELS)[0];
@@ -150,8 +151,7 @@ export default async function questionEditor(container) {
     const sortChoices = [
       ...q.spec.dimensions.map((d, i) => ({ key: `dim${i}`, label: getField(model.key, d.field)?.label || d.field })),
       ...(q.spec.measures.length ? q.spec.measures : [{ agg: 'count' }]).map(m => ({
-        key: m.agg === 'count' ? 'count' : `${m.agg}__${m.field}`,
-        label: m.agg === 'count' ? 'Count' : `${m.agg} ${getField(model.key, m.field)?.label || m.field}`,
+        key: measureAlias(m), label: measureLabelFor(model, m),
       })),
     ];
 
@@ -227,6 +227,7 @@ export default async function questionEditor(container) {
           const cand = model.fields.filter(f => f.measure && (!def.types || def.types.includes(f.type)));
           q.spec.measures[i].field = cand[0]?.name;
         }
+        q.spec.sort = null; // aliases changed
         renderBuilderBody(); runPreview();
       });
       rowEl.querySelector('.m-field')?.addEventListener('change', e => { q.spec.measures[i].field = e.target.value; runPreview(); });
@@ -272,13 +273,19 @@ export default async function questionEditor(container) {
   }
 
   function measureRow(m, i, model) {
+    const isNamed = (m.agg || '').startsWith('m:');
     const def = AGGREGATIONS.find(a => a.id === m.agg) || AGGREGATIONS[0];
-    const fieldSel = def.needsField ? `<select class="form-input form-input-sm m-field" style="width:170px">
+    const named = model.measures || [];
+    const fieldSel = (!isNamed && def.needsField) ? `<select class="form-input form-input-sm m-field" style="width:170px">
         ${model.fields.filter(f => f.measure && (!def.types || def.types.includes(f.type))).map(f => `<option value="${esc(f.name)}" ${f.name === m.field ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}
       </select>` : '';
+    const namedGroup = named.length ? `<optgroup label="Metrics">
+        ${named.map(nm => `<option value="m:${esc(nm.key)}" ${m.agg === 'm:' + nm.key ? 'selected' : ''}>${esc(nm.label)}</option>`).join('')}
+      </optgroup>` : '';
     return `<div data-measure="${i}" style="display:flex;gap:var(--space-2);align-items:center">
-      <select class="form-input form-input-sm m-agg" style="width:170px">
+      <select class="form-input form-input-sm m-agg" style="width:190px">
         ${AGGREGATIONS.map(a => `<option value="${a.id}" ${a.id === m.agg ? 'selected' : ''}>${esc(a.label)}</option>`).join('')}
+        ${namedGroup}
       </select>
       ${fieldSel}
       <button class="btn btn-ghost btn-sm m-del" title="Remove" style="padding:0 8px">✕</button>

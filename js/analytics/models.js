@@ -1,116 +1,214 @@
-// Analytics data models — the curated catalogue the query builder explores.
+// Analytics semantic layer — the curated catalogue the query builder explores.
 //
-// Each model maps a friendly name to a real table/view and declares which
-// fields can be used as dimensions (group-by / breakout) and which as measures
-// (things to aggregate). Every read runs through the RLS-scoped Supabase
-// client, so listing a table here never widens what a user can see — RLS still
-// limits rows to the caller. `feature` gates the model behind the same module
-// visibility flags the sidebar uses (see js/features.js), so an org that has
-// CRM turned off never sees CRM models.
+// Each model maps a friendly name to a base table (+ alias) and declares:
+//   • joins       — related tables, keyed, emitted only when a selected field
+//                   needs them (so a query stays as narrow as possible).
+//   • fields      — dimensions / measurable columns, each carrying the SQL
+//                   expression that produces it (using the aliases below) and,
+//                   if it lives on a joined table, the join key it needs.
+//   • measures    — named, pre-written aggregate metrics (win rate, weighted
+//                   pipeline, …) that a plain agg-over-column can't express.
 //
-// Field types drive the operators the filter UI offers and how values are
-// bucketed/formatted: 'text' | 'number' | 'money' | 'date' | 'datetime' | 'bool'.
+// The compiler (js/analytics/compiler.js) turns a builder spec into one
+// aggregate SQL statement from these definitions; it runs through the
+// analytics_run_sql RPC, which is SECURITY INVOKER — so every table's RLS is
+// enforced for the caller. Listing a table here never widens what a user sees.
+//
+// Field types drive filter operators and value formatting:
+// 'text' | 'number' | 'money' | 'date' | 'datetime' | 'bool'.
 
 export const FIELD_TYPES = ['text', 'number', 'money', 'date', 'datetime', 'bool'];
 
-// A field usable as a dimension (group-by) unless role says otherwise.
-const dim = (name, label, type = 'text') => ({ name, label, type, dimension: true, measure: type === 'number' || type === 'money' });
-const measureOnly = (name, label, type = 'number') => ({ name, label, type, dimension: false, measure: true });
+// dimension: usable as a group-by. measure: usable as sum/avg/etc. target.
+const dim = (name, label, sql, type = 'text', join) => ({ name, label, sql, type, join, dimension: true, measure: type === 'number' || type === 'money' });
+const num = (name, label, sql, type = 'number', join) => ({ name, label, sql, type, join, dimension: false, measure: true });
 
 export const MODELS = {
   employees: {
-    key: 'employees', label: 'Employees', icon: '👥', table: 'users', feature: 'people',
+    key: 'employees', label: 'Employees', icon: '👥', feature: 'people',
+    base: 'users u',
+    joins: { dept: 'left join departments d on d.id = u.department_id' },
     fields: [
-      dim('status', 'Status'), dim('role', 'Role'), dim('designation', 'Designation'),
-      dim('department_id', 'Department'), dim('date_of_joining', 'Joined', 'date'),
-      dim('created_at', 'Created', 'datetime'),
+      dim('status', 'Status', 'u.status'),
+      dim('role', 'Role', 'u.role'),
+      dim('designation', 'Designation', 'u.designation'),
+      dim('department', 'Department', 'd.name', 'text', 'dept'),
+      dim('date_of_joining', 'Joined', 'u.date_of_joining', 'date'),
+      dim('created_at', 'Created', 'u.created_at', 'datetime'),
     ],
   },
   attendance: {
-    key: 'attendance', label: 'Attendance', icon: '🕒', table: 'attendance', feature: 'me',
+    key: 'attendance', label: 'Attendance', icon: '🕒', feature: 'me',
+    base: 'attendance a',
+    joins: { emp: 'left join users u on u.id = a.user_id' },
     fields: [
-      dim('date', 'Date', 'date'), dim('status', 'Status'), dim('user_id', 'Employee'),
-      measureOnly('total_hours', 'Hours', 'number'),
+      dim('date', 'Date', 'a.date', 'date'),
+      dim('status', 'Status', 'a.status'),
+      dim('employee', 'Employee', 'coalesce(u.full_name, u.email)', 'text', 'emp'),
+      num('total_hours', 'Hours', 'a.total_hours', 'number'),
+    ],
+    measures: [
+      { key: 'present_rate', label: 'Present rate %', type: 'number', sql: "round(100.0 * count(*) filter (where a.status = 'present') / nullif(count(*), 0), 1)" },
     ],
   },
   leave_requests: {
-    key: 'leave_requests', label: 'Leave requests', icon: '🌿', table: 'leave_requests', feature: 'me',
+    key: 'leave_requests', label: 'Leave requests', icon: '🌿', feature: 'me',
+    base: 'leave_requests lr',
+    joins: { emp: 'left join users u on u.id = lr.user_id' },
     fields: [
-      dim('status', 'Status'), dim('user_id', 'Employee'), dim('start_date', 'Start date', 'date'),
-      dim('created_at', 'Requested', 'datetime'), measureOnly('days', 'Days', 'number'),
+      dim('status', 'Status', 'lr.status'),
+      dim('employee', 'Employee', 'coalesce(u.full_name, u.email)', 'text', 'emp'),
+      dim('start_date', 'Start date', 'lr.start_date', 'date'),
+      dim('created_at', 'Requested', 'lr.created_at', 'datetime'),
+      num('days', 'Days', 'lr.days', 'number'),
     ],
   },
   jobs: {
-    key: 'jobs', label: 'Jobs (openings)', icon: '💼', table: 'jobs', feature: 'recruitment',
+    key: 'jobs', label: 'Jobs (openings)', icon: '💼', feature: 'recruitment',
+    base: 'jobs j',
     fields: [
-      dim('status', 'Status'), dim('employment_type', 'Employment type'), dim('location', 'Location'),
-      dim('created_at', 'Created', 'datetime'),
+      dim('status', 'Status', 'j.status'),
+      dim('employment_type', 'Employment type', 'j.employment_type'),
+      dim('location', 'Location', 'j.location'),
+      dim('created_at', 'Created', 'j.created_at', 'datetime'),
     ],
   },
   candidates: {
-    key: 'candidates', label: 'Candidates', icon: '🧑‍💼', table: 'candidates', feature: 'recruitment',
-    fields: [ dim('source', 'Source'), dim('created_at', 'Added', 'datetime') ],
+    key: 'candidates', label: 'Candidates', icon: '🧑‍💼', feature: 'recruitment',
+    base: 'candidates c',
+    fields: [
+      dim('source', 'Source', 'c.source'),
+      dim('created_at', 'Added', 'c.created_at', 'datetime'),
+    ],
   },
   applications: {
-    key: 'applications', label: 'Job applications', icon: '📄', table: 'job_applications', feature: 'recruitment',
+    key: 'applications', label: 'Job applications', icon: '📄', feature: 'recruitment',
+    base: 'job_applications ja',
+    joins: { job: 'left join jobs jb on jb.id = ja.job_id' },
     fields: [
-      dim('status', 'Stage'), dim('job_id', 'Job'), dim('created_at', 'Applied', 'datetime'),
-      measureOnly('match_score', 'Match score', 'number'),
+      dim('status', 'Stage', 'ja.status'),
+      dim('job', 'Job', 'jb.title', 'text', 'job'),
+      dim('created_at', 'Applied', 'ja.created_at', 'datetime'),
+      num('match_score', 'Match score', 'ja.match_score', 'number'),
     ],
   },
   interviews: {
-    key: 'interviews', label: 'Interviews', icon: '🎙️', table: 'interviews', feature: 'recruitment',
+    key: 'interviews', label: 'Interviews', icon: '🎙️', feature: 'recruitment',
+    base: 'interviews i',
     fields: [
-      dim('status', 'Status'), dim('round_name', 'Round'), dim('scheduled_at', 'Scheduled', 'datetime'),
-      measureOnly('rating', 'Rating', 'number'),
+      dim('status', 'Status', 'i.status'),
+      dim('round_name', 'Round', 'i.round_name'),
+      dim('scheduled_at', 'Scheduled', 'i.scheduled_at', 'datetime'),
+      num('rating', 'Rating', 'i.rating', 'number'),
     ],
   },
   expenses: {
-    key: 'expenses', label: 'Expenses', icon: '💰', table: 'expenses', feature: 'finance',
+    key: 'expenses', label: 'Expenses', icon: '💰', feature: 'finance',
+    base: 'expenses e',
+    joins: {
+      cat: 'left join expense_categories ec on ec.id = e.category_id',
+      emp: 'left join users u on u.id = e.user_id',
+    },
     fields: [
-      dim('status', 'Status'), dim('category_id', 'Category'), dim('expense_date', 'Date', 'date'),
-      dim('user_id', 'Submitted by'), measureOnly('amount', 'Amount', 'money'),
+      dim('status', 'Status', 'e.status'),
+      dim('category', 'Category', 'ec.name', 'text', 'cat'),
+      dim('expense_date', 'Date', 'e.expense_date', 'date'),
+      dim('submitter', 'Submitted by', 'coalesce(u.full_name, u.email)', 'text', 'emp'),
+      num('amount', 'Amount', 'e.amount', 'money'),
+    ],
+    measures: [
+      { key: 'approved_amount', label: 'Approved amount', type: 'money', sql: "sum(e.amount) filter (where e.status = 'approved')" },
     ],
   },
   tickets: {
-    key: 'tickets', label: 'Helpdesk tickets', icon: '🎫', table: 'helpdesk_tickets', feature: 'helpdesk',
+    key: 'tickets', label: 'Helpdesk tickets', icon: '🎫', feature: 'helpdesk',
+    base: 'helpdesk_tickets ht',
+    joins: {
+      cat: 'left join helpdesk_categories hc on hc.id = ht.category_id',
+      assignee: 'left join users u on u.id = ht.assigned_to',
+    },
     fields: [
-      dim('status', 'Status'), dim('priority', 'Priority'), dim('category_id', 'Category'),
-      dim('created_at', 'Created', 'datetime'), dim('assigned_to', 'Assignee'),
+      dim('status', 'Status', 'ht.status'),
+      dim('priority', 'Priority', 'ht.priority'),
+      dim('category', 'Category', 'hc.name', 'text', 'cat'),
+      dim('assignee', 'Assignee', 'coalesce(u.full_name, u.email)', 'text', 'assignee'),
+      dim('created_at', 'Created', 'ht.created_at', 'datetime'),
+    ],
+    measures: [
+      { key: 'resolved_rate', label: 'Resolved rate %', type: 'number', sql: "round(100.0 * count(*) filter (where ht.status in ('resolved','closed')) / nullif(count(*), 0), 1)" },
     ],
   },
   // --- CRM ---
   accounts: {
-    key: 'accounts', label: 'CRM · Accounts', icon: '🏢', table: 'crm_accounts', feature: 'crm',
-    fields: [ dim('industry', 'Industry'), dim('created_at', 'Created', 'datetime') ],
+    key: 'accounts', label: 'CRM · Accounts', icon: '🏢', feature: 'crm',
+    base: 'crm_accounts acc',
+    fields: [
+      dim('industry', 'Industry', 'acc.industry'),
+      dim('tier', 'Tier', 'acc.tier'),
+      dim('billing_city', 'City', 'acc.billing_city'),
+      dim('region', 'Region', 'acc.region'),
+      dim('created_at', 'Created', 'acc.created_at', 'datetime'),
+    ],
   },
   leads: {
-    key: 'leads', label: 'CRM · Leads', icon: '🎯', table: 'crm_leads', feature: 'crm_leads',
+    key: 'leads', label: 'CRM · Leads', icon: '🎯', feature: 'crm_leads',
+    base: 'crm_leads l',
+    joins: { owner: 'left join users u on u.id = l.owner_id' },
     fields: [
-      dim('status', 'Status'), dim('rating', 'Rating'), dim('source', 'Source'),
-      dim('owner_id', 'Owner'), dim('created_at', 'Created', 'datetime'),
+      dim('status', 'Status', 'l.status'),
+      dim('rating', 'Rating', 'l.rating'),
+      dim('source', 'Source', 'l.source'),
+      dim('owner', 'Owner', 'coalesce(u.full_name, u.email)', 'text', 'owner'),
+      dim('created_at', 'Created', 'l.created_at', 'datetime'),
+    ],
+    measures: [
+      { key: 'conversion_rate', label: 'Conversion rate %', type: 'number', sql: "round(100.0 * count(*) filter (where l.status = 'converted') / nullif(count(*), 0), 1)" },
     ],
   },
   opportunities: {
-    key: 'opportunities', label: 'CRM · Deals', icon: '📈', table: 'crm_opportunities', feature: 'crm_pipeline',
+    key: 'opportunities', label: 'CRM · Deals', icon: '📈', feature: 'crm_pipeline',
+    base: 'crm_opportunities o',
+    joins: {
+      owner: 'left join users u on u.id = o.owner_id',
+      stage: 'left join crm_pipeline_stages s on s.id = o.stage_id',
+    },
     fields: [
-      dim('status', 'Status'), dim('stage_id', 'Stage'), dim('owner_id', 'Owner'),
-      dim('source', 'Source'), dim('close_date', 'Close date', 'date'),
-      dim('created_at', 'Created', 'datetime'), dim('updated_at', 'Updated', 'datetime'),
-      measureOnly('amount', 'Amount', 'money'), measureOnly('probability', 'Probability', 'number'),
+      dim('status', 'Status', 'o.status'),
+      dim('stage', 'Stage', 's.name', 'text', 'stage'),
+      dim('owner', 'Owner', 'coalesce(u.full_name, u.email)', 'text', 'owner'),
+      dim('source', 'Source', 'o.source'),
+      dim('close_date', 'Close date', 'o.close_date', 'date'),
+      dim('created_at', 'Created', 'o.created_at', 'datetime'),
+      dim('updated_at', 'Updated', 'o.updated_at', 'datetime'),
+      num('amount', 'Amount', 'o.amount', 'money'),
+      num('probability', 'Probability', 'o.probability', 'number'),
+    ],
+    measures: [
+      { key: 'open_amount', label: 'Open pipeline', type: 'money', sql: "sum(o.amount) filter (where o.status = 'open')" },
+      { key: 'won_amount', label: 'Won amount', type: 'money', sql: "sum(o.amount) filter (where o.status = 'won')" },
+      { key: 'weighted', label: 'Weighted pipeline', type: 'money', sql: "sum(o.amount * coalesce(o.probability, 0) / 100.0) filter (where o.status = 'open')" },
+      { key: 'win_rate', label: 'Win rate %', type: 'number', sql: "round(100.0 * count(*) filter (where o.status = 'won') / nullif(count(*) filter (where o.status in ('won','lost')), 0), 1)" },
     ],
   },
   visits: {
-    key: 'visits', label: 'CRM · Field visits', icon: '📍', table: 'crm_visits', feature: 'crm_visits',
+    key: 'visits', label: 'CRM · Field visits', icon: '📍', feature: 'crm_visits',
+    base: 'crm_visits v',
+    joins: {
+      partner: 'left join crm_accounts acc on acc.id = v.account_id',
+      bde: 'left join users u on u.id = v.visited_by',
+    },
     fields: [
-      dim('visited_at', 'Visited', 'datetime'), dim('account_id', 'Partner'),
-      dim('visited_by', 'BDE'), dim('tally_serial_status', 'Tally serial'),
-      dim('visit_status', 'Outcome'), dim('created_at', 'Logged', 'datetime'),
+      dim('visited_at', 'Visited', 'v.visited_at', 'datetime'),
+      dim('created_at', 'Logged', 'v.created_at', 'datetime'),
+      dim('partner', 'Partner', 'acc.name', 'text', 'partner'),
+      dim('bde', 'BDE', 'coalesce(u.full_name, v.visited_by_name)', 'text', 'bde'),
+      dim('visit_status', 'Outcome', 'v.visit_status'),
+      dim('tally_serial_status', 'Tally serial', 'v.tally_serial_status'),
     ],
   },
 };
 
-// The aggregation functions the builder offers, keyed by id.
+// Standard aggregations offered per measurable field.
 export const AGGREGATIONS = [
   { id: 'count', label: 'Count of rows', needsField: false },
   { id: 'count_distinct', label: 'Distinct count of', needsField: true, types: ['text', 'number', 'money', 'date', 'datetime', 'bool'] },
@@ -120,34 +218,30 @@ export const AGGREGATIONS = [
   { id: 'max', label: 'Maximum of', needsField: true, types: ['number', 'money', 'date', 'datetime'] },
 ];
 
-// Operators offered per field type. `value` says how many value inputs the UI
-// needs: 0 (none), 1 (single), or 'n' (comma list).
 export const OPERATORS = {
-  text:     [
+  text: [
     { id: 'eq', label: 'is', value: 1 }, { id: 'neq', label: 'is not', value: 1 },
     { id: 'contains', label: 'contains', value: 1 },
     { id: 'in', label: 'is one of', value: 'n' },
     { id: 'is_null', label: 'is empty', value: 0 }, { id: 'not_null', label: 'is not empty', value: 0 },
   ],
-  number:   [
+  number: [
     { id: 'eq', label: '=', value: 1 }, { id: 'neq', label: '≠', value: 1 },
     { id: 'gt', label: '>', value: 1 }, { id: 'gte', label: '≥', value: 1 },
     { id: 'lt', label: '<', value: 1 }, { id: 'lte', label: '≤', value: 1 },
     { id: 'is_null', label: 'is empty', value: 0 }, { id: 'not_null', label: 'is not empty', value: 0 },
   ],
-  date:     [
+  date: [
     { id: 'last_n_days', label: 'in the last (days)', value: 1 },
     { id: 'gte', label: 'on or after', value: 1 }, { id: 'lte', label: 'on or before', value: 1 },
     { id: 'eq', label: 'on', value: 1 },
     { id: 'is_null', label: 'is empty', value: 0 }, { id: 'not_null', label: 'is not empty', value: 0 },
   ],
-  bool:     [ { id: 'is_true', label: 'is true', value: 0 }, { id: 'is_false', label: 'is false', value: 0 } ],
+  bool: [{ id: 'is_true', label: 'is true', value: 0 }, { id: 'is_false', label: 'is false', value: 0 }],
 };
-// money and datetime reuse number/date operators.
 OPERATORS.money = OPERATORS.number;
 OPERATORS.datetime = OPERATORS.date;
 
-// Time-bucket granularities for a date/datetime dimension.
 export const GRANULARITIES = [
   { id: 'day', label: 'Day' }, { id: 'week', label: 'Week' }, { id: 'month', label: 'Month' },
   { id: 'quarter', label: 'Quarter' }, { id: 'year', label: 'Year' },
@@ -156,5 +250,8 @@ export const GRANULARITIES = [
 export function getModel(key) { return MODELS[key] || null; }
 export function getField(modelKey, name) {
   return (MODELS[modelKey]?.fields || []).find(f => f.name === name) || null;
+}
+export function getNamedMeasure(modelKey, key) {
+  return (MODELS[modelKey]?.measures || []).find(m => m.key === key) || null;
 }
 export function operatorsForType(type) { return OPERATORS[type] || OPERATORS.text; }
