@@ -86,7 +86,7 @@ export default async function dashboardView(container) {
       const q = qById[c.question_id];
       const out = container.querySelector(`#card-out-${i}`);
       if (!q || !out) return;
-      try { out.innerHTML = renderChart(q.viz, await runQuestion(q)); }
+      try { out.innerHTML = renderChart(q.viz, await runQuestion(q), { theme: q.spec?.vizTheme }); }
       catch (e) { out.innerHTML = `<div style="color:var(--color-error);font-size:var(--text-sm)">${esc(e.message)}</div>`; }
     });
   }

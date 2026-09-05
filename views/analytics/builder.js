@@ -13,14 +13,14 @@ import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { navigate, routeParams } from '../../js/router.js';
 import { MODELS, AGGREGATIONS, GRANULARITIES, getModel, getField, operatorsForType } from '../../js/analytics/models.js';
 import { runBuilder, runSql } from '../../js/analytics/engine.js';
-import { renderChart, VIZ_TYPES } from '../../js/analytics/charts.js';
+import { renderChart, VIZ_TYPES, CHART_THEMES } from '../../js/analytics/charts.js';
 
 const firstModel = Object.keys(MODELS)[0];
 
 function blankQuestion() {
   return {
     id: null, name: '', description: '', mode: 'builder', viz: 'table',
-    spec: { model: firstModel, dimensions: [], measures: [{ agg: 'count' }], filters: [], sort: null, limit: 50, sql: '', maxRows: 1000 },
+    spec: { model: firstModel, dimensions: [], measures: [{ agg: 'count' }], filters: [], sort: null, limit: 50, sql: '', maxRows: 1000, vizTheme: 'mono' },
   };
 }
 
@@ -56,9 +56,12 @@ export default async function questionEditor(container) {
     </div>
     <div id="editor-body"></div>
     <div class="card" style="margin-top:var(--space-4)">
-      <div class="card-header" style="justify-content:space-between">
+      <div class="card-header" style="justify-content:space-between;flex-wrap:wrap;gap:var(--space-2)">
         <span class="card-title">Preview</span>
-        <div id="viz-picker" style="display:flex;gap:4px"></div>
+        <div style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
+          <div id="theme-picker" style="display:flex;gap:4px"></div>
+          <div id="viz-picker" style="display:flex;gap:4px"></div>
+        </div>
       </div>
       <div class="card-body" id="preview-out" style="min-height:160px"></div>
     </div>`;
@@ -74,6 +77,7 @@ export default async function questionEditor(container) {
   const bodyEl = container.querySelector('#editor-body');
   const outEl = container.querySelector('#preview-out');
   const vizEl = container.querySelector('#viz-picker');
+  const themeEl = container.querySelector('#theme-picker');
 
   function renderVizPicker() {
     vizEl.innerHTML = VIZ_TYPES.map(v => `
@@ -83,7 +87,15 @@ export default async function questionEditor(container) {
     }));
   }
 
-  function paint() { outEl.innerHTML = renderChart(q.viz, lastResult); }
+  function renderThemePicker() {
+    themeEl.innerHTML = CHART_THEMES.map(t => `
+      <button class="btn btn-sm ${(q.spec.vizTheme || 'mono') === t.id ? 'btn-secondary' : 'btn-ghost'}" data-theme="${t.id}" title="${t.label} palette">${t.label}</button>`).join('');
+    themeEl.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => {
+      q.spec.vizTheme = b.dataset.theme; renderThemePicker(); paint();
+    }));
+  }
+
+  function paint() { outEl.innerHTML = renderChart(q.viz, lastResult, { theme: q.spec.vizTheme }); }
 
   async function runPreview() {
     outEl.innerHTML = `<div style="color:var(--color-text-tertiary);font-size:var(--text-sm);padding:var(--space-4)">Running…</div>`;
@@ -307,6 +319,7 @@ export default async function questionEditor(container) {
   }
 
   renderVizPicker();
+  renderThemePicker();
   renderBody();
   runPreview();
 }
