@@ -1,4 +1,5 @@
 import { getMembership } from '../../js/auth.js';
+import { isFeatureAllowed } from '../../js/features.js';
 
 export default async function reportsView(container) {
   const membership = await getMembership();
@@ -17,18 +18,19 @@ export default async function reportsView(container) {
   }
 
   const reports = [
-    { icon: '📊', title: 'Attendance Report', desc: 'Monthly attendance breakdown by employee', route: '#/attendance/report', roles: ['owner', 'admin', 'manager'] },
-    { icon: '🌿', title: 'Leave Report', desc: 'Leave usage and balance summary', route: '#/leave/report', roles: ['owner', 'admin', 'manager'] },
-    { icon: '💼', title: 'Recruitment Report', desc: 'Pipeline funnel, match scores, and job analytics', route: '#/reports/recruitment', roles: ['owner', 'admin', 'manager'] },
-    { icon: '🎯', title: 'Sales Report', desc: 'CRM pipeline, weighted forecast, win rate, and owner performance', route: '#/reports/crm', roles: ['owner', 'admin', 'manager'] },
-    { icon: '🎫', title: 'Helpdesk Report', desc: 'Ticket volume, categories, and resolution times', route: '#/reports/helpdesk', roles: ['owner', 'admin', 'manager'] },
-    { icon: '📅', title: 'Team Planner', desc: 'Weekly view of team availability and leave', route: '#/reports/planner', roles: ['owner', 'admin', 'manager'] },
-    { icon: '💰', title: 'Expense Report', desc: 'Expense analytics, categories, and monthly trends', route: '#/reports/expenses', roles: ['owner', 'admin', 'manager'] },
-    { icon: '📈', title: 'Analytics (self-serve)', desc: 'Build your own questions and dashboards across any data you can see', route: '#/analytics', roles: ['owner', 'admin', 'manager'] },
+    { icon: '📊', title: 'Attendance Report', desc: 'Monthly attendance breakdown by employee', route: '#/attendance/report', roles: ['owner', 'admin', 'manager'], feature: 'me' },
+    { icon: '🌿', title: 'Leave Report', desc: 'Leave usage and balance summary', route: '#/leave/report', roles: ['owner', 'admin', 'manager'], feature: 'me' },
+    { icon: '💼', title: 'Recruitment Report', desc: 'Pipeline funnel, match scores, and job analytics', route: '#/reports/recruitment', roles: ['owner', 'admin', 'manager'], feature: 'recruitment' },
+    { icon: '🎯', title: 'Sales Report', desc: 'CRM pipeline, weighted forecast, win rate, and owner performance', route: '#/reports/crm', roles: ['owner', 'admin', 'manager'], feature: 'crm' },
+    { icon: '🎫', title: 'Helpdesk Report', desc: 'Ticket volume, categories, and resolution times', route: '#/reports/helpdesk', roles: ['owner', 'admin', 'manager'], feature: 'helpdesk' },
+    { icon: '📅', title: 'Team Planner', desc: 'Weekly view of team availability and leave', route: '#/reports/planner', roles: ['owner', 'admin', 'manager'], feature: 'people' },
+    { icon: '💰', title: 'Expense Report', desc: 'Expense analytics, categories, and monthly trends', route: '#/reports/expenses', roles: ['owner', 'admin', 'manager'], feature: 'finance' },
+    { icon: '📈', title: 'Analytics (self-serve)', desc: 'Build your own questions and dashboards across any data you can see', route: '#/analytics', roles: ['owner', 'admin', 'manager'], feature: 'analytics' },
     { icon: '📋', title: 'Audit Log', desc: 'Track all actions across the platform', route: '#/audit', roles: ['owner', 'admin'] },
   ];
 
-  const visible = reports.filter(r => r.roles.includes(role));
+  // Autonomy: only show a report whose module the org has enabled.
+  const visible = reports.filter(r => r.roles.includes(role) && (!r.feature || isFeatureAllowed(r.feature)));
 
   container.innerHTML = `
     <div style="margin-bottom:var(--space-6);">

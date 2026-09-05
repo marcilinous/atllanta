@@ -61,6 +61,7 @@ A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from i
 4. **All data access goes through RLS.** Never put the `service_role` key in frontend or in the AI path — if the user can't see it in the UI, the AI can't either.
 5. **Multi-tenant:** every org-scoped table has `org_id`, isolated by RLS keyed on the authed user's `org_id`. Cross-tenant isolation must always hold.
 6. **Every Supabase call checks `error`:** `const { data, error } = await supabase...`.
+7. **Four productized modules — autonomous · integrated · integratable** (Sachin, 2026-09). The product is four modules: **HRMS** (people/attendance/leave/finance/helpdesk/docs), **CRM**, **Recruitment** (resume↔JD matching + interview automation), **Analytics**. Each must be: (a) **autonomous** — an org can enable only some (per-org toggles in `js/features.js`); a module must **degrade gracefully** when another is off, never hard-break (e.g. Analytics only offers models for enabled modules); (b) **integrated** when co-present — only via the event bus (`module.entity.action`) + shared identity/RLS, never direct cross-module table reads (rule 2/3); (c) **integratable with any external tool** — external tools read via REST/PostgREST (RLS) + **outbound webhooks** on the event bus and authenticate with **org-scoped API keys**; external systems sync **in** via connectors that map to the **canonical schema**, so internal modules always read one schema (an org can run Atllanta CRM *or* Salesforce and the other modules don't care).
 
 ## 6. Conventions
 
