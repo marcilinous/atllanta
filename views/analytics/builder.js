@@ -17,6 +17,11 @@ import { measureAlias, measureLabelFor } from '../../js/analytics/compiler.js';
 import { renderChart, VIZ_TYPES, CHART_THEMES } from '../../js/analytics/charts.js';
 import { askAI } from '../../js/analytics/nl.js';
 import { mountLab } from '../../js/analytics/duck.js';
+import { isFeatureAllowed } from '../../js/features.js';
+
+// Only offer models for modules the org has enabled (autonomy: a module never
+// surfaces another module's data when that module is off).
+function availableModels() { return Object.values(MODELS).filter(m => isFeatureAllowed(m.feature)); }
 
 const firstModel = Object.keys(MODELS)[0];
 
@@ -31,6 +36,8 @@ export default async function questionEditor(container) {
   const org = getOrg();
   const params = routeParams();
   let q = blankQuestion();
+  // New question → default to the first model whose module is enabled.
+  if (!params.id) q.spec.model = availableModels()[0]?.key || q.spec.model;
 
   if (params.id) {
     const { data, error } = await sb.from('analytics_questions').select('*').eq('id', params.id).single();
@@ -202,7 +209,12 @@ export default async function questionEditor(container) {
       <div class="form-group" style="margin:0;max-width:340px">
         <label class="form-label">Data</label>
         <select class="form-input" id="model-sel">
-          ${Object.values(MODELS).map(m => opt(m.key, `${m.icon} ${m.label}`, m.key === q.spec.model)).join('')}
+          ${(() => {
+            const list = availableModels();
+            // Keep the current model selectable even if its module was since disabled.
+            if (!list.some(m => m.key === q.spec.model) && getModel(q.spec.model)) list.unshift(getModel(q.spec.model));
+            return list.map(m => opt(m.key, `${m.icon} ${m.label}`, m.key === q.spec.model)).join('');
+          })()}
         </select>
       </div>
 

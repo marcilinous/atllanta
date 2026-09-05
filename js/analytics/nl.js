@@ -8,12 +8,13 @@
 import { getAuthToken } from '../ui.js';
 import { MODELS, getModel, getField, getNamedMeasure, AGGREGATIONS, GRANULARITIES, operatorsForType } from './models.js';
 import { measureAlias } from './compiler.js';
+import { isFeatureAllowed } from '../features.js';
 
 const VIZ_IDS = ['number', 'table', 'bar', 'row', 'line', 'pie'];
 
 // Compact model catalogue the LLM plans against.
 export function buildCatalog() {
-  return Object.values(MODELS).map(m => ({
+  return Object.values(MODELS).filter(m => isFeatureAllowed(m.feature)).map(m => ({
     key: m.key,
     label: m.label,
     dimensions: m.fields.filter(f => f.dimension).map(f => ({ name: f.name, temporal: f.type === 'date' || f.type === 'datetime' })),
