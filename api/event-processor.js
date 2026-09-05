@@ -1,4 +1,5 @@
-import { supabaseAdmin } from "../lib/supabaseServer.js";
+import { supabaseAdmin, supabaseAsUser } from "../lib/supabaseServer.js";
+import { compile } from "../js/analytics/compiler.js";
 import crypto from "crypto";
 
 // Server-side event worker. Two responsibilities:
@@ -575,6 +576,115 @@ async function refreshOpportunityEngine(sb) {
   return { refreshed: true, computed_at: data };
 }
 
+// ---- scheduled analytics reports & threshold alerts ------------------------
+// Mint a short-lived JWT for a user so the query runs under THEIR RLS via the
+// analytics_run_sql RPC (which is SECURITY INVOKER). Signed with the project
+// JWT secret, which lives only in the server env.
+function b64url(buf) {
+  return Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function mintUserJwt(sub, secret) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { sub, role: "authenticated", aud: "authenticated", iat: now, exp: now + 120 };
+  const data = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+  const sig = b64url(crypto.createHmac("sha256", secret).update(data).digest());
+  return `${data}.${sig}`;
+}
+
+const DUE_MS = { daily: 20 * 3600e3, weekly: 7 * 24 * 3600e3, monthly: 28 * 24 * 3600e3 };
+function alertDue(a, now) {
+  if (!a.last_run_at) return true;
+  const age = now - new Date(a.last_run_at).getTime();
+  return age >= (DUE_MS[a.schedule] || DUE_MS.daily);
+}
+function compareOp(v, op, target) {
+  switch (op) {
+    case "gt": return v > target; case "gte": return v >= target;
+    case "lt": return v < target; case "lte": return v <= target;
+    case "eq": return v === target; case "neq": return v !== target;
+    default: return false;
+  }
+}
+function fmtCell(v) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "number") return v.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  return String(v).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+}
+function reportTableHtml(columns, rows) {
+  const headers = columns?.length ? columns.map((c) => c.label) : Object.keys(rows[0] || {});
+  const keys = columns?.length ? columns.map((c) => c.key) : Object.keys(rows[0] || {});
+  const th = headers.map((h) => `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid #e5e7eb;font-size:12px;color:#6b7280">${fmtCell(h)}</th>`).join("");
+  const trs = rows.slice(0, 100).map((r) =>
+    `<tr>${keys.map((k) => `<td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:13px">${fmtCell(r[k])}</td>`).join("")}</tr>`).join("");
+  return `<table style="border-collapse:collapse;width:100%;max-width:640px"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;
+}
+
+async function processAnalyticsAlerts(sb) {
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret) return { skipped: "SUPABASE_JWT_SECRET not set" };
+  if (!process.env.RESEND_API_KEY) return { skipped: "RESEND_API_KEY not set" };
+
+  const { data: alerts } = await sb
+    .from("analytics_alerts")
+    .select("*, question:analytics_questions(id, name, mode, spec, viz)")
+    .eq("active", true);
+  if (!alerts?.length) return { processed: 0 };
+
+  const now = Date.now();
+  let reports = 0, fired = 0, checked = 0, errored = 0;
+
+  for (const a of alerts) {
+    if (!a.question || !a.created_by || !alertDue(a, now)) continue;
+    checked++;
+    try {
+      let sql, columns = null;
+      if (a.question.mode === "sql") sql = a.question.spec?.sql;
+      else { const c = compile(a.question.spec || {}); sql = c.sql; columns = c.columns; }
+      if (!sql) throw new Error("empty query");
+
+      const token = mintUserJwt(a.created_by, secret);
+      const asUser = supabaseAsUser(token);
+      const { data: rows, error } = await asUser.rpc("analytics_run_sql", { query: sql, max_rows: a.kind === "schedule" ? 200 : 50 });
+      if (error) throw new Error(error.message);
+      const result = Array.isArray(rows) ? rows : [];
+
+      const { data: creator } = await sb.from("users").select("email, full_name").eq("id", a.created_by).maybeSingle();
+      const to = creator?.email;
+      const patch = { last_run_at: new Date().toISOString() };
+
+      if (a.kind === "schedule") {
+        if (to) {
+          const body = result.length
+            ? reportTableHtml(columns, result)
+            : `<p style="color:#6b7280">No rows matched.</p>`;
+          await sendEmail(to, `Report: ${a.question.name}`,
+            `<div style="font-family:system-ui,Arial,sans-serif;color:#111"><h2 style="margin:0 0 4px">${fmtCell(a.question.name)}</h2>
+             <p style="color:#6b7280;font-size:13px;margin:0 0 16px">Your ${a.schedule} analytics report.</p>${body}</div>`);
+          reports++;
+        }
+      } else {
+        // threshold alert on the first row's chosen column
+        const val = Number(result[0]?.[a.alert_column]);
+        patch.last_value = isFinite(val) ? val : null;
+        const triggered = isFinite(val) && compareOp(val, a.alert_op, Number(a.alert_value));
+        patch.last_triggered = triggered;
+        if (triggered && !a.last_triggered && to) {
+          const opTxt = { gt: ">", gte: "≥", lt: "<", lte: "≤", eq: "=", neq: "≠" }[a.alert_op] || a.alert_op;
+          await sendEmail(to, `Alert: ${a.question.name}`,
+            `<div style="font-family:system-ui,Arial,sans-serif;color:#111"><h2 style="margin:0 0 8px">⚠️ ${fmtCell(a.question.name)}</h2>
+             <p style="font-size:15px">${fmtCell(a.alert_column)} is <b>${fmtCell(val)}</b> (alert set for ${opTxt} ${fmtCell(a.alert_value)}).</p></div>`);
+          fired++;
+        }
+      }
+      await sb.from("analytics_alerts").update(patch).eq("id", a.id);
+    } catch (e) {
+      errored++;
+    }
+  }
+  return { checked, reports, fired, errored };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).json({ error: "Use POST or GET" });
@@ -602,7 +712,8 @@ export default async function handler(req, res) {
     const events = await processBackstopEvents(sb);
     const emails = await dispatchEmails(sb);
     const opportunities = await refreshOpportunityEngine(sb);
-    return res.status(200).json({ events, emails, opportunities });
+    const analyticsAlerts = await processAnalyticsAlerts(sb);
+    return res.status(200).json({ events, emails, opportunities, analyticsAlerts });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

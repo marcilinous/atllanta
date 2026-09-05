@@ -54,6 +54,7 @@ export default async function questionEditor(container) {
           <button class="tab ${q.mode === 'builder' ? 'active' : ''}" data-mode="builder">Visual</button>
           <button class="tab ${q.mode === 'sql' ? 'active' : ''}" data-mode="sql">SQL</button>
         </div>
+        ${q.id ? '<button class="btn btn-secondary btn-sm" id="alerts-btn">🔔 Alerts</button>' : ''}
         <button class="btn btn-primary btn-sm" id="save">Save</button>
       </div>
     </div>
@@ -87,6 +88,7 @@ export default async function questionEditor(container) {
     renderBody(); runPreview();
   }));
   container.querySelector('#save').addEventListener('click', () => saveQuestion(q, org, returnDashboard));
+  container.querySelector('#alerts-btn')?.addEventListener('click', () => manageAlerts(q, org));
 
   // Ask AI → validated builder spec.
   const askInput = container.querySelector('#ai-ask');
@@ -413,6 +415,82 @@ async function saveQuestion(q, org, returnDashboard) {
       navigate('analytics/question?id=' + savedId);
     }
   });
+}
+
+// ---- alerts & schedules -----------------------------------------------------
+async function manageAlerts(q, org) {
+  const model = getModel(q.spec.model);
+  const measures = (q.spec.measures?.length ? q.spec.measures : [{ agg: 'count' }]);
+  const colOpts = q.mode === 'sql' ? [] : measures.map(m => ({ key: measureAlias(m), label: measureLabelFor(model, m) }));
+
+  const body = document.createElement('div');
+  const render = async () => {
+    const { data: existing } = await sb.from('analytics_alerts').select('*').eq('question_id', q.id).order('created_at', { ascending: false });
+    body.innerHTML = `
+      <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin:0 0 var(--space-3)">Scheduled reports are emailed to you at your data scope. Alerts email you when a metric crosses a threshold. Delivery runs on the daily server job.</p>
+      <div class="form-group"><label class="form-label">Type</label>
+        <select class="form-input" id="al-kind">
+          <option value="schedule">📅 Scheduled report (email me)</option>
+          <option value="alert">⚠️ Threshold alert</option>
+        </select></div>
+      <div id="al-schedule-wrap" class="form-group"><label class="form-label">Frequency</label>
+        <select class="form-input" id="al-schedule"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
+      <div id="al-alert-wrap" hidden>
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+          <div class="form-group" style="flex:1;min-width:150px"><label class="form-label">Metric</label>
+            ${colOpts.length
+              ? `<select class="form-input" id="al-col">${colOpts.map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join('')}</select>`
+              : `<input class="form-input" id="al-col" placeholder="result column name">`}
+          </div>
+          <div class="form-group" style="width:90px"><label class="form-label">Op</label>
+            <select class="form-input" id="al-op"><option value="gt">&gt;</option><option value="gte">≥</option><option value="lt">&lt;</option><option value="lte">≤</option><option value="eq">=</option><option value="neq">≠</option></select></div>
+          <div class="form-group" style="width:120px"><label class="form-label">Value</label>
+            <input class="form-input" id="al-val" type="number"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="al-create">Create</button>
+      <div style="margin-top:var(--space-4)">
+        <div class="form-label">Active on this question</div>
+        ${(existing || []).length ? (existing || []).map(a => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-2) 0;border-top:1px solid var(--color-border)">
+            <span style="font-size:var(--text-sm)">${a.kind === 'schedule' ? `📅 ${esc(a.schedule)} report` : `⚠️ alert: ${esc(a.alert_column || '')} ${esc(a.alert_op || '')} ${esc(String(a.alert_value ?? ''))}`}${a.last_run_at ? ` · last run ${new Date(a.last_run_at).toLocaleDateString()}` : ''}</span>
+            <button class="btn btn-ghost btn-sm" data-del="${a.id}" title="Delete">✕</button>
+          </div>`).join('') : '<div style="font-size:var(--text-sm);color:var(--color-text-tertiary)">None yet.</div>'}
+      </div>`;
+
+    const kindSel = body.querySelector('#al-kind');
+    const sync = () => {
+      const isAlert = kindSel.value === 'alert';
+      body.querySelector('#al-alert-wrap').hidden = !isAlert;
+      body.querySelector('#al-schedule-wrap').hidden = isAlert;
+    };
+    kindSel.addEventListener('change', sync); sync();
+
+    body.querySelector('#al-create').addEventListener('click', async () => {
+      const { data: { user } } = await sb.auth.getUser();
+      const kind = kindSel.value;
+      const row = { org_id: org.id, question_id: q.id, created_by: user?.id, kind };
+      if (kind === 'schedule') {
+        row.schedule = body.querySelector('#al-schedule').value;
+      } else {
+        const col = body.querySelector('#al-col').value.trim();
+        const val = body.querySelector('#al-val').value;
+        if (!col || val === '') { toast('Pick a metric and value'); return; }
+        row.alert_column = col; row.alert_op = body.querySelector('#al-op').value; row.alert_value = Number(val);
+        row.schedule = 'daily';
+      }
+      const { error } = await sb.from('analytics_alerts').insert(row);
+      if (error) { toast('Could not save: ' + error.message); return; }
+      toast('Saved'); render();
+    });
+    body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+      const { error } = await sb.from('analytics_alerts').delete().eq('id', b.dataset.del);
+      if (error) { toast('Delete failed: ' + error.message); return; }
+      render();
+    }));
+  };
+  openModal('Alerts & schedules', body);
+  render();
 }
 
 async function addToDashboard(dashId, questionId) {
