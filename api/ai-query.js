@@ -65,11 +65,19 @@ export default async function handler(req, res) {
   const user = await getUserFromToken(token);
   if (!user?.id) return res.status(401).json({ error: "Invalid token" });
 
-  const { query } = req.body || {};
+  const { query, mode, catalog } = req.body || {};
   if (!query) return res.status(400).json({ error: "query is required" });
 
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) return res.status(500).json({ error: "GROQ_API_KEY not configured" });
+
+  // Analytics NL→spec: turn a plain-English question into a builder spec against
+  // the semantic model the client sent. We never touch data here — the browser
+  // compiles the returned spec and runs it through the RLS-safe analytics RPC —
+  // so this branch only needs the LLM (whose key stays server-side).
+  if (mode === "analytics") {
+    return handleAnalyticsSpec({ res, groqKey, query, catalog, userId: user.id });
+  }
 
   // RLS-scoped client — the whole point: the AI can only see what the user can.
   const sb = supabaseAsUser(token);
@@ -154,4 +162,57 @@ If the question isn't about this data, reply with a short plain-text answer inst
   }
 
   return res.status(200).json({ response: answer, data });
+}
+
+// ---- analytics NL → builder spec -------------------------------------------
+// `catalog` is a compact description of the models the caller may use (sent by
+// the browser from js/analytics/models.js). We ask the LLM to emit a builder
+// spec as JSON; the browser then validates it against the real catalogue and
+// compiles it to RLS-safe SQL, so a hallucinated field simply gets dropped.
+async function handleAnalyticsSpec({ res, groqKey, query, catalog, userId }) {
+  if (!Array.isArray(catalog) || !catalog.length) {
+    return res.status(400).json({ error: "catalog is required for analytics mode" });
+  }
+  const today = new Date().toISOString().split("T")[0];
+  const catalogText = catalog.map((m) => {
+    const dims = (m.dimensions || []).map((d) => `${d.name}${d.temporal ? " (date)" : ""}`).join(", ");
+    const meas = (m.measures || []).join(", ");
+    const named = (m.namedMeasures || []).map((n) => `m:${n}`).join(", ");
+    const filt = (m.filters || []).join(", ");
+    return `- model "${m.key}" (${m.label}):\n    dimensions: ${dims || "—"}\n    measures: count, then <agg> of a numeric field where agg ∈ [count_distinct,sum,avg,min,max]: ${meas || "—"}\n    named measures: ${named || "—"}\n    filterable: ${filt || "—"}`;
+  }).join("\n");
+
+  const sys = `You are Atllanta AI, a data analyst for a Business OS. Today is ${today}.
+Turn the user's question into ONE JSON object describing a chart query. Use ONLY models and field names from this catalogue — never invent names:
+
+${catalogText}
+
+Reply with ONLY this JSON (no prose):
+{"model":"<key>","dimensions":[{"field":"<name>","granularity":"month"}],"measures":[{"agg":"count"}|{"agg":"sum","field":"<name>"}|{"agg":"m:<namedKey>"}],"filters":[{"field":"<name>","op":"<op>","value":"<v>"}],"sort":{"by":"<columnKey>","dir":"desc"},"limit":50,"viz":"bar","explanation":"<one short sentence>"}
+
+Rules:
+- granularity only for date dimensions, one of: day, week, month, quarter, year.
+- op is one of: eq, neq, gt, gte, lt, lte, contains, in, is_null, not_null, is_true, is_false, last_n_days (value = number of days).
+- viz one of: number, table, bar, row, line, pie. Prefer line for trends over time, pie for share of a total, number for a single value, bar/row otherwise.
+- Keep it minimal; omit filters/sort if not needed. Output valid JSON only.`;
+
+  let raw;
+  try {
+    raw = await callGroq(groqKey, [
+      { role: "system", content: sys },
+      { role: "user", content: String(query).slice(0, 500) },
+    ], 500, { name: "ai-query.analytics", userId, metadata: { query } });
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
+
+  let spec = null;
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) spec = JSON.parse(m[0]);
+  } catch {}
+  if (!spec || !spec.model) {
+    return res.status(200).json({ error: "Couldn't turn that into a query. Try naming a metric and a grouping, e.g. \"deals by stage\" or \"headcount by department\"." });
+  }
+  return res.status(200).json({ spec });
 }

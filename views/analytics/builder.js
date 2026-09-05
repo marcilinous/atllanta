@@ -15,6 +15,7 @@ import { MODELS, AGGREGATIONS, GRANULARITIES, getModel, getField, operatorsForTy
 import { runBuilder, runSql } from '../../js/analytics/engine.js';
 import { measureAlias, measureLabelFor } from '../../js/analytics/compiler.js';
 import { renderChart, VIZ_TYPES, CHART_THEMES } from '../../js/analytics/charts.js';
+import { askAI } from '../../js/analytics/nl.js';
 
 const firstModel = Object.keys(MODELS)[0];
 
@@ -55,6 +56,14 @@ export default async function questionEditor(container) {
         <button class="btn btn-primary btn-sm" id="save">Save</button>
       </div>
     </div>
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <div class="card-body" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+        <span title="Ask in plain English" style="font-size:var(--text-lg)">✨</span>
+        <input class="form-input" id="ai-ask" placeholder="Ask in plain English — e.g. “win rate by owner this quarter”, “headcount by department”" style="flex:1;min-width:220px" autocomplete="off">
+        <button class="btn btn-primary btn-sm" id="ai-go">Ask AI</button>
+        <span id="ai-note" style="font-size:var(--text-xs);color:var(--color-text-tertiary)"></span>
+      </div>
+    </div>
     <div id="editor-body"></div>
     <div class="card" style="margin-top:var(--space-4)">
       <div class="card-header" style="justify-content:space-between;flex-wrap:wrap;gap:var(--space-2)">
@@ -74,6 +83,33 @@ export default async function questionEditor(container) {
     renderBody(); runPreview();
   }));
   container.querySelector('#save').addEventListener('click', () => saveQuestion(q, org, returnDashboard));
+
+  // Ask AI → validated builder spec.
+  const askInput = container.querySelector('#ai-ask');
+  const askNote = container.querySelector('#ai-note');
+  const askBtn = container.querySelector('#ai-go');
+  async function runAsk() {
+    const question = askInput.value.trim();
+    if (!question) return;
+    askBtn.disabled = true; askNote.textContent = 'Thinking…';
+    try {
+      const { spec, viz, explanation } = await askAI(question);
+      q.mode = 'builder';
+      q.spec = { ...blankQuestion().spec, ...spec };
+      q.viz = viz;
+      container.querySelectorAll('.tab[data-mode]').forEach(x => x.classList.toggle('active', x.dataset.mode === 'builder'));
+      renderVizPicker(); renderThemePicker(); renderBody();
+      askNote.textContent = explanation || '';
+      await runPreview();
+    } catch (e) {
+      askNote.textContent = '';
+      toast(e.message || 'Could not build that query');
+    } finally {
+      askBtn.disabled = false;
+    }
+  }
+  askBtn.addEventListener('click', runAsk);
+  askInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runAsk(); } });
 
   const bodyEl = container.querySelector('#editor-body');
   const outEl = container.querySelector('#preview-out');
