@@ -24,6 +24,7 @@ export default async function reportsView(container) {
     { icon: '🎫', title: 'Helpdesk Report', desc: 'Ticket volume, categories, and resolution times', route: '#/reports/helpdesk', roles: ['owner', 'admin', 'manager'] },
     { icon: '📅', title: 'Team Planner', desc: 'Weekly view of team availability and leave', route: '#/reports/planner', roles: ['owner', 'admin', 'manager'] },
     { icon: '💰', title: 'Expense Report', desc: 'Expense analytics, categories, and monthly trends', route: '#/reports/expenses', roles: ['owner', 'admin', 'manager'] },
+    { icon: '📈', title: 'Analytics (self-serve)', desc: 'Build your own questions and dashboards across any data you can see', route: '#/analytics', roles: ['owner', 'admin', 'manager'] },
     { icon: '📋', title: 'Audit Log', desc: 'Track all actions across the platform', route: '#/audit', roles: ['owner', 'admin'] },
   ];
 

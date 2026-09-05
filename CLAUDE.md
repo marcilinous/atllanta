@@ -16,8 +16,12 @@ Well past Phase 0. Substantially built out beyond the original recruitment-only 
 
 - **`api/`** — 12 Vercel serverless functions (kept ≤12-function limit by consolidation): matching, resume/JD parsing, ai-query, bulk-import, create-org, google-auth, schedule, reports, send-notification, event-processor, extract-candidate, screen-job.
 - **`supabase/migrations/`** — ~49 migrations = the real schema (foundation multi-tenant, interview scheduling, Google OAuth/invitations, business-OS platform, expense tracking, helpdesk, asset tracking, announcements, **+ the whole CRM/partner-sales vertical**).
-- **`views/`** — recruitment, employees, attendance, leave, finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **plus `views/crm/` (24 files)**.
+- **`views/`** — recruitment, employees, attendance, leave, finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **`views/analytics/` (Metabase-style self-serve BI)**, **plus `views/crm/` (24 files)**.
 - **Infra** — Vercel + Supabase wired (project `nburswxjpukntgdwuyme` = `atllanta`); PWA (`manifest.json`, `sw.js`); Playwright tests in `tests/`. Live-app changes verified against the real Supabase project, additive migrations applied there directly.
+
+### Analytics (self-serve BI, Metabase-inspired)
+
+Gated by the `analytics` feature (admins toggle per-org; defaults to managers/admins, sidebar `data-role="manager"`). Two org-scoped tables — `analytics_questions` (a saved query: `spec` JSONB + `viz`, `mode` builder|sql) and `analytics_dashboards` (`cards` JSONB = ordered {question_id,w} grid). **Semantic layer** in `js/analytics/models.js` (base table + joins + per-field SQL expressions + named measures like win-rate/weighted-pipeline) → `js/analytics/compiler.js` compiles a builder spec to one aggregate SQL statement (joins emitted on demand, time-bucketing via `date_trunc`+`to_char`, values escaped as literals). Both the **visual builder** and the **SQL mode** run that SQL through `analytics_run_sql(text,int)` — a **SECURITY INVOKER** RPC (RLS stays enforced) guarded to a single read-only SELECT/WITH, catalog-blocked, timeout + row-capped — so aggregation/joins happen **server-side, no client row cap**. `engine.js` just dispatches spec→compile→RPC. **AI ask** (`js/analytics/nl.js`): plain-English → a *validated* builder spec via `api/ai-query.js` `mode:"analytics"` (Groq plans against a compact catalogue the browser sends; the key stays server-side; the returned spec is re-validated against the real models, so hallucinated fields are dropped, then compiled + run on the RLS path). No new Vercel function — reuses ai-query (still 12/12). Six chart types rendered with **Apache ECharts** (lazy-loaded from the jsdelivr CDN in `js/analytics/charts.js`; `renderChart(container, viz, result, {theme})`), with a per-question **mono / color** theme toggle; `table` + `number` stay HTML. **Local analysis** (`js/analytics/duck.js`): a DuckDB-Wasm panel in the builder for fast in-browser slice/dice/pivot/window-fns over the current result. Security-critical: it is **never a data channel** — it only ingests rows already fetched through the RLS path, runs in a sandboxed worker, **fully in-memory** (no OPFS/IndexedDB), over the in-memory `data` table; wasm lazy-loads from jsdelivr. **Scheduled reports & alerts** (`analytics_alerts` table, RLS): per-question schedule (daily/weekly/monthly email) or threshold alert. The daily cron (`api/event-processor.js` → `processAnalyticsAlerts`) compiles the stored spec, **mints a short-lived JWT for the report's creator** and runs it via `analytics_run_sql` (so the creator's RLS applies — no service_role-bypass, no impersonation function), then emails via Resend. Requires `SUPABASE_JWT_SECRET` in the server env (else it no-ops). UI: 🔔 Alerts on a saved question. Routes `analytics`, `analytics/question`, `analytics/dashboard`. **No new Vercel function** (stayed at 12/12; reuses ai-query + event-processor).
 
 ### CRM / partner-sales vertical (tenant **RTcompu**, org `e8845b88-…`)
 
@@ -41,12 +45,13 @@ A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from i
 
 **Skills:** `archify` (`.claude/skills/archify` → `.agents/skills/archify`) generates interactive HTML diagrams (architecture/workflow/sequence/dataflow/lifecycle) from prose, Mermaid, or repo code — `node bin/archify.mjs validate|deliver <type> <spec.json> <out.html> --quality showcase`.
 
-## 4. Stack (hard rules)
+## 4. Stack
 
 - DB / Auth / Storage: **Supabase (Postgres 15+)**. Hosting: **Vercel**. AI: **Groq (LLaMA)**. Email: **Resend**.
-- Frontend: **vanilla JS + HTML + CSS**. **No React/Next/TypeScript/Tailwind** unless Sachin explicitly asks.
-- Supabase JS client via **CDN**, not npm. No npm packages for what vanilla JS can do.
-- Zero monthly cost during build/pilot — free tiers only.
+- **No language/framework lock-in** (Sachin, 2026-09: "no limitation on coding languages — use multiple if required; goal is a world-class Business OS"). React/Next/TypeScript/Tailwind, other backend languages (Python/Go/… as Vercel functions or build tools), npm packages, real charting/UI libs, and a build step are all fair game **where they earn their place**. The app today is vanilla JS + HTML + CSS loading the Supabase client via CDN.
+- **Adopt incrementally, don't rewrite what works.** New modules/features may use the best tool for the job; migrate existing vanilla views only when there's a concrete reason, not wholesale. Keep the app one deployable unit (see §5).
+- Still true: **zero monthly cost** during build/pilot (free tiers), and the **Vercel 12-function limit** (consolidate; prefer client + RPC over new functions).
+- The §5 architecture rules (modular monolith, RLS, multi-tenant, events) are **unchanged and still non-negotiable** — language freedom does not relax them.
 
 ## 5. Architecture Rules (non-negotiable)
 
@@ -62,7 +67,8 @@ A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from i
 - Tables: `snake_case` plural. Columns: `snake_case`. JS files: `kebab-case`. JS functions: `camelCase`. CSS classes: `kebab-case`. Events: `module.entity.action`.
 - `const` by default, `let` when needed, never `var`. `async/await` over `.then()`. Early returns over nesting.
 - Commits: imperative, short. Branches: `feature/…`, `fix/…`, `chore/…`.
+- **Product copy (Sachin, 2026-09):** don't explain the internal working/architecture to end users in the UI — no "runs in your browser / in-memory / RLS-scoped / compiled to SQL / on the daily job" style notes. Keep UI microcopy functional and outcome-focused; mechanics belong in code comments and docs, not on screen.
 
 ## 7. Do NOT Build (until named trigger)
 
-Payroll, visual workflow builder, custom-permissions UI (four fixed roles: owner/admin/manager/member), native mobile app (PWA first), CRM module, microservices, Elasticsearch, React/Next migration. Rationale in `docs/HANDOVER.md §15`.
+Payroll, visual workflow builder, custom-permissions UI (four fixed roles: owner/admin/manager/member), native mobile app (PWA first), microservices, Elasticsearch. Rationale in `docs/HANDOVER.md §15`. *(No longer deferred: framework choice — see §4. Multiple languages are fine **within the modular monolith**; splitting into separate services is still the deferred "microservices" item, a distinct architectural call.)*

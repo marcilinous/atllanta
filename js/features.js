@@ -24,6 +24,7 @@ export const FEATURES = [
   { key: 'documents', label: 'Documents' },
   { key: 'finance', label: 'Finance' },
   { key: 'reports', label: 'Reports' },
+  { key: 'analytics', label: 'Analytics (self-serve)' },
   { key: 'helpdesk', label: 'Helpdesk' },
   { key: 'announcements', label: 'Announcements' },
   { key: 'ai', label: 'AI assistant' },
