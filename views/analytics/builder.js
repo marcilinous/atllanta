@@ -16,6 +16,7 @@ import { runBuilder, runSql } from '../../js/analytics/engine.js';
 import { measureAlias, measureLabelFor } from '../../js/analytics/compiler.js';
 import { renderChart, VIZ_TYPES, CHART_THEMES } from '../../js/analytics/charts.js';
 import { askAI } from '../../js/analytics/nl.js';
+import { mountLab } from '../../js/analytics/duck.js';
 
 const firstModel = Object.keys(MODELS)[0];
 
@@ -74,7 +75,10 @@ export default async function questionEditor(container) {
         </div>
       </div>
       <div class="card-body" id="preview-out" style="min-height:160px"></div>
-    </div>`;
+    </div>
+    <div id="analytics-lab"></div>`;
+
+  mountLab(container.querySelector('#analytics-lab'), () => lastResult);
 
   container.querySelector('#back').addEventListener('click', () => navigate(returnDashboard ? 'analytics/dashboard?id=' + returnDashboard : 'analytics'));
   container.querySelectorAll('.tab[data-mode]').forEach(t => t.addEventListener('click', () => {
