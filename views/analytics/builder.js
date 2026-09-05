@@ -95,7 +95,7 @@ export default async function questionEditor(container) {
     }));
   }
 
-  function paint() { outEl.innerHTML = renderChart(q.viz, lastResult, { theme: q.spec.vizTheme }); }
+  async function paint() { await renderChart(outEl, q.viz, lastResult, { theme: q.spec.vizTheme }); }
 
   async function runPreview() {
     outEl.innerHTML = `<div style="color:var(--color-text-tertiary);font-size:var(--text-sm);padding:var(--space-4)">Running…</div>`;
@@ -104,7 +104,7 @@ export default async function questionEditor(container) {
         ? await runSql(q.spec.sql || '', q.spec.maxRows || 1000)
         : await runBuilder(q.spec);
       const note = lastResult.capped ? ` · showing first ${lastResult.rows.length} (capped)` : '';
-      paint();
+      await paint();
       const meta = container.querySelector('#preview-meta');
       if (meta) meta.textContent = `${lastResult.rows.length} row${lastResult.rows.length === 1 ? '' : 's'}${note}`;
     } catch (e) {

@@ -7,7 +7,7 @@ import { getOrg } from '../../js/auth.js';
 import { esc, toast, openModal, closeModal } from '../../js/ui.js';
 import { navigate, routeParams } from '../../js/router.js';
 import { runQuestion } from '../../js/analytics/engine.js';
-import { renderChart } from '../../js/analytics/charts.js';
+import { renderChart, disposeChartsIn } from '../../js/analytics/charts.js';
 
 export default async function dashboardView(container) {
   const org = getOrg();
@@ -52,6 +52,7 @@ export default async function dashboardView(container) {
 
   function renderGrid() {
     const grid = container.querySelector('#grid');
+    disposeChartsIn(grid);
     if (!cards.length) {
       grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:var(--space-12)">
         <div class="empty-state-icon">📊</div>
@@ -86,7 +87,7 @@ export default async function dashboardView(container) {
       const q = qById[c.question_id];
       const out = container.querySelector(`#card-out-${i}`);
       if (!q || !out) return;
-      try { out.innerHTML = renderChart(q.viz, await runQuestion(q), { theme: q.spec?.vizTheme }); }
+      try { await renderChart(out, q.viz, await runQuestion(q), { theme: q.spec?.vizTheme, height: 260 }); }
       catch (e) { out.innerHTML = `<div style="color:var(--color-error);font-size:var(--text-sm)">${esc(e.message)}</div>`; }
     });
   }
