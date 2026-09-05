@@ -685,6 +685,86 @@ async function processAnalyticsAlerts(sb) {
   return { checked, reports, fired, errored };
 }
 
+// ---- outbound webhook delivery ---------------------------------------------
+const WEBHOOK_BATCH = 50;
+const WEBHOOK_MAX_ATTEMPTS = 6;
+const WEBHOOK_BACKOFF_MIN = [1, 5, 30, 120, 360, 1440]; // minutes, by attempt
+
+// SSRF guard: only deliver to public HTTPS URLs (admins configure these, but
+// the server must not be talked into hitting internal hosts).
+function isDeliverableUrl(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return false; }
+  if (u.protocol !== "https:") return false;
+  const h = u.hostname.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return false;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+  if (h === "::1" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80")) return false;
+  return true;
+}
+
+async function dispatchWebhooks(sb) {
+  const { data: due } = await sb
+    .from("webhook_deliveries")
+    .select("id, endpoint_id, event_type, payload, attempts, org_id, created_at, endpoint:webhook_endpoints(url, secret, active)")
+    .eq("status", "pending")
+    .lte("next_attempt_at", new Date().toISOString())
+    .order("created_at")
+    .limit(WEBHOOK_BATCH);
+  if (!due?.length) return { delivered: 0, failed: 0, retry: 0 };
+
+  let delivered = 0, failed = 0, retry = 0;
+  for (const d of due) {
+    const ep = d.endpoint;
+    if (!ep || !ep.active || !isDeliverableUrl(ep.url)) {
+      await sb.from("webhook_deliveries").update({ status: "failed", attempts: d.attempts + 1, last_error: !ep || !ep.active ? "endpoint inactive" : "blocked url" }).eq("id", d.id);
+      failed++; continue;
+    }
+    const body = JSON.stringify({ id: d.id, event: d.event_type, org_id: d.org_id, created_at: d.created_at, data: d.payload });
+    const signature = crypto.createHmac("sha256", ep.secret).update(body).digest("hex");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    let ok = false, statusCode = null, errText = null;
+    try {
+      const resp = await fetch(ep.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Atllanta-Event": d.event_type,
+          "X-Atllanta-Delivery": d.id,
+          "X-Atllanta-Signature": `sha256=${signature}`,
+          "User-Agent": "Atllanta-Webhooks/1",
+        },
+        body,
+        signal: controller.signal,
+      });
+      statusCode = resp.status;
+      ok = resp.ok;
+      if (!ok) errText = `HTTP ${resp.status}`;
+    } catch (e) {
+      errText = e.name === "AbortError" ? "timeout" : (e.message || "request failed");
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const attempts = d.attempts + 1;
+    if (ok) {
+      await sb.from("webhook_deliveries").update({ status: "delivered", delivered_at: new Date().toISOString(), attempts, last_status: statusCode, last_error: null }).eq("id", d.id);
+      await sb.from("webhook_endpoints").update({ last_delivery_at: new Date().toISOString() }).eq("id", d.endpoint_id);
+      delivered++;
+    } else if (attempts >= WEBHOOK_MAX_ATTEMPTS) {
+      await sb.from("webhook_deliveries").update({ status: "failed", attempts, last_status: statusCode, last_error: errText }).eq("id", d.id);
+      failed++;
+    } else {
+      const mins = WEBHOOK_BACKOFF_MIN[attempts - 1] || 1440;
+      await sb.from("webhook_deliveries").update({ attempts, next_attempt_at: new Date(Date.now() + mins * 60000).toISOString(), last_status: statusCode, last_error: errText }).eq("id", d.id);
+      retry++;
+    }
+  }
+  return { delivered, failed, retry };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).json({ error: "Use POST or GET" });
@@ -713,7 +793,8 @@ export default async function handler(req, res) {
     const emails = await dispatchEmails(sb);
     const opportunities = await refreshOpportunityEngine(sb);
     const analyticsAlerts = await processAnalyticsAlerts(sb);
-    return res.status(200).json({ events, emails, opportunities, analyticsAlerts });
+    const webhooks = await dispatchWebhooks(sb);
+    return res.status(200).json({ events, emails, opportunities, analyticsAlerts, webhooks });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
