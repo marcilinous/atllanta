@@ -210,7 +210,7 @@ export default async function employeeImport(container) {
 
       if (result.imported > 0) await publishEvent('people.employees.bulk_imported', { count: result.imported });
 
-      const creds = result.credentials || [];
+      const invitesSent = result.invites_sent || 0;
       const errs = result.errors || [];
       resultEl.classList.remove('hidden');
       resultEl.innerHTML = `
@@ -218,29 +218,14 @@ export default async function employeeImport(container) {
           <div style="font-weight:var(--font-weight-semibold);color:var(--color-success)">Import complete</div>
           <div>${result.imported} added, ${result.skipped} already members${errs.length ? `, ${errs.length} errors` : ''}</div>
         </div>
-        ${creds.length ? `
-          <div style="margin-top:var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-2) var(--space-3);background:var(--color-bg-secondary)">
-              <span style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${creds.length} new login${creds.length !== 1 ? 's' : ''} — share these credentials</span>
-              <button class="btn btn-secondary btn-sm" id="dl-creds">Download CSV</button>
-            </div>
-            <div class="table-wrap" style="max-height:240px;overflow:auto"><table class="table">
-              <thead><tr><th>Email</th><th>Temporary password</th></tr></thead>
-              <tbody>${creds.map(c => `<tr><td style="font-size:var(--text-sm)">${esc(c.email)}</td><td style="font-family:var(--font-mono);font-size:var(--text-sm);user-select:all">${esc(c.temp_password)}</td></tr>`).join('')}</tbody>
-            </table></div>
+        ${result.imported > 0 ? `
+          <div style="margin-top:var(--space-3);padding:var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-sm)">
+            ${invitesSent > 0
+              ? `Sent ${invitesSent} invitation email${invitesSent !== 1 ? 's' : ''} with a link to set a password and sign in.`
+              : `New members were added, but invitation emails couldn't be sent. Use <strong>Reset pw</strong> on each member in Settings → Users to send a set-password link.`}
           </div>` : ''}
         ${errs.length ? `<div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-error)">${errs.slice(0, 8).map(e => esc(`Row ${e.row}: ${e.error}`)).join('<br>')}</div>` : ''}
       `;
-
-      resultEl.querySelector('#dl-creds')?.addEventListener('click', () => {
-        const csv = 'Email,Temporary Password\n' + creds.map(c => `"${c.email}","${c.temp_password}"`).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'new_logins.csv';
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
     } catch (err) {
       resultEl.classList.remove('hidden');
       resultEl.innerHTML = `<div style="padding:var(--space-3);border-radius:var(--radius-md);background:var(--color-error-light);font-size:var(--text-sm);color:var(--color-error)">Import failed: ${esc(err.message)}</div>`;
