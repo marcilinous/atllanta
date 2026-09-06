@@ -54,7 +54,7 @@ async function processOne(event, org) {
   try {
     const handler = HANDLERS[event.event_type];
     if (handler) {
-      await handler(event.payload, org, event.actor_id);
+      await handler(event.payload, org, event.actor_id, event.id);
     }
     await sb.rpc('resolve_event', { event_id: event.id, new_status: 'completed' });
   } catch (e) {
@@ -62,7 +62,7 @@ async function processOne(event, org) {
     // attempts was already incremented by claim_events; fail permanently
     // after the 3rd try, otherwise re-queue for another pass.
     const finalStatus = (event.attempts || 0) >= 3 ? 'failed' : 'pending';
-    await sb.rpc('resolve_event', { event_id: event.id, new_status: finalStatus });
+    await sb.rpc('resolve_event', { event_id: event.id, new_status: finalStatus, p_error: String(e?.message || e).slice(0, 500) });
   }
 }
 
@@ -136,7 +136,7 @@ const HANDLERS = {
     await notifyByRole(org.id, ['admin', 'owner'], 'New leave request', `${name} has applied for leave`, 'leave', 'leave_request', p.leave_request_id);
   },
 
-  'leave.request.approved': async (p, org) => {
+  'leave.request.approved': async (p, org, actorId, eventId) => {
     const approverName = await getUserName(p.approved_by);
     await notify(org.id, p.user_id, 'Leave approved', `Your leave request was approved by ${approverName}`, 'leave', 'leave_request', p.leave_request_id, true);
 
@@ -144,28 +144,30 @@ const HANDLERS = {
       const year = new Date().getFullYear();
       const days = parseFloat(p.days) || 0;
       if (days > 0) {
-        const { data: bal } = await sb
-          .from('leave_balances')
-          .select('id, used')
-          .eq('user_id', p.user_id)
-          .eq('leave_type_id', p.leave_type_id)
-          .eq('year', year)
-          .single();
-
-        if (bal) {
-          await sb.from('leave_balances').update({
-            used: (parseFloat(bal.used) || 0) + days
-          }).eq('id', bal.id);
-        } else {
-          await sb.from('leave_balances').insert({
-            org_id: org.id,
-            user_id: p.user_id,
-            leave_type_id: p.leave_type_id,
-            year,
-            opening_balance: 0,
-            accrued: 0,
-            used: days
+        // Idempotent: apply the used-days increment at most once per event, so a
+        // retry (or the server backstop re-running this) can't double-count.
+        const firstTime = eventId
+          ? (await sb.rpc('claim_side_effect', { p_event_id: eventId, p_effect_key: 'leave_used' })).data
+          : true;
+        if (firstTime) {
+          const { data: newUsed } = await sb.rpc('apply_leave_usage', {
+            p_user_id: p.user_id,
+            p_leave_type_id: p.leave_type_id,
+            p_year: year,
+            p_days: days,
           });
+
+          if (newUsed == null) {
+            await sb.from('leave_balances').upsert({
+              org_id: org.id,
+              user_id: p.user_id,
+              leave_type_id: p.leave_type_id,
+              year,
+              opening_balance: 0,
+              accrued: 0,
+              used: days
+            }, { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
+          }
         }
       }
     }
@@ -241,7 +243,7 @@ const HANDLERS = {
         accrued: t.annual_quota || 0,
         used: 0
       }));
-      await sb.from('leave_balances').insert(balances);
+      await sb.from('leave_balances').upsert(balances, { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
     }
 
     const managerId = await getManager(p.employee_id);

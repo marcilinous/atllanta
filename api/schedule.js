@@ -4,6 +4,7 @@
 
 import { supabaseAdmin } from "../lib/supabaseServer.js";
 import { createMeetEvent } from "../lib/googleMeet.js";
+import { rateLimit, tooMany, clientIp } from "../lib/ratelimit.js";
 
 export default async function handler(req, res) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -11,6 +12,11 @@ export default async function handler(req, res) {
   }
 
   const db = supabaseAdmin();
+
+  // This is a public (unauthenticated) endpoint — limit per client IP to blunt
+  // token-guessing and booking abuse.
+  const rl = await rateLimit(db, { key: `schedule:ip:${clientIp(req)}`, limit: 40, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
 
   if (req.method === "GET") {
     const { token } = req.query;

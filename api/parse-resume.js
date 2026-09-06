@@ -10,6 +10,7 @@
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
+import { rateLimit, tooMany } from "../lib/ratelimit.js";
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
@@ -44,8 +45,12 @@ export default async function handler(req, res) {
   const user = await getUserFromToken(token);
   if (!user?.id) return res.status(401).json({ error: "Invalid session" });
 
+  // Abuse control on document parsing / AI extraction.
+  const rl = await rateLimit(supabaseAdmin(), { key: `parse:user:${user.id}`, limit: 30, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
+
   const action = req.query?.action;
-  if (action === "parse-jd") return handleParseJD(req, res);
+  if (action === "parse-jd") return handleParseJD(req, res, user);
   if (action === "extract-candidate") return handleExtractCandidate(req, res);
 
   const { filename, data } = req.body || {};
@@ -168,12 +173,40 @@ ${resume_text.slice(0, 4000)}`;
   });
 }
 
-async function handleParseJD(req, res) {
+async function handleParseJD(req, res, user) {
   const { description, job_id } = req.body || {};
   if (!description) return res.status(400).json({ error: "description is required" });
 
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) return res.status(500).json({ error: "GROQ_API_KEY not configured" });
+
+  // If the result will be written back to a job, verify the caller can access
+  // that job before spending a model call — the write goes through the
+  // service-role client, so RLS won't catch a cross-tenant job_id here. Same
+  // access rule as screen-job: an agency-wide role, or membership scoped to the
+  // job's client.
+  if (job_id) {
+    const sb = supabaseAdmin();
+    const { data: job } = await sb
+      .from("jobs")
+      .select("id, client_id, clients(organization_id)")
+      .eq("id", job_id)
+      .maybeSingle();
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const orgId = job.clients?.organization_id;
+    const { data: membership } = await sb
+      .from("memberships")
+      .select("role, client_id")
+      .eq("user_id", user.id)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+
+    const allowed = membership &&
+      (["agency_admin", "super_admin"].includes(membership.role) ||
+        membership.client_id === job.client_id);
+    if (!allowed) return res.status(403).json({ error: "No access to this job" });
+  }
 
   const prompt = `Extract skills from this job description. Return JSON only:
 {

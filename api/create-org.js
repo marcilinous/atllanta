@@ -8,6 +8,7 @@
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { findOrCreateUser, provisionMember } from "../lib/provisionMember.js";
+import { baseUrlFromReq, sendPasswordSetupEmail } from "../lib/email.js";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -84,13 +85,19 @@ async function handleCreateOrg(req, res, db, user) {
       role: "agency_admin",
     });
 
+    let inviteSent = false;
+    if (adminUser.new_account) {
+      const r = await sendPasswordSetupEmail(db, { email, baseUrl: baseUrlFromReq(req), orgName: name.trim(), isNew: true });
+      inviteSent = !!r.sent;
+    }
+
     return res.json({
       created: true,
       org_id: newOrg.id,
       org_name: name.trim(),
       admin_email: email,
       new_account: adminUser.new_account,
-      temp_password: adminUser.temp_password || null,
+      invite_sent: inviteSent,
     });
   }
 
@@ -131,13 +138,19 @@ async function handleCreateOrg(req, res, db, user) {
       client_id: newClient.id,
     });
 
+    let inviteSent = false;
+    if (adminUser.new_account) {
+      const r = await sendPasswordSetupEmail(db, { email, baseUrl: baseUrlFromReq(req), orgName: name.trim(), isNew: true });
+      inviteSent = !!r.sent;
+    }
+
     return res.json({
       created: true,
       client_id: newClient.id,
       client_name: name.trim(),
       admin_email: email,
       new_account: adminUser.new_account,
-      temp_password: adminUser.temp_password || null,
+      invite_sent: inviteSent,
     });
   }
 
@@ -182,6 +195,7 @@ async function handleInvite(req, res, db, user) {
   const result = await provisionMember(db, {
     orgId, email, role, full_name, client_id,
     department_id, reporting_manager_id, designation, date_of_joining,
+    baseUrl: baseUrlFromReq(req),
   });
   if (result.error) return res.status(500).json({ error: result.error });
 
@@ -191,7 +205,8 @@ async function handleInvite(req, res, db, user) {
     role,
     user_id: result.user_id,
     new_account: result.new_account,
-    temp_password: result.temp_password || null,
+    invite_sent: result.invite_sent,
+    invite_error: result.invite_error || null,
   });
 }
 
@@ -219,15 +234,14 @@ async function handleResetPassword(req, res, db, user) {
     .maybeSingle();
 
   if (!target) return res.status(404).json({ error: "Member not found in your organization" });
+  if (!target.email) return res.status(400).json({ error: "This member has no email on file to send a reset link to." });
 
-  const tempPassword = crypto.randomUUID().slice(0, 16) + "Ax1!";
-  const { error } = await db.auth.admin.updateUserById(user_id, {
-    password: tempPassword,
-    email_confirm: true,
-  });
-  if (error) return res.status(500).json({ error: "Reset failed: " + error.message });
+  // Re-issue access by emailing a one-time set-password link — no password is
+  // generated or returned.
+  const r = await sendPasswordSetupEmail(db, { email: target.email, baseUrl: baseUrlFromReq(req), isNew: false });
+  if (r.error) return res.status(500).json({ error: "Could not send the reset email: " + r.error });
 
-  return res.json({ reset: true, email: target.email, temp_password: tempPassword });
+  return res.json({ reset: true, email: target.email, invite_sent: true });
 }
 
 // --- Assign HR access (level + optional department scope) to a member ---

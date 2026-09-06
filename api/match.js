@@ -9,6 +9,7 @@
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
+import { rateLimit, tooMany } from "../lib/ratelimit.js";
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
@@ -33,6 +34,10 @@ export default async function handler(req, res) {
 
   const user = await getUserFromToken(token);
   if (!user?.id) return res.status(401).json({ error: "Invalid session" });
+
+  // Abuse control on this AI/credit-spending endpoint.
+  const rl = await rateLimit(supabaseAdmin(), { key: `match:user:${user.id}`, limit: 30, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
 
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({
@@ -197,17 +202,15 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
     .eq("id", app.id);
   if (updateErr) return res.status(500).json({ error: updateErr.message });
 
-  // Charge 1 credit
-  await db
-    .from("organizations")
-    .update({ credits_balance: org.credits_balance - 1 })
-    .eq("id", orgId);
-  await db.from("credit_ledger").insert({
-    organization_id: orgId,
-    action_type: "resume_match",
-    credits_delta: -1,
-    reference_id: app.id,
+  // Charge 1 credit atomically (row-locked decrement + ledger in one txn) so
+  // concurrent matches can't lose a decrement or desync the ledger.
+  const { data: charge } = await db.rpc("consume_credits", {
+    p_org_id: orgId,
+    p_amount: 1,
+    p_action_type: "resume_match",
+    p_reference_id: app.id,
   });
+  const creditsRemaining = charge?.[0]?.credits_remaining ?? (org.credits_balance - 1);
 
   return res.status(200).json({
     application_id: app.id,
@@ -215,6 +218,6 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
     summary: parsed.summary,
     strengths: parsed.strengths || [],
     gaps: parsed.gaps || [],
-    credits_remaining: org.credits_balance - 1,
+    credits_remaining: creditsRemaining,
   });
 }

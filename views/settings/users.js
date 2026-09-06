@@ -329,10 +329,10 @@ export default async function settingsUsers(container) {
         btn.addEventListener('click', async () => {
           const targetUserId = btn.dataset.resetPw;
           const email = btn.dataset.email || '';
-          if (!confirm(`Reset the password for ${email || 'this member'}? Their current password will stop working.`)) return;
+          if (!confirm(`Email a password-reset link to ${email || 'this member'}?`)) return;
           btn.disabled = true;
           const orig = btn.textContent;
-          btn.textContent = 'Resetting...';
+          btn.textContent = 'Sending...';
           try {
             const { data: { session } } = await sb.auth.getSession();
             const resp = await fetch('/api/create-org', {
@@ -345,7 +345,7 @@ export default async function settingsUsers(container) {
             });
             const result = await resp.json();
             if (!resp.ok) {
-              toast(result.error || 'Failed to reset password');
+              toast(result.error || 'Failed to send reset link');
               btn.disabled = false;
               btn.textContent = orig;
               return;
@@ -357,17 +357,14 @@ export default async function settingsUsers(container) {
               <div style="display:grid;gap:var(--space-4)">
                 <div style="text-align:center">
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" width="48" height="48" style="margin:0 auto var(--space-3)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Password Reset</div>
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Reset link sent</div>
                 </div>
                 <div style="background:var(--color-bg-secondary);border-radius:var(--radius-md);padding:var(--space-4)">
-                  <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-2)">Share the new credentials with the member:</div>
-                  <div style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Email:</strong> ${esc(result.email || email)}</div>
-                  <div style="font-size:var(--text-sm)"><strong>New Password:</strong> <code style="background:var(--color-bg-tertiary);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);user-select:all">${esc(result.temp_password)}</code></div>
+                  <div style="font-size:var(--text-sm)">We emailed a one-time link to <strong>${esc(result.email || email)}</strong> to set a new password.</div>
                 </div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);text-align:center">They should change their password after logging in.</div>
                 <button class="btn btn-primary" id="reset-done-btn">Done</button>
               </div>`;
-            openModal('Password Reset', info);
+            openModal('Reset link sent', info);
             info.querySelector('#reset-done-btn').addEventListener('click', closeModal);
           } catch (err) {
             toast('Failed to reset password: ' + err.message);
@@ -478,23 +475,23 @@ export default async function settingsUsers(container) {
           if (result.user_id) await publishEvent('people.employee.created', { employee_id: result.user_id, name: full_name || email });
           closeModal();
 
-          if (result.new_account && result.temp_password) {
+          if (result.new_account) {
+            const emailFailed = result.invite_sent === false;
             const info = document.createElement('div');
             info.innerHTML = `
               <div style="display:grid;gap:var(--space-4)">
                 <div style="text-align:center">
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" width="48" height="48" style="margin:0 auto var(--space-3)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Account Created</div>
+                  <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Member invited</div>
                 </div>
                 <div style="background:var(--color-bg-secondary);border-radius:var(--radius-md);padding:var(--space-4)">
-                  <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-2)">Share these credentials with the new member:</div>
-                  <div style="font-size:var(--text-sm);margin-bottom:var(--space-1)"><strong>Email:</strong> ${esc(email)}</div>
-                  <div style="font-size:var(--text-sm)"><strong>Temporary Password:</strong> <code style="background:var(--color-bg-tertiary);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);user-select:all">${esc(result.temp_password)}</code></div>
+                  ${emailFailed
+                    ? `<div style="font-size:var(--text-sm)">Added <strong>${esc(email)}</strong>, but the invitation email couldn't be sent. Use <strong>Reset pw</strong> on their row to send a set-password link.</div>`
+                    : `<div style="font-size:var(--text-sm)">We emailed an invitation to <strong>${esc(email)}</strong> with a link to set their password and sign in.</div>`}
                 </div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);text-align:center">They should change their password after first login.</div>
                 <button class="btn btn-primary" id="invite-done-btn">Done</button>
               </div>`;
-            openModal('Member Invited', info);
+            openModal('Member invited', info);
             info.querySelector('#invite-done-btn').addEventListener('click', closeModal);
           } else {
             toast('Staff member added: ' + email);

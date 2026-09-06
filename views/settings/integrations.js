@@ -134,7 +134,70 @@ export default async function integrationsView(container) {
     </div>
   `;
 
-  if (isAdmin) mountWebhooks();
+  if (isAdmin) { mountWebhooks(); mountApiKeys(); }
+
+  async function mountApiKeys() {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:var(--space-8)';
+    container.appendChild(wrap);
+    const base = (window.ATLLANTA_CONFIG?.SUPABASE_URL || '') + '/functions/v1/api-gateway';
+
+    const sha256Hex = async (s) => {
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+      return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
+    };
+    const genKey = () => 'atl_live_' + Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    const render = async (justCreated) => {
+      const { data: keys } = await sb.from('api_keys').select('*').order('created_at', { ascending: false });
+      wrap.innerHTML = `
+        <h3 style="font-size:var(--text-base);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);margin-bottom:var(--space-3)">API keys</h3>
+        <div class="card" style="margin-bottom:var(--space-4)"><div class="card-body">
+          <div style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-3)">Let external tools read and write your data. Base URL: <code style="word-break:break-all">${esc(base)}/&lt;table&gt;</code> — send the key as <code>Authorization: Bearer atl_…</code>. Access is limited to what you can see.</div>
+          ${justCreated ? `<div style="padding:var(--space-3);background:var(--color-success-light);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
+            <div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-bottom:4px">Copy this key now — it won't be shown again.</div>
+            <code style="word-break:break-all;font-weight:var(--font-weight-medium)">${esc(justCreated)}</code>
+          </div>` : ''}
+          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="flex:2;min-width:180px;margin:0"><label class="form-label">Name</label><input class="form-input" id="ak-name" placeholder="e.g. Zapier"></div>
+            <div class="form-group" style="min-width:150px;margin:0"><label class="form-label">Access</label>
+              <select class="form-input" id="ak-scope"><option value="read">Read only</option><option value="write">Read &amp; write</option></select></div>
+            <button class="btn btn-primary" id="ak-add">Create key</button>
+          </div>
+        </div></div>
+        ${(keys || []).length ? `<div style="display:flex;flex-direction:column;gap:var(--space-2)">
+          ${(keys || []).map(k => `<div class="card"><div class="card-body" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="font-weight:var(--font-weight-medium)">${esc(k.name)} <code style="font-weight:400;color:var(--color-text-tertiary)">${esc(k.prefix)}…</code></div>
+              <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc((k.scopes || []).join(' + '))}${k.last_used_at ? ' · last used ' + new Date(k.last_used_at).toLocaleString() : ' · never used'}</div>
+            </div>
+            ${k.active ? '<span class="badge badge-success"><span class="badge-dot"></span>active</span>' : '<span class="badge badge-neutral">revoked</span>'}
+            ${k.active ? `<button class="btn btn-ghost btn-sm" data-revoke="${k.id}">Revoke</button>` : ''}
+          </div></div>`).join('')}
+        </div>` : ''}`;
+
+      wrap.querySelector('#ak-add').addEventListener('click', async () => {
+        const name = wrap.querySelector('#ak-name').value.trim();
+        if (!name) { toast('Name the key'); return; }
+        const scope = wrap.querySelector('#ak-scope').value;
+        const scopes = scope === 'write' ? ['read', 'write'] : ['read'];
+        const raw = genKey();
+        const { data: { user } } = await sb.auth.getUser();
+        const { error } = await sb.from('api_keys').insert({
+          org_id: org.id, name, prefix: raw.slice(0, 16), key_hash: await sha256Hex(raw),
+          acting_user_id: user?.id, created_by: user?.id, scopes,
+        });
+        if (error) { toast('Could not create: ' + error.message); return; }
+        render(raw);
+      });
+      wrap.querySelectorAll('[data-revoke]').forEach(b => b.addEventListener('click', async () => {
+        if (!confirm('Revoke this key? Any tool using it stops working immediately.')) return;
+        await sb.from('api_keys').update({ active: false, revoked_at: new Date().toISOString() }).eq('id', b.dataset.revoke);
+        render();
+      }));
+    };
+    render();
+  }
 
   async function mountWebhooks() {
     const wrap = document.createElement('div');
