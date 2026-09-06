@@ -144,19 +144,16 @@ const HANDLERS = {
       const year = new Date().getFullYear();
       const days = parseFloat(p.days) || 0;
       if (days > 0) {
-        const { data: bal } = await sb
-          .from('leave_balances')
-          .select('id, used')
-          .eq('user_id', p.user_id)
-          .eq('leave_type_id', p.leave_type_id)
-          .eq('year', year)
-          .single();
+        // Atomic in-DB increment (single UPDATE) so concurrent approvals can't
+        // double-count. Returns null when no balance row exists yet — seed one.
+        const { data: newUsed } = await sb.rpc('apply_leave_usage', {
+          p_user_id: p.user_id,
+          p_leave_type_id: p.leave_type_id,
+          p_year: year,
+          p_days: days,
+        });
 
-        if (bal) {
-          await sb.from('leave_balances').update({
-            used: (parseFloat(bal.used) || 0) + days
-          }).eq('id', bal.id);
-        } else {
+        if (newUsed == null) {
           await sb.from('leave_balances').insert({
             org_id: org.id,
             user_id: p.user_id,

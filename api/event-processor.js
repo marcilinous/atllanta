@@ -173,20 +173,14 @@ const recipes = {
       event.payload;
 
     const year = new Date().getFullYear();
-    const { data: balance } = await sb
-      .from("leave_balances")
-      .select("id, used")
-      .eq("user_id", user_id)
-      .eq("leave_type_id", leave_type_id)
-      .eq("year", year)
-      .maybeSingle();
-
-    if (balance) {
-      await sb
-        .from("leave_balances")
-        .update({ used: (parseFloat(balance.used) || 0) + parseFloat(days) })
-        .eq("id", balance.id);
-    }
+    // Atomic in-DB increment (single UPDATE) so concurrent approvals can't
+    // double-count the used-days counter.
+    await sb.rpc("apply_leave_usage", {
+      p_user_id: user_id,
+      p_leave_type_id: leave_type_id,
+      p_year: year,
+      p_days: parseFloat(days) || 0,
+    });
 
     const { data: leaveReq } = await sb
       .from("leave_requests")

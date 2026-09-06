@@ -382,15 +382,17 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
 
-        creditsRemaining -= 1;
-        creditsUsed += 1;
-        await db.from("organizations").update({ credits_balance: creditsRemaining }).eq("id", orgId);
-        await db.from("credit_ledger").insert({
-          organization_id: orgId,
-          action_type: "resume_match",
-          credits_delta: -1,
-          reference_id: app.id,
+        // Atomic per-item charge: row-locked decrement + ledger in one txn, so
+        // concurrent batches can't overspend or desync the ledger.
+        const { data: charge } = await db.rpc("consume_credits", {
+          p_org_id: orgId,
+          p_amount: 1,
+          p_action_type: "resume_match",
+          p_reference_id: app.id,
         });
+        creditsUsed += 1;
+        if (charge?.[0]?.credits_remaining != null) creditsRemaining = charge[0].credits_remaining;
+        else creditsRemaining -= 1;
 
         results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score, summary: parsed.summary });
       } catch (err) {
@@ -629,15 +631,15 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
     return res.status(500).json({ error: "Generated the questions but could not save them: " + saveErr.message });
   }
 
-  // Charge only after the guide is safely stored.
-  const creditsRemaining = (org?.credits_balance ?? 0) - 1;
-  await db.from("organizations").update({ credits_balance: creditsRemaining }).eq("id", orgId);
-  await db.from("credit_ledger").insert({
-    organization_id: orgId,
-    action_type: "interview_questions",
-    credits_delta: -1,
-    reference_id: app.id,
+  // Charge only after the guide is safely stored — atomically (row-locked
+  // decrement + ledger in one txn).
+  const { data: charge } = await db.rpc("consume_credits", {
+    p_org_id: orgId,
+    p_amount: 1,
+    p_action_type: "interview_questions",
+    p_reference_id: app.id,
   });
+  const creditsRemaining = charge?.[0]?.credits_remaining ?? ((org?.credits_balance ?? 0) - 1);
 
   return res.status(200).json({
     ...payload,
