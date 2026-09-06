@@ -3,25 +3,90 @@ import { logGroqGeneration } from "../lib/langfuse.js";
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
-// Whitelist of datasets the assistant may read. The query always runs through
-// the caller's RLS (supabaseAsUser), so results are automatically limited to
-// what that user is allowed to see — a member gets only their own rows, a
-// manager their team's, an admin the org's. The whitelist additionally stops
-// the LLM from reaching arbitrary tables/columns.
-const DATASETS = {
-  employees:     { table: "users",              filters: ["status", "role", "department_id"], select: "full_name,email,designation,status,role" },
-  attendance:    { table: "attendance",         filters: ["status", "date", "user_id"],       select: "user_id,date,status,total_hours" },
-  leave_requests:{ table: "leave_requests",     filters: ["status", "user_id"],               select: "user_id,start_date,end_date,days,status" },
-  jobs:          { table: "jobs",               filters: ["status", "employment_type"],       select: "title,status,location,employment_type" },
-  candidates:    { table: "candidates",         filters: ["source"],                          select: "full_name,email,source" },
-  interviews:    { table: "interviews",         filters: ["status"],                          select: "round_name,scheduled_at,status,rating" },
-  accounts:      { table: "crm_accounts",       filters: ["industry"],                        select: "name,industry,website,phone" },
-  contacts:      { table: "crm_contacts",       filters: ["account_id"],                      select: "first_name,last_name,email,title" },
-  leads:         { table: "crm_leads",          filters: ["status", "rating", "source"],      select: "first_name,last_name,company,status,rating" },
-  opportunities: { table: "crm_opportunities",  filters: ["status", "source"],                select: "name,amount,status,close_date,probability" },
-  expenses:      { table: "expenses",           filters: ["status"],                          select: "title,amount,status,expense_date" },
-  tickets:       { table: "helpdesk_tickets",   filters: ["status", "priority"],              select: "subject,status,priority" },
+// Typed registry of datasets the assistant may read. This is the security
+// boundary for the AI data path, in two layers:
+//   1. The query always runs through the caller's RLS (supabaseAsUser), so
+//      results are limited to what that user may see — a member gets their own
+//      rows, a manager their team's, an admin the org's. RLS is the authority,
+//      never the model.
+//   2. The model may only name a dataset KEY here (not an arbitrary table), and
+//      each dataset fixes its selected columns and declares each filter's
+//      column AND allowed values/type. A filter whose column isn't declared, or
+//      whose value fails its type, is dropped before the query runs — so a
+//      hallucinated or hostile filter can't reach the database.
+//
+// Filter spec per column: { enum: [...] } (value must match exactly),
+// { type: "uuid" | "date" } (format-checked), or { type: "text" } (trimmed,
+// length-capped). Nothing else is accepted.
+const S = {                              // shared enum sets
+  memberRole: ["owner", "admin", "manager", "member"],
 };
+const DATASETS = {
+  employees: {
+    table: "users", select: "full_name,email,designation,status,role",
+    filters: { status: { enum: ["active", "on_notice", "exited"] }, role: { enum: S.memberRole }, department_id: { type: "uuid" } },
+  },
+  attendance: {
+    table: "attendance", select: "user_id,date,status,total_hours",
+    filters: { status: { enum: ["present", "absent", "late", "on_leave", "holiday", "weekly_off"] }, date: { type: "date" }, user_id: { type: "uuid" } },
+  },
+  leave_requests: {
+    table: "leave_requests", select: "user_id,start_date,end_date,days,status",
+    filters: { status: { enum: ["pending", "approved", "rejected", "cancelled"] }, user_id: { type: "uuid" } },
+  },
+  jobs: {
+    table: "jobs", select: "title,status,location,employment_type",
+    filters: { status: { enum: ["draft", "open", "on_hold", "closed"] }, employment_type: { type: "text" } },
+  },
+  candidates: {
+    table: "candidates", select: "full_name,email,source",
+    filters: { source: { type: "text" } },
+  },
+  interviews: {
+    table: "interviews", select: "round_name,scheduled_at,status,rating",
+    filters: { status: { enum: ["scheduled", "completed", "cancelled", "no_show"] } },
+  },
+  accounts: {
+    table: "crm_accounts", select: "name,industry,website,phone",
+    filters: { industry: { type: "text" } },
+  },
+  contacts: {
+    table: "crm_contacts", select: "first_name,last_name,email,title",
+    filters: { account_id: { type: "uuid" } },
+  },
+  leads: {
+    table: "crm_leads", select: "first_name,last_name,company,status,rating",
+    filters: { status: { enum: ["new", "working", "qualified", "unqualified", "converted"] }, rating: { enum: ["hot", "warm", "cold"] }, source: { type: "text" } },
+  },
+  opportunities: {
+    table: "crm_opportunities", select: "name,amount,status,close_date,probability",
+    filters: { status: { enum: ["open", "won", "lost"] }, source: { type: "text" } },
+  },
+  expenses: {
+    table: "expenses", select: "title,amount,status,expense_date",
+    filters: { status: { enum: ["pending", "approved", "rejected", "reimbursed"] } },
+  },
+  tickets: {
+    table: "helpdesk_tickets", select: "subject,status,priority",
+    filters: { status: { enum: ["open", "in_progress", "resolved", "closed"] }, priority: { enum: ["Low", "Medium", "High", "Urgent"] } },
+  },
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Validate one model-proposed filter against its declared spec. Returns the
+// cleaned value to apply, or null to drop it.
+function cleanFilterValue(fspec, value) {
+  if (fspec == null || value == null) return null;
+  const v = String(value).trim();
+  if (!v) return null;
+  if (fspec.enum) return fspec.enum.includes(v) ? v : null;
+  if (fspec.type === "uuid") return UUID_RE.test(v) ? v : null;
+  if (fspec.type === "date") return DATE_RE.test(v) ? v : null;
+  if (fspec.type === "text") return v.length <= 100 ? v : v.slice(0, 100);
+  return null;
+}
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -139,8 +204,13 @@ If the question isn't about this data, reply with a short plain-text answer inst
 
   const spec = DATASETS[intent.dataset];
   let q = sb.from(spec.table).select(spec.select);
-  for (const [k, v] of Object.entries(intent.filters || {})) {
-    if (spec.filters.includes(k)) q = q.eq(k, v);
+  // Apply only declared filters whose value passes its declared type/enum —
+  // an undeclared column or an off-spec value is dropped, never sent to the DB.
+  const filters = intent.filters && typeof intent.filters === "object" ? intent.filters : {};
+  for (const [k, rawV] of Object.entries(filters)) {
+    const fspec = spec.filters[k];
+    const clean = cleanFilterValue(fspec, rawV);
+    if (clean !== null) q = q.eq(k, clean);
   }
   q = q.limit(50);
 
