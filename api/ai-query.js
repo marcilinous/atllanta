@@ -1,5 +1,6 @@
-import { supabaseAsUser, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { supabaseAsUser, supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
+import { rateLimit, tooMany } from "../lib/ratelimit.js";
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
@@ -129,6 +130,10 @@ export default async function handler(req, res) {
 
   const user = await getUserFromToken(token);
   if (!user?.id) return res.status(401).json({ error: "Invalid token" });
+
+  // Abuse control — each AI question is an LLM call.
+  const rl = await rateLimit(supabaseAdmin(), { key: `aiquery:user:${user.id}`, limit: 30, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
 
   const { query, mode, catalog } = req.body || {};
   if (!query) return res.status(400).json({ error: "query is required" });

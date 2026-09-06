@@ -14,6 +14,7 @@
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
+import { rateLimit, tooMany } from "../lib/ratelimit.js";
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
@@ -233,6 +234,11 @@ export default async function handler(req, res) {
   if (!user?.id) return res.status(401).json({ error: "Invalid or expired session — please log in again" });
 
   const db = supabaseAdmin();
+
+  // Abuse control on this AI/credit-spending endpoint (batch screening can fan
+  // out to many candidates, so keep the per-minute cap modest).
+  const rl = await rateLimit(db, { key: `screen:user:${user.id}`, limit: 20, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
 
   if (req.query?.action === "interview-questions") {
     return handleInterviewQuestions(req, res, db, user);

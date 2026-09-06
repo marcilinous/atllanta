@@ -14,6 +14,7 @@
 // arbitrary org-wide mail, and the admin gate excludes client_admin anyway.
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { rateLimit, tooMany } from "../lib/ratelimit.js";
 
 // How long a scheduling link stays valid once it is actually sent to someone.
 // Nothing set an expiry before this, so links lived forever.
@@ -40,6 +41,10 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ error: "Invalid token" });
 
   const sb = supabaseAdmin();
+
+  // Abuse control — this endpoint sends email / creates notifications.
+  const rl = await rateLimit(sb, { key: `notify:user:${user.id}`, limit: 30, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
 
   if (req.query?.action === "candidate-outreach") {
     return handleCandidateOutreach(req, res, sb, user);

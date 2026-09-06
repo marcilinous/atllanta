@@ -10,6 +10,7 @@
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 import { logGroqGeneration } from "../lib/langfuse.js";
+import { rateLimit, tooMany } from "../lib/ratelimit.js";
 
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
@@ -43,6 +44,10 @@ export default async function handler(req, res) {
 
   const user = await getUserFromToken(token);
   if (!user?.id) return res.status(401).json({ error: "Invalid session" });
+
+  // Abuse control on document parsing / AI extraction.
+  const rl = await rateLimit(supabaseAdmin(), { key: `parse:user:${user.id}`, limit: 30, windowSec: 60 });
+  if (!rl.allowed) return tooMany(res, rl.retryAfter);
 
   const action = req.query?.action;
   if (action === "parse-jd") return handleParseJD(req, res, user);

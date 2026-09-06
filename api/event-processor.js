@@ -788,7 +788,9 @@ export default async function handler(req, res) {
     const opportunities = await refreshOpportunityEngine(sb);
     const analyticsAlerts = await processAnalyticsAlerts(sb);
     const webhooks = await dispatchWebhooks(sb);
-    return res.status(200).json({ events, emails, opportunities, analyticsAlerts, webhooks });
+    // Housekeeping: drop rate-limit windows that rolled over long ago.
+    const { data: rlGc } = await sb.rpc("rate_limit_gc");
+    return res.status(200).json({ events, emails, opportunities, analyticsAlerts, webhooks, rate_limit_gc: rlGc ?? null });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
