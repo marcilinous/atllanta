@@ -173,14 +173,18 @@ const recipes = {
       event.payload;
 
     const year = new Date().getFullYear();
-    // Atomic in-DB increment (single UPDATE) so concurrent approvals can't
-    // double-count the used-days counter.
-    await sb.rpc("apply_leave_usage", {
-      p_user_id: user_id,
-      p_leave_type_id: leave_type_id,
-      p_year: year,
-      p_days: parseFloat(days) || 0,
-    });
+    // Atomic in-DB increment, applied at most once per event: claim_side_effect
+    // dedupes across retries and across the browser processor, so the used-days
+    // counter can't double-count.
+    const { data: firstTime } = await sb.rpc("claim_side_effect", { p_event_id: event.id, p_effect_key: "leave_used" });
+    if (firstTime) {
+      await sb.rpc("apply_leave_usage", {
+        p_user_id: user_id,
+        p_leave_type_id: leave_type_id,
+        p_year: year,
+        p_days: parseFloat(days) || 0,
+      });
+    }
 
     const { data: leaveReq } = await sb
       .from("leave_requests")
@@ -523,7 +527,7 @@ async function processBackstopEvents(sb) {
     // that grabbed it a moment ago wins and we skip it.
     const { data: claimed } = await sb
       .from("events")
-      .update({ status: "processing", attempts: event.attempts + 1 })
+      .update({ status: "processing", attempts: event.attempts + 1, locked_at: new Date().toISOString() })
       .eq("id", event.id)
       .eq("status", "pending")
       .select("id");
@@ -533,7 +537,7 @@ async function processBackstopEvents(sb) {
     if (!recipe) {
       await sb
         .from("events")
-        .update({ status: "completed", processed_at: new Date().toISOString() })
+        .update({ status: "completed", processed_at: new Date().toISOString(), locked_at: null })
         .eq("id", event.id);
       processed++;
       continue;
@@ -543,12 +547,17 @@ async function processBackstopEvents(sb) {
       await recipe(sb, event);
       await sb
         .from("events")
-        .update({ status: "completed", processed_at: new Date().toISOString() })
+        .update({ status: "completed", processed_at: new Date().toISOString(), locked_at: null })
         .eq("id", event.id);
       processed++;
     } catch (err) {
-      const newStatus = event.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
-      await sb.from("events").update({ status: newStatus }).eq("id", event.id);
+      const isFailed = event.attempts + 1 >= MAX_ATTEMPTS;
+      await sb.from("events").update({
+        status: isFailed ? "failed" : "pending",
+        locked_at: null,
+        last_error: String(err?.message || err).slice(0, 500),
+        failed_at: isFailed ? new Date().toISOString() : null,
+      }).eq("id", event.id);
       failed++;
     }
   }
@@ -783,6 +792,10 @@ export default async function handler(req, res) {
   const sb = supabaseAdmin();
 
   try {
+    // Rescue events stranded in 'processing' by a dead worker, and dead-letter
+    // any that have burned through their attempts, before draining the queue.
+    const { data: staleRows } = await sb.rpc("requeue_stale_events", { p_lease_seconds: 600, p_max_attempts: MAX_ATTEMPTS });
+    const stale = staleRows?.[0] || null;
     const events = await processBackstopEvents(sb);
     const emails = await dispatchEmails(sb);
     const opportunities = await refreshOpportunityEngine(sb);
@@ -790,7 +803,7 @@ export default async function handler(req, res) {
     const webhooks = await dispatchWebhooks(sb);
     // Housekeeping: drop rate-limit windows that rolled over long ago.
     const { data: rlGc } = await sb.rpc("rate_limit_gc");
-    return res.status(200).json({ events, emails, opportunities, analyticsAlerts, webhooks, rate_limit_gc: rlGc ?? null });
+    return res.status(200).json({ events, emails, opportunities, analyticsAlerts, webhooks, stale, rate_limit_gc: rlGc ?? null });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
