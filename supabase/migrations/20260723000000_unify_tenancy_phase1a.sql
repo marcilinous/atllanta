@@ -19,13 +19,15 @@
 -- ============================================================
 
 -- The single source of truth: the caller's one org.
+-- search_path pinned empty + schema-qualified table (SECURITY DEFINER hardening).
 create or replace function auth_org_id()
 returns uuid
 language sql
 security definer
 stable
+set search_path = ''
 as $$
-  select org_id from users where id = auth.uid()
+  select org_id from public.users where id = auth.uid()
 $$;
 
 -- Re-point the existing HR/People helper at users.org_id instead of memberships.
@@ -37,8 +39,9 @@ returns setof uuid
 language sql
 security definer
 stable
+set search_path = ''
 as $$
-  select org_id from users where id = auth.uid()
+  select org_id from public.users where id = auth.uid()
 $$;
 
 -- ============================================================
