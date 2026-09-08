@@ -337,17 +337,29 @@ This file is the target. The code is being brought onto it in phases (full detai
 in the approved plan `enchanted-sleeping-lemon.md`):
 
 - **Phase 0 (this file)** — canonical definition + requirements. ✅
-- **Phase 1** — unify tenancy: migrate recruitment tables `client_id → org_id`;
-  fold `memberships` into `users`; drop `clients`; replace
-  `auth_accessible_client_ids()` + `auth_user_org_ids()` with one `auth_org_id()`;
-  delete the `roleMap` shim (`js/auth.js:29`); standardize `organization_id → org_id`.
-- **Phase 2** — enforce module boundaries; add password-reset flow.
-- **Phase 3** — design-system cleanup (inline-style removal, SVG icons, dedupe
-  `index.html` helpers against `js/ui.js`).
-- **Phase 4** — build CRM. **Phase 5** — build Analytics as a real module.
+- **Phase 1** — unify tenancy: recruitment tables migrated `client_id → org_id`;
+  `memberships` folded into `users`; `clients` dropped;
+  `auth_accessible_client_ids()` removed; the `roleMap` shim deleted;
+  `invitations` canonicalized to `org_id`. ✅ Credits/`credit_ledger` kept
+  (org-scoped). Org resolution consolidated: `auth_org_id()` is the single
+  source of truth and `auth_user_org_ids()` now delegates to it. ✅
+- **Phase 2** — password-reset flow added (`login.html` + `PASSWORD_RECOVERY`
+  in `js/auth.js`). ✅ Module-boundary enforcement is folded into Phases 4/5
+  (the two remaining direct cross-module reads — the AI assistant's RLS-scoped
+  queries per §11, and `views/reports/*` — resolve as Analytics is built).
+- **Phase 3** — design-system cleanup: reference palette + per-module accents,
+  SVG icons (no emoji), festival banner revised, inline-style unwind. ✅
+- **Phase 4** — CRM: **backend exists ahead of this doc.** The live DB carries
+  `crm_accounts/contacts/leads/opportunities/pipeline_stages/activities` plus a
+  field-sales layer (`crm_visits/calls`, `crm_pjp_*` journey plans,
+  `crm_report_imports/rows`) and `crm_*` RPCs — but **no frontend** (`views/crm/`
+  is unbuilt; the router has a `crm` stub). This schema diverges from §6.4's
+  proposal (opportunities vs deals; PJP/visits not in the doc). Reconcile §6.4
+  with the real schema before building the CRM UI.
+- **Phase 5** — build Analytics as a real module (retire `views/reports/*`).
 
-Until Phase 1 lands, recruitment code still queries `client_id`/`memberships`.
-Do not extend that model; new work targets `org_id`.
+Tenancy is unified: `org_id` is the only tenant key. Do not reintroduce
+`client_id`/`memberships`; new work targets `org_id`.
 
 ---
 
