@@ -20,7 +20,7 @@
 
 .btn-primary {
   background: var(--color-accent);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
 .btn-primary:hover { background: var(--color-accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -39,9 +39,9 @@
 
 .btn-danger {
   background: var(--color-error);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
-.btn-danger:hover { background: #B91C1C; }
+.btn-danger:hover { filter: brightness(0.94); }
 
 .btn-sm { height: 30px; padding: var(--space-1) var(--space-3); font-size: var(--text-xs); }
 .btn-lg { height: 42px; padding: var(--space-3) var(--space-6); font-size: var(--text-base); }

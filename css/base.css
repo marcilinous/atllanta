@@ -34,16 +34,10 @@ img { max-width: 100%; display: block; }
 }
 
 h1, h2, h3, h4 {
-  font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
-  letter-spacing: -0.01em;
   color: var(--color-text-primary);
 }
-
-/* Display-face utilities: headings, section titles, and numbers that carry
-   weight (KPIs, match scores). See DESIGN.md §3 — not for body text. */
-.font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
 
 h1 { font-size: var(--text-2xl); }
 h2 { font-size: var(--text-xl); }

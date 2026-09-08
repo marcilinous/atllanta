@@ -1,31 +1,41 @@
 :root {
-  --color-bg: #FFFFFF;
-  --color-bg-secondary: #F6F6F4;
-  --color-bg-tertiary: #ECECE8;
+  /* ===== Base palette — Professional Blue (light) ===== */
+  --color-bg: #F8FAFC;
+  --color-bg-secondary: #F1F5F9;
+  --color-bg-tertiary: #E7ECF2;
   --color-surface: #FFFFFF;
-  --color-border: #E4E4DE;
-  --color-border-light: #F0F0EC;
+  --color-border: #E2E8F0;
+  --color-border-light: #EEF1F6;
 
-  --color-text-primary: #191A17;
-  --color-text-secondary: #6A6C66;
-  --color-text-tertiary: #9A9C95;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #64748B;
   --color-text-inverse: #FFFFFF;
 
-  --color-accent: #4F46E5;
-  --color-accent-hover: #4338CA;
-  --color-accent-light: #EEF0FF;
+  /* Text color to place ON an accent surface (primary buttons, logo).
+     Light theme accents are dark → white; dark theme flips it (see below). */
+  --color-on-accent: #FFFFFF;
 
-  --color-success: #15803D;
-  --color-success-light: #EEF9F1;
-  --color-warning: #B45309;
-  --color-warning-light: #FBF3E7;
-  --color-error: #B91C1C;
-  --color-error-light: #FBECEC;
-  --color-info: #4F46E5;
-  --color-info-light: #EEF0FF;
+  /* ===== Module accent palette (light) — each AA-safe for white text
+     and as link text on white. Blue base (Palette 1) + green (Palette 2). ===== */
+  --accent-brand: #1E3A8A;      --accent-brand-hover: #172E6B;      --accent-brand-light: #E8EDF9;
+  --accent-people: #047857;     --accent-people-hover: #036349;     --accent-people-light: #E6F4EF;
+  --accent-crm: #2563EB;        --accent-crm-hover: #1D4FD8;        --accent-crm-light: #E9F0FE;
+  --accent-analytics: #475569;  --accent-analytics-hover: #3B475C;  --accent-analytics-light: #EEF1F5;
 
+  /* Active accent — defaults to brand; [data-module] overrides it per module. */
+  --color-accent: var(--accent-brand);
+  --color-accent-hover: var(--accent-brand-hover);
+  --color-accent-light: var(--accent-brand-light);
+
+  /* ===== Semantic ===== */
+  --color-success: #15803D;  --color-success-light: #ECFDF3;
+  --color-warning: #B45309;  --color-warning-light: #FEF6E7;
+  --color-error: #B91C1C;    --color-error-light: #FEF0F0;
+  --color-info: #1E3A8A;     --color-info-light: #E8EDF9;
+
+  /* ===== Type — Inter only (reference: "Inter or similar") ===== */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: 'Space Grotesk', 'Inter', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   --text-xs: 0.75rem;
@@ -46,6 +56,7 @@
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.625;
 
+  /* ===== Spacing (4px base, 8px rhythm) ===== */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -63,9 +74,10 @@
   --radius-xl: 14px;
   --radius-full: 9999px;
 
-  --shadow-sm: 0 1px 2px rgba(20,20,15,0.05);
-  --shadow-md: 0 4px 12px -2px rgba(20,20,15,0.08);
-  --shadow-lg: 0 12px 28px -6px rgba(20,20,15,0.12);
+  /* soft, subtle shadows (reference: subtle borders + soft shadows) */
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.05);
+  --shadow-md: 0 4px 12px -2px rgba(15,23,42,0.08);
+  --shadow-lg: 0 12px 28px -6px rgba(15,23,42,0.12);
 
   --sidebar-width: 64px;
   --topbar-height: 56px;
@@ -74,58 +86,62 @@
   --transition-normal: 200ms ease;
 }
 
+/* ===== Dark theme — Deep navy ground; accents lightened so they stay
+   visible on the dark bg (which is why on-accent text flips to near-black) ===== */
 [data-theme="dark"] {
-  --color-bg: #0E0F13;
-  --color-bg-secondary: #16181E;
-  --color-bg-tertiary: #20232B;
-  --color-surface: #16181E;
-  --color-border: #2A2E38;
-  --color-border-light: #20232B;
+  --color-bg: #0B1020;
+  --color-bg-secondary: #121A2E;
+  --color-bg-tertiary: #1C2540;
+  --color-surface: #121A2E;
+  --color-border: #263149;
+  --color-border-light: #1C2540;
 
-  --color-text-primary: #EDEEF0;
-  --color-text-secondary: #9DA0AA;
-  --color-text-tertiary: #6B6F7A;
+  --color-text-primary: #E2E8F0;
+  --color-text-secondary: #94A3B8;
+  --color-text-tertiary: #64748B;
 
-  --color-accent: #7C7BFF;
-  --color-accent-hover: #9E9DFF;
-  --color-accent-light: #20213A;
+  --color-on-accent: #0B1020;
 
-  --color-success: #4ADE80;
-  --color-success-light: #0E2A1A;
-  --color-warning: #FBBF24;
-  --color-warning-light: #2E2410;
-  --color-error: #F87171;
-  --color-error-light: #2E1515;
-  --color-info: #7C7BFF;
-  --color-info-light: #20213A;
+  --accent-brand: #3B82F6;      --accent-brand-hover: #60A5FA;      --accent-brand-light: #17233F;
+  --accent-people: #10B981;     --accent-people-hover: #34D399;     --accent-people-light: #0E2A20;
+  --accent-crm: #38BDF8;        --accent-crm-hover: #7DD3FC;        --accent-crm-light: #10283A;
+  --accent-analytics: #94A3B8;  --accent-analytics-hover: #CBD5E1;  --accent-analytics-light: #1E2633;
+
+  --color-accent: var(--accent-brand);
+  --color-accent-hover: var(--accent-brand-hover);
+  --color-accent-light: var(--accent-brand-light);
+
+  --color-success: #34D399;  --color-success-light: #0E2A20;
+  --color-warning: #FBBF24;  --color-warning-light: #2E2410;
+  --color-error: #F87171;    --color-error-light: #2E1515;
+  --color-info: #3B82F6;     --color-info-light: #17233F;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 12px -2px rgba(0,0,0,0.5);
   --shadow-lg: 0 12px 28px -6px rgba(0,0,0,0.6);
 }
 
-[data-theme="light"] {
-  --color-bg: #FFFFFF;
-  --color-bg-secondary: #F6F6F4;
-  --color-bg-tertiary: #ECECE8;
-  --color-surface: #FFFFFF;
-  --color-border: #E4E4DE;
-  --color-border-light: #F0F0EC;
-  --color-text-primary: #191A17;
-  --color-text-secondary: #6A6C66;
-  --color-text-tertiary: #9A9C95;
-  --color-accent: #4F46E5;
-  --color-accent-hover: #4338CA;
-  --color-accent-light: #EEF0FF;
-  --color-success: #15803D;
-  --color-success-light: #EEF9F1;
-  --color-warning: #B45309;
-  --color-warning-light: #FBF3E7;
-  --color-error: #B91C1C;
-  --color-error-light: #FBECEC;
-  --color-info: #4F46E5;
-  --color-info-light: #EEF0FF;
-  --shadow-sm: 0 1px 2px rgba(20,20,15,0.05);
-  --shadow-md: 0 4px 12px -2px rgba(20,20,15,0.08);
-  --shadow-lg: 0 12px 28px -6px rgba(20,20,15,0.12);
+/* ===== Per-module accent switch — set by js/router.js on <html data-module>.
+   Theme-agnostic: references the --accent-* vars, which each theme redefines.
+   Placed last so it wins over the theme block's default --color-accent. ===== */
+[data-module="default"],
+[data-module="recruitment"] {
+  --color-accent: var(--accent-brand);
+  --color-accent-hover: var(--accent-brand-hover);
+  --color-accent-light: var(--accent-brand-light);
+}
+[data-module="people"] {
+  --color-accent: var(--accent-people);
+  --color-accent-hover: var(--accent-people-hover);
+  --color-accent-light: var(--accent-people-light);
+}
+[data-module="crm"] {
+  --color-accent: var(--accent-crm);
+  --color-accent-hover: var(--accent-crm-hover);
+  --color-accent-light: var(--accent-crm-light);
+}
+[data-module="analytics"] {
+  --color-accent: var(--accent-analytics);
+  --color-accent-hover: var(--accent-analytics-hover);
+  --color-accent-light: var(--accent-analytics-light);
 }

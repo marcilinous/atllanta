@@ -23,60 +23,78 @@ just enough personality that a dashboard doesn't read like a stock admin templat
 
 ## 2. Color tokens
 
-Defined in `css/tokens.css` on `:root`, overridden under `[data-theme="dark"]`.
+Base palette is **Professional Blue** on cool slate neutrals. Defined in
+`css/tokens.css` on `:root`, overridden under `[data-theme="dark"]`.
 **Reference tokens, never raw hex, in views and components.**
 
 ### Light (`:root`)
 | Token | Value | Use |
 |---|---|---|
-| `--color-bg` | `#FFFFFF` | app background |
-| `--color-bg-secondary` | `#F6F6F4` | canvas behind cards (warmed neutral) |
-| `--color-bg-tertiary` | `#ECECE8` | tracks, inset fills |
+| `--color-bg` | `#F8FAFC` | app background |
+| `--color-bg-secondary` | `#F1F5F9` | canvas / inset panels |
+| `--color-bg-tertiary` | `#E7ECF2` | tracks, hover fills |
 | `--color-surface` | `#FFFFFF` | cards, sidebar, topbar |
-| `--color-border` | `#E4E4DE` | card/input borders |
-| `--color-border-light` | `#F0F0EC` | table row dividers |
-| `--color-text-primary` | `#191A17` | headings, body |
-| `--color-text-secondary` | `#6A6C66` | subtitles, labels |
-| `--color-text-tertiary` | `#9A9C95` | meta, placeholders |
-| `--color-accent` | `#4F46E5` | primary actions, active nav, links |
-| `--color-accent-hover` | `#4338CA` | accent hover |
-| `--color-accent-light` | `#EEF0FF` | accent tint (active nav bg, focus ring) |
-| `--color-success` / `-light` | `#15803D` / `#EEF9F1` | positive states |
-| `--color-warning` / `-light` | `#B45309` / `#FBF3E7` | attention states |
-| `--color-error` / `-light` | `#B91C1C` / `#FBECEC` | destructive/error |
+| `--color-border` | `#E2E8F0` | card/input borders |
+| `--color-border-light` | `#EEF1F6` | table row dividers |
+| `--color-text-primary` | `#0F172A` | headings, body |
+| `--color-text-secondary` | `#475569` | subtitles, labels |
+| `--color-text-tertiary` | `#64748B` | meta, placeholders |
+| `--color-accent` | *per module* (default `#1E3A8A`) | primary actions, active nav, links |
+| `--color-on-accent` | `#FFFFFF` | text/icon **on** an accent fill (buttons, logo) |
+| `--color-success` / `-light` | `#15803D` / `#ECFDF3` | positive states |
+| `--color-warning` / `-light` | `#B45309` / `#FEF6E7` | attention states |
+| `--color-error` / `-light` | `#B91C1C` / `#FEF0F0` | destructive/error |
 
 ### Dark (`[data-theme="dark"]`)
 | Token | Value |
 |---|---|
-| `--color-bg` | `#0E0F13` |
-| `--color-bg-secondary` | `#16181E` |
-| `--color-bg-tertiary` | `#20232B` |
-| `--color-surface` | `#16181E` |
-| `--color-border` | `#2A2E38` |
-| `--color-text-primary` | `#EDEEF0` |
-| `--color-accent` | `#7C7BFF` (lightened so it holds contrast on dark) |
-| `--color-accent-light` | `#20213A` |
+| `--color-bg` | `#0B1020` |
+| `--color-bg-secondary` | `#121A2E` |
+| `--color-surface` | `#121A2E` |
+| `--color-border` | `#263149` |
+| `--color-text-primary` | `#E2E8F0` |
+| `--color-on-accent` | `#0B1020` (accents lighten on dark, so on-accent text flips to near-black) |
 
 **Rule:** every color has its light definition on bare `:root`; dark only
-*overrides*. Never define a color solely inside the dark block.
+*overrides*. Never define a color solely inside the dark block. Never put text
+directly on an accent fill with `--color-text-inverse`; use `--color-on-accent`,
+which flips per theme so button labels always pass contrast.
 
-**Why indigo, not `#2563EB`:** the old accent was the single most generic
-SaaS-dashboard blue. Indigo reads more premium while staying trustworthy for
-business software.
+---
+
+## 2a. Module accents (color that means "which module you're in")
+
+Atllanta recolors **only the accent** based on the active module — neutrals never
+move. `js/router.js` sets `data-module` on `<html>` per route; `tokens.css` maps
+each module to its accent via `[data-module="…"]`. Every element already using
+`var(--color-accent)` recolors automatically.
+
+| Module | Light accent | Dark accent | Routes |
+|---|---|---|---|
+| Platform / default | `#1E3A8A` | `#3B82F6` | dashboard, inbox, settings, admin |
+| Recruitment | `#1E3A8A` | `#3B82F6` | `recruitment/*` |
+| People / HRMS | `#047857` (green) | `#10B981` | employees, people, attendance, leave, assets, documents, finance, helpdesk, me |
+| CRM | `#2563EB` | `#38BDF8` | `crm/*` |
+| Analytics | `#475569` (slate) | `#94A3B8` | `reports/*` |
+
+Each accent has `-hover` and `-light` (tint for active-nav bg / focus ring).
+**Color is never the only signal:** the module is always also named by the nav
+label + icon, per WCAG 2.2 AA (color-blind safe). Light accents are all AA for
+white text and as link text on white; dark accents are lightened for visibility on
+the dark ground, which is why on-accent text flips to near-black.
 
 ---
 
 ## 3. Typography
 
-Two faces, loaded once via Google Fonts in `index.html` / `login.html`.
+**Inter only**, loaded once via Google Fonts in `index.html` / `login.html`
+(reference spec: "Inter or similar — clean, modern, highly readable"). No display
+face; hierarchy comes from scale + weight + space, not a second font.
 
 | Token | Stack | Used for |
 |---|---|---|
-| `--font-sans` | `'Inter', -apple-system, BlinkMacSystemFont, sans-serif` | all UI, body, labels, tables |
-| `--font-display` | `'Space Grotesk', 'Inter', sans-serif` | page/section headings, big metric numbers, the logo mark |
-
-**Rule:** display face is for *headings and numbers that carry weight* (KPIs,
-match scores) — not body text. It creates the personality; overusing it kills it.
+| `--font-sans` | `'Inter', -apple-system, BlinkMacSystemFont, sans-serif` | everything |
+| `--font-mono` | `'JetBrains Mono', 'Fira Code', monospace` | code / ids |
 
 ### Scale (`--text-*`, rem)
 `xs .75` · `sm .8125` · `base .875` (default UI) · `md 1` · `lg 1.125` ·
@@ -113,11 +131,11 @@ Live in `css/components.css`. Canonical set: `button` (primary/secondary/ghost),
 - **Badges/pills:** calm, low-saturation — semantic tint bg + matching text +
   a 6px dot. Statuses map through `stagePill()`/`badge-*` in `js/ui.js`.
 - **Cards:** surface + `--color-border` + radius `lg`; header row with a
-  `--font-display` title; body padding `--space-4`.
+  `semibold` title; body padding `--space-4`.
 - **Tables:** uppercase `xs` tertiary headers, `--border-light` row dividers,
   dense rows (`--space-2/-3` padding). No zebra stripes.
-- **Metrics:** label in `xs` uppercase tertiary; value in `--font-display` bold,
-  `~2xl`; delta in success/error with a ▲/▼.
+- **Metrics:** label in `xs` uppercase tertiary; value in `bold ~2xl`; delta as
+  plain `+3 / −2` in success/error (no triangles).
 
 Reuse ladder before writing UI: a `js/ui.js` helper (`esc, toast, openModal,
 formatDate, timeAgo, initials, avColor, scoreBar, stagePill, showError,

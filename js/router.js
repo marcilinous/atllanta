@@ -38,9 +38,26 @@ async function handleRoute() {
   }
 
   currentView = path;
+  document.documentElement.dataset.module = moduleForRoute(path);
   contentEl.innerHTML = '';
   await handler(contentEl);
   updateActiveNav(path);
+}
+
+// Map a route to its business module so the accent recolors per module.
+// Accent-only theming: neutrals stay constant (see DESIGN.md).
+const MODULE_BY_BASE = {
+  recruitment: 'recruitment',
+  reports: 'analytics',
+  crm: 'crm',
+  employees: 'people', people: 'people', attendance: 'people', leave: 'people',
+  lifecycle: 'people', assets: 'people', letters: 'people', documents: 'people',
+  helpdesk: 'people', finance: 'people', announcements: 'people',
+  onboarding: 'people', me: 'people',
+};
+
+function moduleForRoute(path) {
+  return MODULE_BY_BASE[path.split('/')[0]] || 'default';
 }
 
 function updateActiveNav(path) {
