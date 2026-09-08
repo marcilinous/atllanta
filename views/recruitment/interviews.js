@@ -11,7 +11,7 @@ export default async function interviewsView(container) {
     container.innerHTML = '<div class="empty-state"><div class="empty-state-title">No organization found</div></div>';
     return;
   }
-  const orgCol = org ? 'org_id' : 'client_id';
+  const orgCol = 'org_id';
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
@@ -47,7 +47,7 @@ export default async function interviewsView(container) {
     sb.from('jobs').select('*').eq(orgCol, cid),
     sb.from('candidates').select('*').eq(orgCol, cid),
     sb.from('job_applications').select('*').in('status', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
-    sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org?.id || cid),
+    sb.from('users').select('user_id:id, full_name, email, role').eq('org_id', org?.id || cid),
   ]);
   if (jobsErr) toast('Failed to load jobs: ' + jobsErr.message);
   if (candsErr) toast('Failed to load candidates: ' + candsErr.message);

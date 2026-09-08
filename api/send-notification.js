@@ -22,17 +22,17 @@ export default async function handler(req, res) {
 
   const sb = supabaseAdmin();
   const { data: membership } = await sb
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
+    .from("users")
+    .select("org_id, role")
+    .eq("id", user.id)
     .limit(1)
     .single();
 
-  if (!membership?.organization_id) {
+  if (!membership?.org_id) {
     return res.status(403).json({ error: "No organization found" });
   }
 
-  const isAdmin = ["owner", "admin", "super_admin", "agency_admin"].includes(membership.role);
+  const isAdmin = ["owner", "admin"].includes(membership.role);
   if (!isAdmin) return res.status(403).json({ error: "Admin access required" });
 
   const { to, subject, body, channel, user_id, module, entity_type, entity_id } = req.body || {};
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
     if (!user_id || !subject) return res.status(400).json({ error: "user_id and subject required" });
 
     const { error } = await sb.from("notifications").insert({
-      org_id: membership.organization_id,
+      org_id: membership.org_id,
       user_id,
       title: subject,
       body: body || null,

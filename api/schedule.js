@@ -28,16 +28,13 @@ export default async function handler(req, res) {
     }
 
     const [{ data: job }, { data: cand }] = await Promise.all([
-      db.from("jobs").select("id, title, client_id, hiring_manager_id").eq("id", app.job_id).single(),
+      db.from("jobs").select("id, title, org_id, hiring_manager_id").eq("id", app.job_id).single(),
       db.from("candidates").select("full_name, name").eq("id", app.candidate_id).single(),
     ]);
     if (!job) return res.status(404).json({ error: "Job not found" });
 
-    const { data: client } = await db
-      .from("clients").select("organization_id, name").eq("id", job.client_id).single();
-
-    const { data: org } = client
-      ? await db.from("organizations").select("full_name, name").eq("id", client.organization_id).single()
+    const { data: org } = job.org_id
+      ? await db.from("organizations").select("full_name, name").eq("id", job.org_id).single()
       : { data: null };
 
     if (app.interview_at) {
@@ -46,7 +43,7 @@ export default async function handler(req, res) {
         interview_at: app.interview_at,
         meet_link: app.meet_link || null,
         job_title: job.title,
-        org_name: org?.name || client?.name || "",
+        org_name: org?.name || "",
         candidate_name: cand?.full_name || cand?.name || "",
       });
     }
@@ -64,7 +61,7 @@ export default async function handler(req, res) {
     return res.json({
       booked: false,
       job_title: job.title,
-      org_name: org?.name || client?.name || "",
+      org_name: org?.name || "",
       candidate_name: cand?.full_name || cand?.name || "",
       slots: slots || [],
       expires_at: expiresAt,
@@ -106,7 +103,7 @@ export default async function handler(req, res) {
 
     // Fetch candidate, job, org info for the calendar event
     const [{ data: job }, { data: cand }] = await Promise.all([
-      db.from("jobs").select("title, client_id").eq("id", app.job_id).single(),
+      db.from("jobs").select("title, org_id").eq("id", app.job_id).single(),
       db.from("candidates").select("full_name, name, email").eq("id", app.candidate_id).single(),
     ]);
 

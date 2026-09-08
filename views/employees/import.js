@@ -194,13 +194,13 @@ export default async function employeeImport(container) {
 
       const role = validRoles.includes(row.role) ? row.role : 'member';
 
-      const { error } = await sb.from('memberships').insert({
-        organization_id: org.id,
+      const { error } = await sb.from('invitations').insert({
+        org_id: org.id,
         full_name: row.full_name,
         email: row.email,
         phone: row.phone || null,
         role,
-        invited_at: new Date().toISOString(),
+        status: 'pending',
       });
 
       if (error) {

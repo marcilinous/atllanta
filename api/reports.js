@@ -22,13 +22,13 @@ export default async function handler(req, res) {
 
   const sb = supabaseAdmin();
   const { data: membership } = await sb
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
+    .from("users")
+    .select("org_id, role")
+    .eq("id", user.id)
     .limit(1)
     .single();
 
-  if (!membership?.organization_id) {
+  if (!membership?.org_id) {
     return res.status(403).json({ error: "No organization found" });
   }
 

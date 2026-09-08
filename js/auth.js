@@ -17,25 +17,29 @@ export async function checkSession() {
 export async function loadUserProfile() {
   if (!currentUser) return null;
 
-  const { data: membership } = await sb
-    .from('memberships')
+  // Single canonical identity row: users(id, org_id, role, ...). One org per user.
+  const { data: profile } = await sb
+    .from('users')
     .select('*')
-    .eq('user_id', currentUser.id)
-    .order('created_at')
-    .limit(1)
+    .eq('id', currentUser.id)
     .single();
 
-  if (membership) {
-    const roleMap = { super_admin: 'owner', agency_admin: 'admin', client_admin: 'admin', client_member: 'member' };
-    membership.role = roleMap[membership.role] || membership.role;
-  }
-  currentMembership = membership;
+  // Membership-shaped for existing consumers (getMembership().organization_id/.role/.full_name).
+  currentMembership = profile
+    ? {
+        user_id: profile.id,
+        organization_id: profile.org_id,
+        role: profile.role,
+        full_name: profile.full_name,
+        email: profile.email,
+      }
+    : null;
 
-  if (membership) {
+  if (profile?.org_id) {
     const { data: org } = await sb
       .from('organizations')
       .select('*')
-      .eq('id', membership.organization_id)
+      .eq('id', profile.org_id)
       .single();
     currentOrg = org;
   }

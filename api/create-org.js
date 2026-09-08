@@ -1,10 +1,5 @@
-// Org & team administration endpoint
-//
-// POST  { type: "agency", name, admin_email }    — create agency (super_admin)
-// POST  { type: "client", name, admin_email }    — onboard client (agency_admin)
-// POST  { action: "invite", email, role, ... }   — invite member
-// GET   ?action=team[&org_id=&client_id=]        — list team members
-// GET   ?action=orgs                             — list orgs + clients hierarchy
+// Team administration endpoint (single-org model).
+// POST { action: "invite", email, role, full_name? } — owner/admin invites a member.
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 
@@ -53,159 +48,56 @@ export default async function handler(req, res) {
   const db = supabaseAdmin();
   const action = req.query?.action || req.body?.action;
 
-  if (req.method === "GET" && action === "team") return handleTeam(req, res, db, user);
-  if (req.method === "GET" && action === "orgs") return handleOrgs(req, res, db, user);
   if (req.method === "POST" && action === "invite") return handleInvite(req, res, db, user);
-  if (req.method === "POST") return handleCreateOrg(req, res, db, user);
 
   return res.status(400).json({ error: "Invalid action" });
 }
 
-// --- Create agency / onboard client ---
-
-async function handleCreateOrg(req, res, db, user) {
-  const { data: membership } = await db
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .in("role", ["super_admin", "agency_admin"])
-    .single();
-
-  if (!membership) return res.status(403).json({ error: "Insufficient permissions" });
-
-  const { type, name, admin_email } = req.body || {};
-  if (!name?.trim()) return res.status(400).json({ error: "Organization name is required" });
-  if (!admin_email?.trim()) return res.status(400).json({ error: "Admin email is required" });
-
-  const email = admin_email.trim().toLowerCase();
-
-  if (type === "agency") {
-    if (membership.role !== "super_admin") {
-      return res.status(403).json({ error: "Only super admins can create agencies" });
-    }
-
-    const { data: newOrg, error: orgErr } = await db
-      .from("organizations")
-      .insert({ name: name.trim(), org_type: "agency", plan_tier: "agency_partner" })
-      .select()
-      .single();
-
-    if (orgErr) return res.status(500).json({ error: orgErr.message });
-
-    const adminUser = await findOrCreateUser(db, email);
-    if (adminUser.error) return res.status(500).json({ error: adminUser.error });
-
-    await db.from("memberships").insert({
-      user_id: adminUser.id,
-      organization_id: newOrg.id,
-      role: "agency_admin",
-    });
-
-    return res.json({
-      created: true,
-      org_id: newOrg.id,
-      org_name: name.trim(),
-      admin_email: email,
-      new_account: adminUser.new_account,
-      temp_password: adminUser.temp_password || null,
-    });
-  }
-
-  if (type === "client") {
-    if (membership.role !== "agency_admin") {
-      return res.status(403).json({ error: "Only agency admins can onboard clients" });
-    }
-
-    const { data: org } = await db
-      .from("organizations")
-      .select("org_type")
-      .eq("id", membership.organization_id)
-      .single();
-
-    if (org?.org_type !== "agency") {
-      return res.status(403).json({ error: "Client onboarding is only for agency organizations" });
-    }
-
-    const { data: newClient, error: clientErr } = await db
-      .from("clients")
-      .insert({
-        organization_id: membership.organization_id,
-        name: name.trim(),
-        is_self: false,
-      })
-      .select()
-      .single();
-
-    if (clientErr) return res.status(500).json({ error: clientErr.message });
-
-    const adminUser = await findOrCreateUser(db, email);
-    if (adminUser.error) return res.status(500).json({ error: adminUser.error });
-
-    await db.from("memberships").insert({
-      user_id: adminUser.id,
-      organization_id: membership.organization_id,
-      role: "client_admin",
-      client_id: newClient.id,
-    });
-
-    return res.json({
-      created: true,
-      client_id: newClient.id,
-      client_name: name.trim(),
-      admin_email: email,
-      new_account: adminUser.new_account,
-      temp_password: adminUser.temp_password || null,
-    });
-  }
-
-  return res.status(400).json({ error: "type must be 'agency' or 'client'" });
-}
-
-// --- Invite member ---
+// --- Invite a member into the caller's org ---
 
 async function handleInvite(req, res, db, user) {
-  const { data: membership } = await db
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .in("role", ["owner", "admin", "super_admin", "agency_admin"])
+  const { data: me } = await db
+    .from("users")
+    .select("org_id, role")
+    .eq("id", user.id)
     .single();
 
-  if (!membership) return res.status(403).json({ error: "Insufficient permissions" });
+  if (!me?.org_id || !["owner", "admin"].includes(me.role)) {
+    return res.status(403).json({ error: "Insufficient permissions" });
+  }
 
-  const { email: rawEmail, role, full_name, client_id } = req.body || {};
+  const { email: rawEmail, role, full_name } = req.body || {};
   if (!rawEmail?.trim()) return res.status(400).json({ error: "Email is required" });
 
   const allowedRoles = ["owner", "admin", "manager", "member"];
-  if (!allowedRoles.includes(role)) {
-    return res.status(400).json({ error: "Invalid role" });
-  }
+  if (!allowedRoles.includes(role)) return res.status(400).json({ error: "Invalid role" });
 
   const email = rawEmail.trim().toLowerCase();
 
   const { data: existing } = await db
-    .from("memberships")
+    .from("users")
     .select("id")
-    .eq("organization_id", membership.organization_id)
+    .eq("org_id", me.org_id)
     .eq("email", email)
     .maybeSingle();
 
-  if (existing) {
-    return res.status(409).json({ error: "This email is already a member" });
-  }
+  if (existing) return res.status(409).json({ error: "This email is already a member" });
 
   const authUser = await findOrCreateUser(db, email);
   if (authUser.error) return res.status(500).json({ error: authUser.error });
 
-  const { error: insertErr } = await db.from("memberships").insert({
-    user_id: authUser.id,
-    organization_id: membership.organization_id,
-    role,
-    email,
-    full_name: (full_name || "").trim() || null,
-    client_id: client_id || null,
-    invited_at: new Date().toISOString(),
-  });
+  const { error: insertErr } = await db.from("users").upsert(
+    {
+      id: authUser.id,
+      org_id: me.org_id,
+      email,
+      full_name: (full_name || "").trim() || null,
+      role,
+      status: "active",
+      date_of_joining: new Date().toISOString().split("T")[0],
+    },
+    { onConflict: "id" }
+  );
 
   if (insertErr) return res.status(500).json({ error: insertErr.message });
 
@@ -216,118 +108,4 @@ async function handleInvite(req, res, db, user) {
     new_account: authUser.new_account,
     temp_password: authUser.temp_password || null,
   });
-}
-
-// --- List team members ---
-
-async function handleTeam(req, res, db, user) {
-  const { data: membership } = await db
-    .from("memberships")
-    .select("organization_id, role, client_id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!membership) return res.status(403).json({ error: "No organization" });
-
-  const isTopAdmin = ["super_admin", "owner"].includes(membership.role);
-  const targetOrgId = req.query.org_id || membership.organization_id;
-  const targetClientId = req.query.client_id || null;
-
-  if (targetOrgId !== membership.organization_id && !isTopAdmin) {
-    return res.status(403).json({ error: "Cannot view other organizations" });
-  }
-
-  let query = db
-    .from("memberships")
-    .select("user_id, role, client_id, email, full_name")
-    .eq("organization_id", targetOrgId);
-
-  if (["client_admin"].includes(membership.role)) {
-    query = query.eq("client_id", membership.client_id);
-  } else if (["agency_admin", "admin"].includes(membership.role) && targetClientId) {
-    query = query.eq("client_id", targetClientId).in("role", ["client_admin", "admin"]);
-  } else if (targetClientId) {
-    query = query.eq("client_id", targetClientId);
-  }
-
-  const { data: members } = await query;
-  if (!members?.length) return res.json({ members: [] });
-
-  const enriched = [];
-  for (const m of members) {
-    let email = m.email;
-    if (!email && m.user_id) {
-      const { data } = await db.auth.admin.getUserById(m.user_id);
-      email = data?.user?.email || m.user_id.slice(0, 8) + "...";
-    }
-    enriched.push({
-      email,
-      full_name: m.full_name || null,
-      role: m.role,
-      client_id: m.client_id,
-    });
-  }
-
-  return res.json({ members: enriched });
-}
-
-// --- List orgs + clients hierarchy ---
-
-async function handleOrgs(req, res, db, user) {
-  const { data: membership } = await db
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!membership) return res.status(403).json({ error: "No organization" });
-
-  const isTopAdmin = ["super_admin", "owner"].includes(membership.role);
-
-  if (isTopAdmin) {
-    const { data: agencies } = await db
-      .from("organizations")
-      .select("id, name, org_type, plan_tier, slug")
-      .eq("org_type", "agency")
-      .order("name");
-
-    const agencyIds = (agencies || []).map((a) => a.id);
-    let clients = [];
-    if (agencyIds.length) {
-      const { data: cl } = await db
-        .from("clients")
-        .select("id, name, organization_id")
-        .in("organization_id", agencyIds)
-        .order("name");
-      clients = cl || [];
-    }
-
-    const result = (agencies || []).map((a) => ({
-      ...a,
-      clients: clients.filter((c) => c.organization_id === a.id),
-    }));
-
-    return res.json({ agencies: result });
-  }
-
-  if (["agency_admin", "admin"].includes(membership.role)) {
-    const { data: org } = await db
-      .from("organizations")
-      .select("id, name, org_type, plan_tier, slug")
-      .eq("id", membership.organization_id)
-      .single();
-
-    const { data: clients } = await db
-      .from("clients")
-      .select("id, name, organization_id")
-      .eq("organization_id", membership.organization_id)
-      .eq("is_self", false)
-      .order("name");
-
-    return res.json({
-      agencies: [{ ...org, clients: clients || [] }],
-    });
-  }
-
-  return res.json({ agencies: [] });
 }

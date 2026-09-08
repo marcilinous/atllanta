@@ -48,7 +48,7 @@ export default async function recruitmentJobs(container) {
   let candidates = [];
   let applications = [];
 
-  const orgCol = org ? 'org_id' : 'client_id';
+  const orgCol = 'org_id';
 
   async function loadData() {
     const [{ data: j, error: jErr }, { data: c, error: cErr }] = await Promise.all([
@@ -228,10 +228,10 @@ export default async function recruitmentJobs(container) {
   let orgMembers = [];
   async function loadOrgMembers() {
     if (orgMembers.length) return;
-    const { data: members } = await sb.from('memberships')
-      .select('user_id, full_name, email, role')
-      .eq('organization_id', org?.id || cid)
-      .in('role', ['owner', 'admin', 'manager', 'super_admin', 'agency_admin', 'client_admin']);
+    const { data: members } = await sb.from('users')
+      .select('user_id:id, full_name, email, role')
+      .eq('org_id', org?.id || cid)
+      .in('role', ['owner', 'admin', 'manager']);
     orgMembers = members || [];
   }
 

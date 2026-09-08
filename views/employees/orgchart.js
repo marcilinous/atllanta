@@ -31,16 +31,7 @@ export default async function orgChart(container) {
     .order('full_name');
 
   if (error) {
-    const { data: members, error: membersErr } = await sb
-      .from('memberships')
-      .select('id, user_id, full_name, email, role')
-      .eq('organization_id', org.id);
-    if (membersErr) { console.error(membersErr); }
-    if (!members?.length) {
-      document.getElementById('orgchart-content').innerHTML = `<div class="empty-state"><div class="empty-state-title">No employees found</div><div class="empty-state-desc">Add employees to see the org chart.</div></div>`;
-      return;
-    }
-    renderFlat(members.map(m => ({ id: m.user_id || m.id, full_name: m.full_name || m.email, email: m.email, role: m.role, designation: '', department: null, reporting_manager_id: null })));
+    document.getElementById('orgchart-content').innerHTML = `<div class="empty-state"><div class="empty-state-title">No employees found</div><div class="empty-state-desc">Add employees to see the org chart.</div></div>`;
     return;
   }
 

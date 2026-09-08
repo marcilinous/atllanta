@@ -236,12 +236,11 @@ export default async function onboarding(container) {
       }
 
       for (const inv of invites) {
-        const { error: invErr } = await sb.from('memberships').insert({
-          organization_id: org.id,
-          user_id: null,
+        const { error: invErr } = await sb.from('invitations').insert({
+          org_id: org.id,
           email: inv.email,
           role: inv.role,
-          status: 'invited',
+          status: 'pending',
         }).select().maybeSingle();
         if (invErr) toast('Invite error: ' + invErr.message);
       }

@@ -57,22 +57,6 @@ export default async function employeeList(container) {
   allEmployees = users || [];
   departments = depts || [];
 
-  // If users table is empty, fall back to memberships
-  if (!allEmployees.length) {
-    const { data: members, error: membersErr } = await sb.from('memberships').select('*').order('created_at', { ascending: false });
-    if (membersErr) { console.error(membersErr); }
-    if (members?.length) {
-      allEmployees = members.map(m => ({
-        id: m.user_id || m.id,
-        full_name: m.email,
-        email: m.email,
-        role: m.role,
-        status: 'active',
-        created_at: m.created_at,
-      }));
-    }
-  }
-
   const deptSelect = document.getElementById('emp-dept-filter');
   departments.forEach(d => {
     const opt = document.createElement('option');

@@ -123,7 +123,7 @@ export default async function uploadResumes(container) {
     document.getElementById('upload-progress').classList.remove('hidden');
 
     let uploaded = 0;
-    const orgCol = org ? 'org_id' : 'client_id';
+    const orgCol = 'org_id';
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
@@ -167,7 +167,7 @@ export default async function uploadResumes(container) {
     const name = document.getElementById('cand-name').value.trim();
     if (!name) return toast('Name is required');
 
-    const orgCol = org ? 'org_id' : 'client_id';
+    const orgCol = 'org_id';
     const { error } = await sb.from('candidates').insert({
       [orgCol]: cid,
       full_name: name,
@@ -184,7 +184,7 @@ export default async function uploadResumes(container) {
   });
 
   async function loadRecent() {
-    const orgCol = org ? 'org_id' : 'client_id';
+    const orgCol = 'org_id';
     const { data: recent, error: recErr } = await sb.from('candidates')
       .select('*')
       .eq(orgCol, cid)

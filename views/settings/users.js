@@ -44,9 +44,9 @@ export default async function settingsUsers(container) {
 
   async function loadMembers() {
     const { data: members, error } = await sb
-      .from('memberships')
+      .from('users')
       .select('*')
-      .eq('organization_id', org.id)
+      .eq('org_id', org.id)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -86,7 +86,7 @@ export default async function settingsUsers(container) {
       <thead><tr><th>Member</th><th>Role</th><th>Invited</th><th>Joined</th>${isAdmin ? '<th>Actions</th>' : ''}</tr></thead>
       <tbody>${filtered.map(m => {
         const displayName = m.full_name || m.email || '—';
-        const isSelf = m.user_id === user?.id;
+        const isSelf = m.id === user?.id;
         return `<tr>
           <td>
             <div class="u-row-3">
@@ -122,7 +122,7 @@ export default async function settingsUsers(container) {
           const memberId = select.dataset.roleChange;
           const newRole = select.value;
           const member = allMembers.find(m => m.id === memberId);
-          const { error } = await sb.from('memberships').update({ role: newRole }).eq('id', memberId);
+          const { error } = await sb.from('users').update({ role: newRole }).eq('id', memberId);
           if (error) {
             toast('Failed to update role: ' + error.message);
             loadMembers();
@@ -139,7 +139,7 @@ export default async function settingsUsers(container) {
           if (!confirm('Remove this member from the organization?')) return;
           const memberId = btn.dataset.removeMember;
           const member = allMembers.find(m => m.id === memberId);
-          const { error } = await sb.from('memberships').delete().eq('id', memberId);
+          const { error } = await sb.from('users').delete().eq('id', memberId);
           if (error) {
             toast('Failed to remove member: ' + error.message);
             return;
