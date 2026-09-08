@@ -179,6 +179,29 @@
   }
 
   .login-toggle button:hover { text-decoration: underline; }
+
+  .login-success {
+    font-size: var(--text-sm);
+    color: var(--color-success);
+    background: var(--color-success-light);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-2);
+  }
+
+  .login-forgot { text-align: right; margin-top: calc(-1 * var(--space-2)); }
+
+  .login-forgot button {
+    color: var(--color-accent);
+    font-weight: var(--font-weight-medium);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    padding: 0;
+  }
+
+  .login-forgot button:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -197,11 +220,14 @@
         <label for="login-password">Password</label>
         <input type="password" id="login-password" autocomplete="current-password" required placeholder="Enter your password">
       </div>
+      <div class="login-forgot">
+        <button type="button" id="forgot-btn">Forgot password?</button>
+      </div>
       <button type="submit" class="login-btn" id="login-btn">Sign in</button>
       <div id="login-error" class="login-error hidden"></div>
     </form>
 
-    <div class="login-divider">or</div>
+    <div class="login-divider" id="login-divider">or</div>
 
     <button type="button" class="google-btn" id="google-btn">
       <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -227,7 +253,33 @@
       </form>
     </div>
 
-    <div class="login-toggle">
+    <div id="reset-section" class="hidden">
+      <form id="reset-form" class="login-form">
+        <div>
+          <label for="reset-email">Email</label>
+          <input type="email" id="reset-email" autocomplete="email" required placeholder="you@company.com">
+        </div>
+        <button type="submit" class="login-btn" id="reset-btn">Send reset link</button>
+        <div id="reset-error" class="login-error hidden"></div>
+        <div id="reset-success" class="login-success hidden"></div>
+      </form>
+      <div class="login-toggle">
+        <button id="reset-back-btn">Back to sign in</button>
+      </div>
+    </div>
+
+    <div id="recovery-section" class="hidden">
+      <form id="recovery-form" class="login-form">
+        <div>
+          <label for="recovery-password">New password</label>
+          <input type="password" id="recovery-password" autocomplete="new-password" required placeholder="Min 6 characters" minlength="6">
+        </div>
+        <button type="submit" class="login-btn" id="recovery-btn">Update password</button>
+        <div id="recovery-error" class="login-error hidden"></div>
+      </form>
+    </div>
+
+    <div class="login-toggle" id="login-toggle-row">
       <span id="toggle-text">Don't have an account?</span>
       <button id="toggle-btn">Sign up</button>
     </div>
@@ -245,25 +297,64 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const cfg = window.ATLLANTA_CONFIG;
 const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-const { data: { session } } = await sb.auth.getSession();
-if (session) { window.location.href = '/'; }
-
-let mode = 'login';
 const loginForm = document.getElementById('login-form');
 const signupSection = document.getElementById('signup-section');
 const signupForm = document.getElementById('signup-form');
+const resetSection = document.getElementById('reset-section');
+const resetForm = document.getElementById('reset-form');
+const recoverySection = document.getElementById('recovery-section');
+const recoveryForm = document.getElementById('recovery-form');
+const googleBtn = document.getElementById('google-btn');
+const loginDivider = document.getElementById('login-divider');
+const toggleRow = document.getElementById('login-toggle-row');
 const toggleBtn = document.getElementById('toggle-btn');
 const toggleText = document.getElementById('toggle-text');
+const titleEl = document.querySelector('.login-title');
+const subtitleEl = document.querySelector('.login-subtitle');
+
+const VIEWS = {
+  login:    { title: 'Welcome back',        subtitle: 'Sign in to your Atllanta workspace' },
+  signup:   { title: 'Create your account', subtitle: 'Get started with Atllanta' },
+  reset:    { title: 'Reset your password', subtitle: "Enter your email and we'll send a reset link" },
+  recovery: { title: 'Set a new password',  subtitle: 'Choose a new password for your account' },
+};
+
+function setView(view) {
+  const oauthVisible = view === 'login' || view === 'signup';
+  loginForm.classList.toggle('hidden', view !== 'login');
+  signupSection.classList.toggle('hidden', view !== 'signup');
+  resetSection.classList.toggle('hidden', view !== 'reset');
+  recoverySection.classList.toggle('hidden', view !== 'recovery');
+  googleBtn.classList.toggle('hidden', !oauthVisible);
+  loginDivider.classList.toggle('hidden', !oauthVisible);
+  toggleRow.classList.toggle('hidden', !oauthVisible);
+  toggleText.textContent = view === 'signup' ? 'Already have an account?' : "Don't have an account?";
+  toggleBtn.textContent = view === 'signup' ? 'Sign in' : 'Sign up';
+  titleEl.textContent = VIEWS[view].title;
+  subtitleEl.textContent = VIEWS[view].subtitle;
+}
+
+// A password-recovery link lands here with a recovery token in the URL hash and
+// fires PASSWORD_RECOVERY. Detect it before the signed-in redirect so the recovery
+// session isn't bounced to '/' before the user can set a new password.
+let recovering = window.location.hash.includes('type=recovery');
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') { recovering = true; setView('recovery'); }
+});
+
+const { data: { session } } = await sb.auth.getSession();
+if (recovering) {
+  setView('recovery');
+} else if (session) {
+  window.location.href = '/';
+}
 
 toggleBtn.addEventListener('click', () => {
-  mode = mode === 'login' ? 'signup' : 'login';
-  loginForm.classList.toggle('hidden', mode === 'signup');
-  signupSection.classList.toggle('hidden', mode === 'login');
-  document.querySelector('.login-title').textContent = mode === 'login' ? 'Welcome back' : 'Create your account';
-  document.querySelector('.login-subtitle').textContent = mode === 'login' ? 'Sign in to your Atllanta workspace' : 'Get started with Atllanta';
-  toggleText.textContent = mode === 'login' ? "Don't have an account?" : 'Already have an account?';
-  toggleBtn.textContent = mode === 'login' ? 'Sign up' : 'Sign in';
+  setView(signupSection.classList.contains('hidden') ? 'signup' : 'login');
 });
+
+document.getElementById('forgot-btn').addEventListener('click', () => setView('reset'));
+document.getElementById('reset-back-btn').addEventListener('click', () => setView('login'));
 
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -321,6 +412,56 @@ document.getElementById('google-btn').addEventListener('click', async () => {
     provider: 'google',
     options: { redirectTo: window.location.origin + '/' }
   });
+});
+
+resetForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('reset-btn');
+  const errEl = document.getElementById('reset-error');
+  const okEl = document.getElementById('reset-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  const { error } = await sb.auth.resetPasswordForEmail(
+    document.getElementById('reset-email').value.trim(),
+    { redirectTo: window.location.origin + '/login' }
+  );
+
+  btn.disabled = false;
+  btn.textContent = 'Send reset link';
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  okEl.textContent = 'Check your email for a link to reset your password.';
+  okEl.classList.remove('hidden');
+});
+
+recoveryForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('recovery-btn');
+  const errEl = document.getElementById('recovery-error');
+  errEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+
+  const { error } = await sb.auth.updateUser({
+    password: document.getElementById('recovery-password').value,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Update password';
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  window.location.href = '/';
 });
 </script>
 </body>
