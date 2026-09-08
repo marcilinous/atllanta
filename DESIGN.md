@@ -183,8 +183,10 @@ Mined from LibreUIUX `accessibility-compliance`.
 ## 9. Anti-slop rules (what the audit found — do not repeat)
 
 1. **No token-laced inline styles.** `style="display:flex;gap:var(--space-2)…"`
-   repeated across views is the #1 slop. Add a utility/component class instead.
-   (~1,700 inline styles to unwind; new views add zero.)
+   repeated across views is the #1 slop. Use the layout utilities in
+   `components.css` instead — `.u-row`, `.u-row-3`, `.u-row-wrap`, `.u-stack`,
+   `.u-stack-4`, `.u-center`, `.u-muted`, `.u-meta`, `.u-sm-muted` — or add a
+   component class. (~1,700 inline styles to unwind incrementally; new views add zero.)
 2. **No emoji icons** (see §6).
 3. **No re-hand-rolled helpers.** Import `esc/timeAgo/initials/avColor` from
    `js/ui.js`; don't paste local copies (e.g. `index.html`).
