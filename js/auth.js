@@ -63,4 +63,9 @@ sb.auth.onAuthStateChange((event) => {
     currentMembership = null;
     window.location.href = '/login';
   }
+  // A password-recovery link may land on an app page instead of /login.
+  // Send it to /login, where the set-new-password form lives.
+  if (event === 'PASSWORD_RECOVERY') {
+    window.location.href = '/login' + window.location.hash;
+  }
 });
