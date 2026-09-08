@@ -89,6 +89,8 @@ export default async function handler(req, res) {
   const allowed = profile && profile.org_id && profile.org_id === job.org_id;
   if (!allowed) return res.status(403).json({ error: "No access to this job" });
 
+  const orgId = job.org_id;
+
   const jd = job.jd_raw_text || job.description || "";
   const resume = candidate.resume_text || candidate.resume_raw_text || "";
   if (!jd.trim() || !resume.trim()) {

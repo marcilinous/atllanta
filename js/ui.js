@@ -140,7 +140,7 @@ export async function getAuthToken() {
 }
 
 // One org per user: resolve the caller's org_id from the users row.
-export async function getClientId() {
+export async function getOrgId() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return null;
   const { data: profile } = await sb
@@ -151,11 +151,11 @@ export async function getClientId() {
   return profile?.org_id || null;
 }
 
-// Legacy name kept for callers; now returns the caller's org_id.
+// Cached org_id resolver for hot paths.
 let cachedOrgId = null;
-export async function clientId() {
+export async function orgId() {
   if (cachedOrgId) return cachedOrgId;
-  cachedOrgId = await getClientId();
+  cachedOrgId = await getOrgId();
   return cachedOrgId;
 }
 

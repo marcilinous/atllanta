@@ -1,12 +1,12 @@
 import sb from '../../js/supabase.js';
-import { esc, toast, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor, formatDate } from '../../js/ui.js';
+import { esc, toast, stagePill, openModal, closeModal, getAuthToken, orgId, initials, avColor, formatDate } from '../../js/ui.js';
 import { getOrg, getUser } from '../../js/auth.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 
 export default async function interviewsView(container) {
   const org = getOrg();
-  const cid = org?.id || await clientId();
+  const cid = org?.id || await orgId();
   if (!cid) {
     container.innerHTML = '<div class="empty-state"><div class="empty-state-title">No organization found</div></div>';
     return;

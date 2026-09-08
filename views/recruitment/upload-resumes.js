@@ -1,11 +1,11 @@
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
-import { esc, toast, clientId } from '../../js/ui.js';
+import { esc, toast, orgId } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
 
 export default async function uploadResumes(container) {
   const org = getOrg();
-  const cid = org?.id || await clientId();
+  const cid = org?.id || await orgId();
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">

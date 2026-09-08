@@ -1,5 +1,5 @@
 import sb from '../../js/supabase.js';
-import { esc, toast, scoreBar, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor } from '../../js/ui.js';
+import { esc, toast, scoreBar, stagePill, openModal, closeModal, getAuthToken, orgId, initials, avColor } from '../../js/ui.js';
 import { getOrg } from '../../js/auth.js';
 import { navigate } from '../../js/router.js';
 import { publishEvent } from '../../js/events.js';
@@ -7,7 +7,7 @@ import { logAction } from '../../js/audit.js';
 
 export default async function recruitmentJobs(container) {
   const org = getOrg();
-  const cid = org?.id || await clientId();
+  const cid = org?.id || await orgId();
   if (!cid) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization found</div><div class="empty-state-desc">Ask your admin to add you to an organization.</div></div>`;
     return;
