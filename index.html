@@ -40,6 +40,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-tooltip">People</span>
       </button>
+      <button class="nav-btn" data-view="crm" aria-label="CRM">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-3"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
+        <span class="nav-tooltip">CRM</span>
+      </button>
       <button class="nav-btn" data-view="reports" aria-label="Reports" data-role="manager">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span class="nav-tooltip">Reports</span>
@@ -192,6 +196,9 @@ import lettersView from '/views/people/letters.js';
 import lifecycleView from '/views/people/lifecycle.js';
 import peopleHub from '/views/people/index.js';
 import profileSettings from '/views/settings/profile.js';
+import crmHub from '/views/crm/index.js';
+import crmAccounts from '/views/crm/accounts.js';
+import crmAccountDetail from '/views/crm/account-detail.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -445,6 +452,9 @@ registerRoute('finance/categories', expenseCategoriesView);
 registerRoute('assets', assetsView);
 registerRoute('letters', lettersView);
 registerRoute('lifecycle', lifecycleView);
+registerRoute('crm', crmHub);
+registerRoute('crm/accounts', crmAccounts);
+registerRoute('crm/account', crmAccountDetail);
 
 initRouter(document.getElementById('main-content'));
 
