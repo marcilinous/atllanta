@@ -57,19 +57,19 @@ export default async function helpdeskReport(container) {
     <div class="stat-grid" style="margin-bottom:var(--space-6)">
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-warning)">${open}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Open</div>
+        <div class="u-sm-muted">Open</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-info)">${inProgress}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">In Progress</div>
+        <div class="u-sm-muted">In Progress</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-success)">${resolved}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Resolved / Closed</div>
+        <div class="u-sm-muted">Resolved / Closed</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:${urgent ? 'var(--color-error)' : 'var(--color-text-tertiary)'}">${urgent || '0'}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Urgent Pending</div>
+        <div class="u-sm-muted">Urgent Pending</div>
       </div></div>
     </div>
 
@@ -82,7 +82,7 @@ export default async function helpdeskReport(container) {
               <span style="font-size:var(--text-md)">${c.icon || '📋'}</span>
               <div style="flex:1;min-width:0">
                 <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(c.name)}</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${c.open} open · ${c.resolved} resolved</div>
+                <div class="u-meta">${c.open} open · ${c.resolved} resolved</div>
               </div>
               <span style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);color:var(--color-text-primary)">${c.total}</span>
             </div>
@@ -92,9 +92,9 @@ export default async function helpdeskReport(container) {
       <div class="card">
         <div class="card-body">
           <h3 style="font-size:var(--text-md);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-4)">By Priority</h3>
-          <div style="display:grid;gap:var(--space-3)">
+          <div class="u-stack">
             ${Object.entries(byPriority).map(([p, count]) => `
-              <div style="display:flex;align-items:center;gap:var(--space-3)">
+              <div class="u-row-3">
                 <div style="width:60px;font-size:var(--text-sm);color:var(--color-text-secondary);text-align:right;flex-shrink:0">${p}</div>
                 <div style="flex:1;height:24px;background:var(--color-bg-secondary);border-radius:var(--radius-md);overflow:hidden;position:relative">
                   <div style="height:100%;width:${(count / maxPri) * 100}%;background:${priColors[p]};border-radius:var(--radius-md);min-width:${count ? '2px' : '0'}"></div>
@@ -104,7 +104,7 @@ export default async function helpdeskReport(container) {
             `).join('')}
           </div>
           <div style="margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--color-border)">
-            <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Avg Resolution Time</div>
+            <div class="u-sm-muted">Avg Resolution Time</div>
             <div style="font-size:var(--text-xl);font-weight:var(--font-weight-bold);color:var(--color-text-primary)">${avgHours === '—' ? '—' : avgHours + 'h'}</div>
           </div>
         </div>

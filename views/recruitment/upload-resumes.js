@@ -1,11 +1,11 @@
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
-import { esc, toast, clientId } from '../../js/ui.js';
+import { esc, toast, orgId } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
 
 export default async function uploadResumes(container) {
   const org = getOrg();
-  const cid = org?.id || await clientId();
+  const cid = org?.id || await orgId();
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
@@ -23,7 +23,7 @@ export default async function uploadResumes(container) {
           <div style="border:2px dashed var(--color-border);border-radius:var(--radius-lg);padding:var(--space-8);text-align:center;cursor:pointer;transition:border-color var(--transition-fast)" id="resume-drop">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" width="40" height="40" style="margin:0 auto var(--space-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <div style="font-weight:var(--font-weight-medium);margin-bottom:var(--space-1)">Drop resumes here or click to browse</div>
-            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">PDF, DOCX, or TXT files</div>
+            <div class="u-meta">PDF, DOCX, or TXT files</div>
             <input type="file" accept=".pdf,.docx,.doc,.txt" multiple id="resume-input" style="display:none">
           </div>
           <div id="file-list" style="margin-top:var(--space-3)"></div>
@@ -123,7 +123,7 @@ export default async function uploadResumes(container) {
     document.getElementById('upload-progress').classList.remove('hidden');
 
     let uploaded = 0;
-    const orgCol = org ? 'org_id' : 'client_id';
+    const orgCol = 'org_id';
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
@@ -167,7 +167,7 @@ export default async function uploadResumes(container) {
     const name = document.getElementById('cand-name').value.trim();
     if (!name) return toast('Name is required');
 
-    const orgCol = org ? 'org_id' : 'client_id';
+    const orgCol = 'org_id';
     const { error } = await sb.from('candidates').insert({
       [orgCol]: cid,
       full_name: name,
@@ -184,7 +184,7 @@ export default async function uploadResumes(container) {
   });
 
   async function loadRecent() {
-    const orgCol = org ? 'org_id' : 'client_id';
+    const orgCol = 'org_id';
     const { data: recent, error: recErr } = await sb.from('candidates')
       .select('*')
       .eq(orgCol, cid)
@@ -202,9 +202,9 @@ export default async function uploadResumes(container) {
       <thead><tr><th>Name</th><th>Email</th><th>Source</th><th>Added</th></tr></thead>
       <tbody>${recent.map(c => `<tr style="cursor:pointer" data-cand-id="${c.id}">
         <td style="font-weight:var(--font-weight-medium)">${esc(c.full_name)}</td>
-        <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(c.email || '—')}</td>
+        <td class="u-sm-muted">${esc(c.email || '—')}</td>
         <td><span class="badge badge-neutral">${esc(c.source || 'manual')}</span></td>
-        <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${new Date(c.created_at).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</td>
+        <td class="u-sm-muted">${new Date(c.created_at).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
 

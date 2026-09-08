@@ -144,7 +144,7 @@ export default async function shortlistView(container) {
     container.querySelectorAll('[data-reject]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const f = document.createElement('div');
-        f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+        f.innerHTML = `<div class="u-stack">
           <div class="form-group"><label class="form-label">Reason (optional)</label><textarea class="form-input" id="rej-reason" rows="2"></textarea></div>
           <button class="btn btn-danger" id="rej-confirm">Reject</button>
         </div>`;

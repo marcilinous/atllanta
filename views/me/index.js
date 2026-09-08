@@ -109,15 +109,15 @@ export default async function meView(container) {
             <button class="${actionClass}" id="me-checkin-btn" ${actionDisabled ? 'disabled' : ''} style="min-width:160px;margin-bottom:var(--space-4)">${actionLabel}</button>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2)">
               <div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">In</div>
+                <div class="u-meta">In</div>
                 <div style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold)">${inTime}</div>
               </div>
               <div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Out</div>
+                <div class="u-meta">Out</div>
                 <div style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold)">${outTime}</div>
               </div>
               <div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Hours</div>
+                <div class="u-meta">Hours</div>
                 <div style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold)">${hours}h</div>
               </div>
             </div>
@@ -158,7 +158,7 @@ export default async function meView(container) {
                   <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(h.name)}</div>
                   ${h.is_optional ? '<span class="badge badge-neutral" style="font-size:9px">Optional</span>' : ''}
                 </div>
-                <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${formatDate(h.date)}</div>
+                <div class="u-sm-muted">${formatDate(h.date)}</div>
               </div>
             `).join('') : '<div class="empty-state" style="padding:var(--space-3)"><div class="empty-state-desc">No upcoming holidays</div></div>'}
           </div>
@@ -478,7 +478,7 @@ export default async function meView(container) {
             <div style="width:64px;height:64px;border-radius:var(--radius-full);background:${bgColor};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:var(--font-weight-bold);font-size:var(--text-xl);flex-shrink:0">${esc(av)}</div>
             <div>
               <div style="font-size:var(--text-xl);font-weight:var(--font-weight-bold)">${esc(profile.full_name)}</div>
-              <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(profile.designation || 'No designation')}</div>
+              <div class="u-sm-muted">${esc(profile.designation || 'No designation')}</div>
               <span class="badge ${profile.status === 'active' ? 'badge-success' : 'badge-neutral'}" style="margin-top:var(--space-1)">${esc(profile.status)}</span>
             </div>
           </div>
@@ -486,17 +486,17 @@ export default async function meView(container) {
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:var(--space-6)">
             <div>
               <h3 style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:var(--space-3)">Personal Info</h3>
-              <div style="display:grid;gap:var(--space-3)">
+              <div class="u-stack">
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Full Name</div>
+                  <div class="u-meta">Full Name</div>
                   <div style="font-size:var(--text-sm)">${esc(profile.full_name)}</div>
                 </div>
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Email</div>
+                  <div class="u-meta">Email</div>
                   <div style="font-size:var(--text-sm)">${esc(profile.email)}</div>
                 </div>
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Phone</div>
+                  <div class="u-meta">Phone</div>
                   <div style="font-size:var(--text-sm)">${esc(profile.phone || 'Not set')}</div>
                 </div>
               </div>
@@ -504,25 +504,25 @@ export default async function meView(container) {
 
             <div>
               <h3 style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:var(--space-3)">Employment Details</h3>
-              <div style="display:grid;gap:var(--space-3)">
+              <div class="u-stack">
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Department</div>
+                  <div class="u-meta">Department</div>
                   <div style="font-size:var(--text-sm)">${esc(profile.department?.name || 'Not assigned')}</div>
                 </div>
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Designation</div>
+                  <div class="u-meta">Designation</div>
                   <div style="font-size:var(--text-sm)">${esc(profile.designation || 'Not set')}</div>
                 </div>
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Date of Joining</div>
+                  <div class="u-meta">Date of Joining</div>
                   <div style="font-size:var(--text-sm)">${profile.date_of_joining ? formatDate(profile.date_of_joining) : 'Not set'}</div>
                 </div>
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Reporting Manager</div>
+                  <div class="u-meta">Reporting Manager</div>
                   <div style="font-size:var(--text-sm)">${esc(profile.manager?.full_name || 'Not assigned')}</div>
                 </div>
                 <div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Role</div>
+                  <div class="u-meta">Role</div>
                   <div style="font-size:var(--text-sm)"><span class="badge badge-neutral">${esc(profile.role)}</span></div>
                 </div>
               </div>

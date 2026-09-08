@@ -26,7 +26,7 @@ export default async function employeeImport(container) {
           <div style="border:2px dashed var(--color-border);border-radius:var(--radius-lg);padding:var(--space-8);text-align:center;cursor:pointer;transition:border-color var(--transition-fast)" id="drop-zone">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" width="40" height="40" style="margin:0 auto var(--space-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <div style="font-weight:var(--font-weight-medium);margin-bottom:var(--space-1)">Drop CSV file here or click to browse</div>
-            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Supports .csv files</div>
+            <div class="u-meta">Supports .csv files</div>
             <input type="file" accept=".csv" id="csv-input" style="display:none">
           </div>
           <div id="file-info" class="hidden" style="margin-top:var(--space-3);font-size:var(--text-sm);color:var(--color-text-secondary)"></div>
@@ -194,13 +194,13 @@ export default async function employeeImport(container) {
 
       const role = validRoles.includes(row.role) ? row.role : 'member';
 
-      const { error } = await sb.from('memberships').insert({
-        organization_id: org.id,
+      const { error } = await sb.from('invitations').insert({
+        org_id: org.id,
         full_name: row.full_name,
         email: row.email,
         phone: row.phone || null,
         role,
-        invited_at: new Date().toISOString(),
+        status: 'pending',
       });
 
       if (error) {

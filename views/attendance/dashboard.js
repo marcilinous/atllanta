@@ -85,7 +85,7 @@ export default async function attendanceDashboard(container) {
 
     <div class="card" style="margin-top:var(--space-4)">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
-        <div style="display:flex;align-items:center;gap:var(--space-3)">
+        <div class="u-row-3">
           <button class="btn btn-ghost btn-sm" id="hm-prev" style="padding:var(--space-1) var(--space-2)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
@@ -217,7 +217,7 @@ export default async function attendanceDashboard(container) {
   }
 
   function miniTimeBlock(label, value) {
-    return `<div style="text-align:center">
+    return `<div class="u-center">
       <div style="font-size:10px;text-transform:uppercase;color:var(--color-text-tertiary);letter-spacing:0.5px">${label}</div>
       <div style="font-size:var(--text-sm);font-weight:var(--font-weight-semibold);margin-top:2px">${value}</div>
     </div>`;
@@ -363,7 +363,7 @@ export default async function attendanceDashboard(container) {
 
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);text-align:center;padding:var(--space-3);background:var(--color-bg-secondary);border-radius:var(--radius-md)">
           <div>
             <div style="font-size:10px;text-transform:uppercase;color:var(--color-text-tertiary)">Check In</div>
@@ -378,8 +378,8 @@ export default async function attendanceDashboard(container) {
             <div style="font-weight:var(--font-weight-semibold);margin-top:2px">${hours}</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
-          <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Status:</span>
+        <div class="u-row">
+          <span class="u-sm-muted">Status:</span>
           <span class="badge badge-${statusBadge[att.status] || 'neutral'}"><span class="badge-dot"></span>${esc(att.status)}</span>
         </div>
         ${hasExistingReg
@@ -460,7 +460,7 @@ export default async function attendanceDashboard(container) {
         const statusColors = { present: 'success', absent: 'error', late: 'warning', on_leave: 'info', half_day: 'warning', holiday: 'neutral', weekly_off: 'neutral' };
         return `<tr>
           <td style="font-weight:var(--font-weight-medium)">${formatDate(a.date)}</td>
-          <td style="color:var(--color-text-secondary)">${d.toLocaleDateString('en', { weekday: 'short' })}</td>
+          <td class="u-muted">${d.toLocaleDateString('en', { weekday: 'short' })}</td>
           <td>${a.check_in ? new Date(a.check_in).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
           <td>${a.check_out ? new Date(a.check_out).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
           <td>${a.total_hours ? Number(a.total_hours).toFixed(1) : '—'}</td>
@@ -536,7 +536,7 @@ export default async function attendanceDashboard(container) {
           const sc = { present: 'success', absent: 'error', late: 'warning', on_leave: 'info', half_day: 'warning' };
           return `<tr>
             <td>
-              <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div class="u-row">
                 <div style="width:28px;height:28px;border-radius:var(--radius-full);background:${avColor(a.user?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(a.user?.full_name || a.user?.email || '?')}</div>
                 <span style="font-size:var(--text-sm)">${esc(a.user?.full_name || a.user?.email || '—')}</span>
               </div>

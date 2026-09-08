@@ -31,16 +31,7 @@ export default async function orgChart(container) {
     .order('full_name');
 
   if (error) {
-    const { data: members, error: membersErr } = await sb
-      .from('memberships')
-      .select('id, user_id, full_name, email, role')
-      .eq('organization_id', org.id);
-    if (membersErr) { console.error(membersErr); }
-    if (!members?.length) {
-      document.getElementById('orgchart-content').innerHTML = `<div class="empty-state"><div class="empty-state-title">No employees found</div><div class="empty-state-desc">Add employees to see the org chart.</div></div>`;
-      return;
-    }
-    renderFlat(members.map(m => ({ id: m.user_id || m.id, full_name: m.full_name || m.email, email: m.email, role: m.role, designation: '', department: null, reporting_manager_id: null })));
+    document.getElementById('orgchart-content').innerHTML = `<div class="empty-state"><div class="empty-state-title">No employees found</div><div class="empty-state-desc">Add employees to see the org chart.</div></div>`;
     return;
   }
 
@@ -88,7 +79,7 @@ export default async function orgChart(container) {
             <div style="font-size:var(--text-xs);color:var(--color-text-secondary)">${esc(node.designation || node.role || '')}${node.department?.name ? ' · ' + esc(node.department.name) : ''}</div>
           </div>
           <span class="badge badge-${roleColors[node.role] || 'neutral'}" style="flex-shrink:0">${esc(node.role || 'member')}</span>
-          ${node.children.length ? `<span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${node.children.length} report${node.children.length !== 1 ? 's' : ''}</span>` : ''}
+          ${node.children.length ? `<span class="u-meta">${node.children.length} report${node.children.length !== 1 ? 's' : ''}</span>` : ''}
         </div>
         ${node.children.map(c => renderNode(c, depth + 1)).join('')}
       </div>`;
@@ -109,7 +100,7 @@ export default async function orgChart(container) {
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--space-3)">
           ${members.map(e => `
             <div class="card" data-emp-id="${e.id}" style="cursor:pointer;padding:var(--space-4)">
-              <div style="display:flex;align-items:center;gap:var(--space-3)">
+              <div class="u-row-3">
                 <div style="width:40px;height:40px;border-radius:var(--radius-full);background:${avColor(e.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);flex-shrink:0">${initials(e.full_name)}</div>
                 <div>
                   <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(e.full_name)}</div>

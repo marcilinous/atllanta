@@ -28,20 +28,20 @@ export default async function handler(req, res) {
   const sb = supabaseAdmin();
 
   const { data: membership } = await sb
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
+    .from("users")
+    .select("org_id, role")
+    .eq("id", user.id)
     .limit(1)
     .single();
 
-  if (!membership?.organization_id) {
+  if (!membership?.org_id) {
     return res.status(403).json({ error: "No organization found" });
   }
   if (!["owner", "admin"].includes(membership.role)) {
     return res.status(403).json({ error: "Admin access required" });
   }
 
-  const orgId = membership.organization_id;
+  const orgId = membership.org_id;
   let imported = 0;
   let skipped = 0;
   const errors = [];
@@ -53,13 +53,13 @@ export default async function handler(req, res) {
         errors.push({ row: i + 1, error: "full_name and email required" });
         continue;
       }
-      const { error } = await sb.from("memberships").insert({
-        organization_id: orgId,
+      const { error } = await sb.from("invitations").insert({
+        org_id: orgId,
         full_name: row.full_name,
         email: row.email,
         phone: row.phone || null,
         role: ["owner", "admin", "manager", "member"].includes(row.role) ? row.role : "member",
-        invited_at: new Date().toISOString(),
+        status: "pending",
       });
       if (error) {
         if (error.code === "23505") skipped++;

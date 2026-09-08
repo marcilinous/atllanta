@@ -93,7 +93,7 @@ export default async function candidateProfile(container) {
           <td>${scoreBar(a.match_score)}</td>
           <td><span class="badge badge-neutral">${esc(a.match_method || '—')}</span></td>
           <td>${stagePill(a.status)}</td>
-          <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${formatDate(a.created_at)}</td>
+          <td class="u-sm-muted">${formatDate(a.created_at)}</td>
         </tr>`).join('')}</tbody>
       </table></div>` : '<div class="card-body" style="text-align:center;color:var(--color-text-tertiary)">No applications</div>'}
     </div>

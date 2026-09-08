@@ -22,7 +22,7 @@ export default async function attendanceReport(container) {
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <div class="u-row">
           <button class="btn btn-secondary btn-sm" id="rpt-prev">&larr;</button>
           <span id="rpt-month-label" style="font-weight:var(--font-weight-semibold);min-width:140px;text-align:center"></span>
           <button class="btn btn-secondary btn-sm" id="rpt-next">&rarr;</button>
@@ -175,7 +175,7 @@ export default async function attendanceReport(container) {
 
             return `<tr>
               <td style="padding:6px 8px;position:sticky;left:0;background:var(--color-surface);z-index:1;border-bottom:1px solid var(--color-border-light);white-space:nowrap">
-                <div style="display:flex;align-items:center;gap:var(--space-2)">
+                <div class="u-row">
                   <div style="width:22px;height:22px;border-radius:var(--radius-full);background:${avColor(r.name)};display:flex;align-items:center;justify-content:center;color:white;font-size:8px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(r.name)}</div>
                   <div>
                     <div style="font-weight:var(--font-weight-medium)">${esc(r.name)}</div>

@@ -21,7 +21,7 @@ export default async function leaveCalendar(container) {
     </div>
     <div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <div class="u-row">
           <button class="btn btn-secondary btn-sm" id="cal-prev">&larr;</button>
           <span id="cal-month-label" style="font-weight:var(--font-weight-semibold);min-width:140px;text-align:center"></span>
           <button class="btn btn-secondary btn-sm" id="cal-next">&rarr;</button>

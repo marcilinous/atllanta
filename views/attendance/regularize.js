@@ -56,7 +56,7 @@ export default async function regularizeView(container) {
     if (myAttErr) { console.error(myAttErr); }
 
     const f = document.createElement('div');
-    f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+    f.innerHTML = `<div class="u-stack-4">
       <div class="form-group">
         <label class="form-label">Select Attendance Record</label>
         <select class="form-input" id="reg-att-id">
@@ -154,7 +154,7 @@ export default async function regularizeView(container) {
           <td style="font-size:var(--text-sm);color:var(--color-accent);font-weight:var(--font-weight-medium)">In: ${reqIn}<br>Out: ${reqOut}</td>
           <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--text-sm)">${esc(r.reason)}</td>
           <td><span class="badge badge-${statusColors[r.status] || 'neutral'}"><span class="badge-dot"></span>${r.status}</span></td>
-          <td style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${r.reviewed_at ? formatDate(r.reviewed_at) : '—'}</td>
+          <td class="u-meta">${r.reviewed_at ? formatDate(r.reviewed_at) : '—'}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div></div>`;
@@ -210,12 +210,12 @@ export default async function regularizeView(container) {
           return `<tr>
             ${all.length > 1 ? `<td><input type="checkbox" class="reg-check" data-id="${r.id}" data-att-id="${r.attendance_id}"></td>` : ''}
             <td>
-              <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div class="u-row">
                 <div style="width:26px;height:26px;border-radius:var(--radius-full);background:${avColor(r.requester?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(r.requester?.full_name || '?')}</div>
                 <span style="font-weight:var(--font-weight-medium);font-size:var(--text-sm)">${esc(r.requester?.full_name || r.requester?.email || '—')}</span>
               </div>
             </td>
-            <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(r.requester?.department?.name || '—')}</td>
+            <td class="u-sm-muted">${esc(r.requester?.department?.name || '—')}</td>
             <td style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${r.attendance ? formatDate(r.attendance.date) : '—'}</td>
             <td style="font-size:var(--text-xs)">In: ${origIn}<br>Out: ${origOut}</td>
             <td style="font-size:var(--text-xs);color:var(--color-accent);font-weight:var(--font-weight-medium)">In: ${reqIn}<br>Out: ${reqOut}</td>

@@ -1,12 +1,12 @@
 import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
-import { esc, toast, scoreBar, stagePill, clientId } from '../../js/ui.js';
+import { esc, toast, scoreBar, stagePill, orgId } from '../../js/ui.js';
 import { publishEvent } from '../../js/events.js';
 
 export default async function matcherView(container) {
   const org = getOrg();
-  const cid = org?.id || await clientId();
-  const orgCol = org ? 'org_id' : 'client_id';
+  const cid = org?.id || await orgId();
+  const orgCol = 'org_id';
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">

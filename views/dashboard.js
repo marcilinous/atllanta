@@ -14,8 +14,6 @@ export default async function dashboard(container) {
   const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = membership?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || '';
 
-  const dayTheme = getDayTheme(today);
-
   container.innerHTML = `
     <style>
       @keyframes dash-float {
@@ -31,42 +29,11 @@ export default async function dashboard(container) {
         0%, 100% { opacity: 0.04; }
         50% { opacity: 0.09; }
       }
-      @keyframes dash-fall {
-        0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
-        10% { opacity: 1; }
-        100% { transform: translateY(calc(100vh + 20px)) rotate(360deg); opacity: 0.6; }
-      }
-      @keyframes dash-rise {
-        0% { transform: translateY(20px) scale(0.8); opacity: 0; }
-        50% { opacity: 1; }
-        100% { transform: translateY(-100vh) scale(1.2); opacity: 0; }
-      }
-      @keyframes dash-twinkle {
-        0%, 100% { opacity: 0.1; transform: scale(0.8); }
-        50% { opacity: 0.6; transform: scale(1.3); }
-      }
-      @keyframes dash-sway {
-        0%, 100% { transform: translateX(0) rotate(-5deg); }
-        50% { transform: translateX(15px) rotate(5deg); }
-      }
-      .dash-scene {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        overflow: hidden;
-        z-index: 0;
-      }
-      .dash-scene .particle {
-        position: absolute;
-        font-size: 20px;
-        opacity: 0;
-        will-change: transform;
-      }
       .dash-wrapper {
         position: relative;
         min-height: 100%;
       }
-      .dash-wrapper > *:not(.dash-scene) {
+      .dash-wrapper > * {
         position: relative;
         z-index: 1;
       }
@@ -78,8 +45,11 @@ export default async function dashboard(container) {
         display: flex;
         align-items: center;
         gap: var(--space-3);
-        border: 1px solid var(--color-border-light);
+        background: var(--color-accent-light);
+        border: 1px solid var(--color-border);
+        color: var(--color-text-primary);
       }
+      .dash-banner svg { width: 22px; height: 22px; color: var(--color-accent); flex-shrink: 0; }
       .dash-two-col {
         display: grid;
         grid-template-columns: 1fr 380px;
@@ -155,7 +125,6 @@ export default async function dashboard(container) {
     </style>
 
     <div class="dash-wrapper">
-    <div class="dash-scene" id="dash-scene"></div>
     <div id="dash-banner-slot"></div>
     <div id="dash-header" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-6);flex-wrap:wrap">
       <div>
@@ -164,14 +133,14 @@ export default async function dashboard(container) {
       </div>
       <div id="att-status" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--color-bg-secondary);border-radius:var(--radius-full)">
         <div style="width:8px;height:8px;border-radius:var(--radius-full);background:var(--color-text-tertiary)"></div>
-        <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Loading...</span>
+        <span class="u-sm-muted">Loading...</span>
       </div>
     </div>
 
     <div class="dash-two-col">
       <div>
         <div id="composer" style="margin-bottom:var(--space-4)"></div>
-        <div id="feed" style="display:grid;gap:var(--space-4)">
+        <div id="feed" class="u-stack-4">
           <div class="card" style="padding:var(--space-6);text-align:center"><div class="skeleton skeleton-text"></div></div>
         </div>
       </div>
@@ -186,7 +155,7 @@ export default async function dashboard(container) {
         <div class="leaves-content">
           <div style="padding:var(--space-4);border-bottom:1px solid var(--color-border-light)">
             <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">Organization Holidays</div>
-            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${today.getFullYear()} holiday calendar</div>
+            <div class="u-meta">${today.getFullYear()} holiday calendar</div>
           </div>
           <div id="leaves-list" style="max-height:520px;overflow-y:auto">
             <div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:70%"></div></div>
@@ -197,15 +166,13 @@ export default async function dashboard(container) {
     </div>
   `;
 
-  renderDayScene(dayTheme);
-
   if (!org) return;
 
   const [attResult, postsResult, eventsResult, membersResult, leavesResult, annResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
     sb.from('posts').select('*').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(30),
     sb.from('events').select('*, actor:actor_id(full_name, email)').order('created_at', { ascending: false }).limit(15),
-    sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org.id),
+    sb.from('users').select('user_id:id, full_name, email, role').eq('org_id', org.id),
     sb.from('holidays').select('*').eq('year', today.getFullYear()).order('date', { ascending: true }),
     sb.from('announcements').select('*, author:author_id(full_name)').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(5),
   ]);
@@ -228,7 +195,7 @@ export default async function dashboard(container) {
     }
     attEl.innerHTML = `
       <div style="width:8px;height:8px;border-radius:var(--radius-full);background:${dot}"></div>
-      <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${label}</span>
+      <span class="u-sm-muted">${label}</span>
       <a href="#/me" style="font-size:var(--text-xs);color:var(--color-accent);text-decoration:none;margin-left:var(--space-1)">My Hub &rarr;</a>
     `;
   }
@@ -243,8 +210,8 @@ export default async function dashboard(container) {
     if (!holidays.length) {
       leavesListEl.innerHTML = `
         <div style="padding:var(--space-8);text-align:center">
-          <div style="font-size:var(--text-2xl);margin-bottom:var(--space-2)">📅</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">No holidays configured</div>
+          <div style="color:var(--color-text-tertiary);margin-bottom:var(--space-2);display:flex;justify-content:center">${ic('calendar', 28)}</div>
+          <div class="u-sm-muted">No holidays configured</div>
           <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">${isAdmin ? 'Add holidays in Leave Settings' : 'Ask your admin to set up the holiday calendar'}</div>
         </div>`;
     } else {
@@ -279,10 +246,10 @@ export default async function dashboard(container) {
 
     return `
       <div class="leave-row" style="${isPast ? 'opacity:0.5' : ''}">
-        <div style="width:32px;height:32px;border-radius:var(--radius-lg);background:${isToday ? 'var(--color-success-light)' : isPast ? 'var(--color-bg-tertiary)' : 'var(--color-accent-light)'};display:flex;align-items:center;justify-content:center;font-size:var(--text-sm);flex-shrink:0">${isToday ? '🎉' : h.is_optional ? '🔹' : '📅'}</div>
+        <div style="width:32px;height:32px;border-radius:var(--radius-lg);background:${isToday ? 'var(--color-success-light)' : isPast ? 'var(--color-bg-tertiary)' : 'var(--color-accent-light)'};display:flex;align-items:center;justify-content:center;color:${dotColor};flex-shrink:0">${isToday ? ic('sparkle') : h.is_optional ? ic('dot') : ic('calendar')}</div>
         <div style="min-width:0">
           <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name)}</div>
-          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dayName}, ${dateLabel}</div>
+          <div class="u-meta">${dayName}, ${dateLabel}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           ${h.is_optional ? '<span style="font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);background:var(--color-warning-light);color:var(--color-warning)">Optional</span>' : ''}
@@ -291,20 +258,19 @@ export default async function dashboard(container) {
       </div>`;
   }
 
-  // Holiday banner + scene upgrade if today is an org holiday
+  // Holiday greeting banner if today is an org holiday
   const todayHoliday = (leavesResult.data || []).find(h => h.date === todayStr);
   const bannerSlot = document.getElementById('dash-banner-slot');
   if (todayHoliday && bannerSlot) {
-    const hTheme = getHolidayTheme(todayHoliday.name);
+    const g = getHolidayGreeting(todayHoliday.name);
     bannerSlot.innerHTML = `
-      <div class="dash-banner" style="background:${hTheme.bannerBg}">
-        <span style="font-size:var(--text-xl)">${hTheme.emoji}</span>
+      <div class="dash-banner">
+        ${HOLIDAY_ICON[g.icon] || HOLIDAY_ICON.sparkle}
         <div>
-          <div style="font-weight:var(--font-weight-semibold);color:${hTheme.bannerText}">${esc(todayHoliday.name)}</div>
-          <div style="font-size:var(--text-xs);color:${hTheme.bannerText};opacity:0.8">${hTheme.message}</div>
+          <div style="font-weight:var(--font-weight-semibold)">${esc(todayHoliday.name)}</div>
+          <div class="u-meta">${esc(g.message)}</div>
         </div>
       </div>`;
-    renderDayScene({ ...dayTheme, ...hTheme });
   }
 
   // Composer (managers+)
@@ -319,9 +285,9 @@ export default async function dashboard(container) {
             <textarea class="form-input" id="post-text" rows="2" placeholder="Share an update, announcement, or shoutout..." style="resize:vertical;border:none;padding:0;background:transparent;font-size:var(--text-base);min-height:48px"></textarea>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--space-2)">
               <div style="display:flex;gap:var(--space-2)">
-                <button class="btn btn-ghost btn-sm post-type-btn active" data-type="announcement" title="Announcement" style="font-size:var(--text-xs)">📢 Announce</button>
-                <button class="btn btn-ghost btn-sm post-type-btn" data-type="shoutout" title="Shoutout" style="font-size:var(--text-xs)">🎉 Shoutout</button>
-                <button class="btn btn-ghost btn-sm post-type-btn" data-type="update" title="Update" style="font-size:var(--text-xs)">📝 Update</button>
+                <button class="btn btn-ghost btn-sm post-type-btn active" data-type="announcement" title="Announcement" style="font-size:var(--text-xs)">${ic('megaphone', 14)} Announce</button>
+                <button class="btn btn-ghost btn-sm post-type-btn" data-type="shoutout" title="Shoutout" style="font-size:var(--text-xs)">${ic('star', 14)} Shoutout</button>
+                <button class="btn btn-ghost btn-sm post-type-btn" data-type="update" title="Update" style="font-size:var(--text-xs)">${ic('edit', 14)} Update</button>
               </div>
               <button class="btn btn-primary btn-sm" id="post-submit">Post</button>
             </div>
@@ -385,25 +351,25 @@ export default async function dashboard(container) {
     const payload = ev.payload || {};
 
     let content = '';
-    let icon = '🔔';
+    let icon = 'bell';
     if (action === 'created' && entity === 'employee') {
       content = `welcomed a new team member${payload.name ? ': **' + payload.name + '**' : ''}`;
-      icon = '👋';
+      icon = 'userplus';
     } else if (action === 'approved' && entity === 'request') {
       content = `approved a leave request`;
-      icon = '✅';
+      icon = 'check';
     } else if (action === 'created' && entity === 'job') {
       content = `posted a new job opening${payload.title ? ': **' + payload.title + '**' : ''}`;
-      icon = '💼';
+      icon = 'briefcase';
     } else if (action === 'shortlisted') {
       content = `shortlisted a candidate`;
-      icon = '⭐';
+      icon = 'star';
     } else if (action === 'completed' && entity === 'checkin') {
       content = `checked in for the day`;
-      icon = '📍';
+      icon = 'pin';
     } else if (action === 'feedback_submitted') {
       content = `submitted interview feedback`;
-      icon = '📝';
+      icon = 'edit';
     } else {
       content = `${action} ${entity}`.trim();
     }
@@ -442,9 +408,9 @@ export default async function dashboard(container) {
   if (!feedItems.length) {
     feedEl.innerHTML = `
       <div class="card" style="padding:var(--space-8);text-align:center">
-        <div style="font-size:var(--text-2xl);margin-bottom:var(--space-3)">📋</div>
+        <div style="color:var(--color-text-tertiary);margin-bottom:var(--space-3);display:flex;justify-content:center">${ic('inbox', 28)}</div>
         <div style="font-weight:var(--font-weight-semibold);margin-bottom:var(--space-1)">Your noticeboard is empty</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${isManager ? 'Post an announcement to get things started.' : 'Updates and announcements from your organization will appear here.'}</div>
+        <div class="u-sm-muted">${isManager ? 'Post an announcement to get things started.' : 'Updates and announcements from your organization will appear here.'}</div>
       </div>`;
   } else {
     feedEl.innerHTML = feedItems.map(item => {
@@ -453,7 +419,7 @@ export default async function dashboard(container) {
       const ago = timeAgo(item.time);
 
       if (item.type === 'post') {
-        const typeLabel = { announcement: '📢', shoutout: '🎉', update: '📝', milestone: '🏆' };
+        const typeLabel = { announcement: ic('megaphone', 12), shoutout: ic('star', 12), update: ic('edit', 12), milestone: ic('award', 12) };
         const typeBadge = typeLabel[item.postType] || '';
         const reactions = item.reactions;
         const canPin = isAdmin && !item.pinned;
@@ -462,13 +428,13 @@ export default async function dashboard(container) {
 
         return `
           <div class="card" style="padding:0;overflow:hidden${item.pinned ? ';border-left:3px solid var(--color-accent)' : ''}">
-            ${item.pinned ? '<div style="padding:var(--space-1) var(--space-4);background:var(--color-accent-light);font-size:var(--text-xs);color:var(--color-accent);font-weight:var(--font-weight-medium)">📌 Pinned</div>' : ''}
+            ${item.pinned ? `<div style="padding:var(--space-1) var(--space-4);background:var(--color-accent-light);font-size:var(--text-xs);color:var(--color-accent);font-weight:var(--font-weight-medium);display:flex;align-items:center;gap:var(--space-1)">${ic('bookmark', 12)} Pinned</div>` : ''}
             <div style="padding:var(--space-4)">
               <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
                 <div style="width:40px;height:40px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);flex-shrink:0">${initials(authorName)}</div>
                 <div style="flex:1;min-width:0">
                   <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago} ${typeBadge}</div>
+                  <div class="u-meta">${ago} ${typeBadge}</div>
                 </div>
                 ${canDelete || canPin || canUnpin ? `<div class="post-actions" style="position:relative">
                   <button class="btn btn-ghost btn-sm post-menu-btn" data-post-id="${item.id}" style="padding:2px 6px;font-size:var(--text-base)">⋯</button>
@@ -487,13 +453,13 @@ export default async function dashboard(container) {
       if (item.type === 'announcement') {
         return `
           <div class="card" style="padding:0;overflow:hidden;border-left:3px solid var(--color-warning)">
-            <div style="padding:var(--space-1) var(--space-4);background:var(--color-warning-light);font-size:var(--text-xs);color:var(--color-warning);font-weight:var(--font-weight-medium);display:flex;align-items:center;gap:var(--space-1)">📢 Announcement${item.pinned ? ' · 📌 Pinned' : ''}</div>
+            <div style="padding:var(--space-1) var(--space-4);background:var(--color-warning-light);font-size:var(--text-xs);color:var(--color-warning);font-weight:var(--font-weight-medium);display:flex;align-items:center;gap:var(--space-1)">${ic('megaphone', 12)} Announcement${item.pinned ? ' · Pinned' : ''}</div>
             <div style="padding:var(--space-4)">
               <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-2)">
                 <div style="width:36px;height:36px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-xs);flex-shrink:0">${initials(authorName)}</div>
                 <div>
                   <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago}</div>
+                  <div class="u-meta">${ago}</div>
                 </div>
               </div>
               ${item.title ? `<h4 style="margin:0 0 var(--space-1);font-size:var(--text-md);font-weight:var(--font-weight-semibold)">${esc(item.title)}</h4>` : ''}
@@ -507,10 +473,10 @@ export default async function dashboard(container) {
         <div style="display:flex;gap:var(--space-3);padding:var(--space-2) var(--space-3);align-items:center">
           <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(authorName)}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:var(--text-sm)"><span style="font-weight:var(--font-weight-medium)">${esc(authorName)}</span> <span style="color:var(--color-text-secondary)">${formatPostContent(esc(item.content))}</span></div>
+            <div style="font-size:var(--text-sm)"><span style="font-weight:var(--font-weight-medium)">${esc(authorName)}</span> <span class="u-muted">${formatPostContent(esc(item.content))}</span></div>
             <div style="font-size:10px;color:var(--color-text-tertiary)">${ago}</div>
           </div>
-          <span style="font-size:var(--text-base)">${item.icon}</span>
+          <span style="color:var(--color-text-tertiary);display:flex">${ic(item.icon)}</span>
         </div>`;
     }).join('');
   }
@@ -541,7 +507,7 @@ export default async function dashboard(container) {
 
       const f = document.createElement('div');
       const actions = [];
-      if (isAdmin && !post.pinned) actions.push(`<button class="btn btn-secondary btn-sm" data-action="pin" style="width:100%">📌 Pin to top</button>`);
+      if (isAdmin && !post.pinned) actions.push(`<button class="btn btn-secondary btn-sm" data-action="pin" style="width:100%">${ic('bookmark', 14)} Pin to top</button>`);
       if (isAdmin && post.pinned) actions.push(`<button class="btn btn-secondary btn-sm" data-action="unpin" style="width:100%">Unpin</button>`);
       if (post.author_id === user.id || isAdmin) actions.push(`<button class="btn btn-secondary btn-sm" data-action="delete" style="width:100%;color:var(--color-error)">Delete post</button>`);
 
@@ -573,78 +539,55 @@ function formatPostContent(text) {
   return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
-function getDayTheme(date) {
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  const md = `${m}-${d}`;
+// Holiday greeting: a single tokenized banner (SVG icon + name + message).
+// No emoji, no particles, no hardcoded colors — inherits the module accent.
+const _svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const HOLIDAY_ICON = {
+  sparkle: _svg('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>'),
+  gift: _svg('<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>'),
+  moon: _svg('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'),
+  sun: _svg('<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/>'),
+  leaf: _svg('<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/>'),
+  flag: _svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>'),
+  star: _svg('<polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/>'),
+  calendar: _svg('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'),
+};
 
-  const known = {
-    '1-1':   { particles: ['🎆','🥂','✨','🎊','🎇'], anim: 'fall', emoji: '🎆', message: 'Happy New Year!', bannerBg: 'linear-gradient(135deg,#1a1a2e,#16213e)', bannerText: '#ffd700' },
-    '1-26':  { particles: ['🇮🇳','🪷','🏛️','⭐','🎖️'], anim: 'sway', emoji: '🇮🇳', message: 'Happy Republic Day!', bannerBg: 'linear-gradient(135deg,#FF9933,#fff,#138808)', bannerText: '#1a1a2e' },
-    '3-8':   { particles: ['💜','🌸','✨','👩','💐'], anim: 'rise', emoji: '💜', message: "Happy Women's Day!", bannerBg: 'linear-gradient(135deg,#7c3aed15,#c084fc15)', bannerText: 'var(--color-text-primary)' },
-    '5-1':   { particles: ['⚒️','✊','🏗️','👷','⭐'], anim: 'sway', emoji: '⚒️', message: 'Happy Labour Day!', bannerBg: 'linear-gradient(135deg,#dc262615,#f97316 15)', bannerText: 'var(--color-text-primary)' },
-    '8-15':  { particles: ['🇮🇳','🪁','🎆','🕊️','⭐'], anim: 'fall', emoji: '🇮🇳', message: 'Happy Independence Day!', bannerBg: 'linear-gradient(135deg,#FF9933,#fff,#138808)', bannerText: '#1a1a2e' },
-    '10-2':  { particles: ['🕊️','🌸','🪷','☮️','✨'], anim: 'rise', emoji: '🕊️', message: 'Gandhi Jayanti', bannerBg: 'linear-gradient(135deg,#f0fdf415,#dcfce715)', bannerText: 'var(--color-text-primary)' },
-    '10-31': { particles: ['🎃','👻','🦇','🕷️','🍬'], anim: 'fall', emoji: '🎃', message: 'Happy Halloween!', bannerBg: 'linear-gradient(135deg,#f97316 15,#1a1a2e15)', bannerText: 'var(--color-text-primary)' },
-    '12-25': { particles: ['🎄','⭐','🎁','❄️','🔔'], anim: 'fall', emoji: '🎄', message: 'Merry Christmas!', bannerBg: 'linear-gradient(135deg,#dc262615,#16a34a15)', bannerText: 'var(--color-text-primary)' },
-    '12-31': { particles: ['🎆','🥂','🎊','✨','🎇'], anim: 'fall', emoji: '🎆', message: 'New Year Eve!', bannerBg: 'linear-gradient(135deg,#1e293b,#0f172a)', bannerText: '#ffd700' },
-  };
+// Inline-SVG glyphs for dashboard UI icons (no emoji). Colored via currentColor.
+const ICON = {
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  sparkle: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  dot: '<circle cx="12" cy="12" r="4"/>',
+  megaphone: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  star: '<polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  userplus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
+  check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  bookmark: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+};
+const ic = (name, size = 16) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle">${ICON[name] || ICON.bell}</svg>`;
 
-  if (known[md]) return known[md];
-
-  if (m >= 3 && m <= 5) return { particles: ['🌸','🌿','🌻','🦋','☀️'], anim: 'sway', emoji: '🌸', message: '', bannerBg: '', bannerText: '' };
-  if (m >= 6 && m <= 9) return { particles: ['🌧️','☁️','🌈','🍃','💧'], anim: 'fall', emoji: '🌧️', message: '', bannerBg: '', bannerText: '' };
-  if (m >= 10 && m <= 11) return { particles: ['🍂','🍁','🌾','🪵','🌅'], anim: 'sway', emoji: '🍂', message: '', bannerBg: '', bannerText: '' };
-  return { particles: ['❄️','✨','☃️','🌟','💫'], anim: 'twinkle', emoji: '❄️', message: '', bannerBg: '', bannerText: '' };
-}
-
-function getHolidayTheme(name) {
-  const n = name.toLowerCase();
-  if (n.includes('diwali') || n.includes('deepavali'))
-    return { particles: ['🪔','✨','🎆','🎇','💫'], anim: 'rise', emoji: '🪔', message: 'Festival of Lights!', bannerBg: 'linear-gradient(135deg,#f59e0b15,#d9770615)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('holi'))
-    return { particles: ['🎨','💜','💚','💛','❤️'], anim: 'fall', emoji: '🎨', message: 'Festival of Colors!', bannerBg: 'linear-gradient(135deg,#a855f715,#ec489915,#eab30815)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('eid'))
-    return { particles: ['🌙','⭐','✨','🕌','🌟'], anim: 'twinkle', emoji: '🌙', message: 'Eid Mubarak!', bannerBg: 'linear-gradient(135deg,#16a34a15,#f59e0b15)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('christmas') || n.includes('xmas'))
-    return { particles: ['🎄','⭐','🎁','❄️','🔔'], anim: 'fall', emoji: '🎄', message: 'Merry Christmas!', bannerBg: 'linear-gradient(135deg,#dc262615,#16a34a15)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('ganesh') || n.includes('vinayak'))
-    return { particles: ['🪷','🌺','🙏','✨','🎉'], anim: 'rise', emoji: '🪷', message: 'Ganpati Bappa Morya!', bannerBg: 'linear-gradient(135deg,#f97316 15,#eab30815)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('pongal') || n.includes('makar') || n.includes('sankranti') || n.includes('lohri'))
-    return { particles: ['🪁','☀️','🌾','✨','🎉'], anim: 'sway', emoji: '🪁', message: 'Happy Harvest Festival!', bannerBg: 'linear-gradient(135deg,#f59e0b15,#ea580c15)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('navratri') || n.includes('durga') || n.includes('dasara') || n.includes('dussehra'))
-    return { particles: ['🪷','✨','🔱','🎊','💫'], anim: 'rise', emoji: '🪷', message: 'Happy Navratri!', bannerBg: 'linear-gradient(135deg,#dc262615,#f59e0b15)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('onam'))
-    return { particles: ['🛶','🌸','🌺','🪷','🎉'], anim: 'sway', emoji: '🛶', message: 'Happy Onam!', bannerBg: 'linear-gradient(135deg,#eab30815,#16a34a15)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('raksha') || n.includes('rakhi'))
-    return { particles: ['🪢','💝','✨','🎊','💐'], anim: 'twinkle', emoji: '🪢', message: 'Happy Raksha Bandhan!', bannerBg: 'linear-gradient(135deg,#ec489915,#a855f715)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('republic'))
-    return { particles: ['🇮🇳','🪷','🏛️','⭐','🎖️'], anim: 'sway', emoji: '🇮🇳', message: 'Happy Republic Day!', bannerBg: 'linear-gradient(135deg,#FF993315,#13880815)', bannerText: 'var(--color-text-primary)' };
-  if (n.includes('independence'))
-    return { particles: ['🇮🇳','🪁','🎆','🕊️','⭐'], anim: 'fall', emoji: '🇮🇳', message: 'Happy Independence Day!', bannerBg: 'linear-gradient(135deg,#FF993315,#13880815)', bannerText: 'var(--color-text-primary)' };
-  return { particles: ['🎉','✨','🎊','💫','⭐'], anim: 'twinkle', emoji: '🎉', message: 'Happy Holiday!', bannerBg: 'linear-gradient(135deg,#2563eb15,#7c3aed15)', bannerText: 'var(--color-text-primary)' };
-}
-
-function renderDayScene(theme) {
-  const scene = document.getElementById('dash-scene');
-  if (!scene) return;
-
-  const count = 18;
-  let html = '';
-  for (let i = 0; i < count; i++) {
-    const p = theme.particles[i % theme.particles.length];
-    const left = Math.random() * 100;
-    const delay = Math.random() * 8;
-    const dur = 6 + Math.random() * 10;
-    const size = 14 + Math.random() * 18;
-    const top = Math.random() * 100;
-
-    let animName = 'dash-fall';
-    if (theme.anim === 'rise') animName = 'dash-rise';
-    else if (theme.anim === 'twinkle') animName = 'dash-twinkle';
-    else if (theme.anim === 'sway') animName = 'dash-sway';
-
-    html += `<span class="particle" style="left:${left}%;top:${top}%;font-size:${size}px;animation:${animName} ${dur}s ${delay}s ease-in-out infinite">${p}</span>`;
-  }
-  scene.innerHTML = html;
+function getHolidayGreeting(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('diwali') || n.includes('deepavali')) return { message: 'Festival of Lights', icon: 'sparkle' };
+  if (n.includes('holi')) return { message: 'Festival of Colours', icon: 'sparkle' };
+  if (n.includes('eid')) return { message: 'Eid Mubarak', icon: 'moon' };
+  if (n.includes('christmas') || n.includes('xmas')) return { message: 'Merry Christmas', icon: 'gift' };
+  if (n.includes('ganesh') || n.includes('vinayak')) return { message: 'Ganpati Bappa Morya', icon: 'sparkle' };
+  if (n.includes('pongal') || n.includes('makar') || n.includes('sankranti') || n.includes('lohri')) return { message: 'Happy Harvest', icon: 'sun' };
+  if (n.includes('navratri') || n.includes('durga') || n.includes('dasara') || n.includes('dussehra')) return { message: 'Happy Navratri', icon: 'sparkle' };
+  if (n.includes('onam')) return { message: 'Happy Onam', icon: 'leaf' };
+  if (n.includes('raksha') || n.includes('rakhi')) return { message: 'Happy Raksha Bandhan', icon: 'star' };
+  if (n.includes('republic') || n.includes('independence')) return { message: 'Jai Hind', icon: 'flag' };
+  if (n.includes('new year')) return { message: 'Happy New Year', icon: 'sparkle' };
+  if (n.includes('women')) return { message: "Happy Women's Day", icon: 'star' };
+  if (n.includes('labour') || n.includes('labor')) return { message: 'Happy Labour Day', icon: 'star' };
+  if (n.includes('gandhi')) return { message: 'Gandhi Jayanti', icon: 'star' };
+  if (n.includes('halloween')) return { message: 'Happy Halloween', icon: 'star' };
+  return { message: 'Enjoy your holiday', icon: 'calendar' };
 }

@@ -57,18 +57,18 @@ export default async function helpdeskSettings(container) {
           <p class="empty-state-desc">Add ticket categories so employees can route their requests to the right team. Click "Load Defaults" for a quick start.</p>
         </div>
       ` : `
-        <div id="categories-list" style="display:grid;gap:var(--space-4)">
+        <div id="categories-list" class="u-stack-4">
           ${categories.map((cat, idx) => {
             const catHandlers = handlerMap[cat.id] || [];
             return `
               <div class="card" data-cat-id="${cat.id}">
                 <div class="card-body">
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-3)">
-                    <div style="display:flex;align-items:center;gap:var(--space-3)">
+                    <div class="u-row-3">
                       <span style="font-size:var(--text-xl)">${esc(cat.icon || '📋')}</span>
                       <div>
                         <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md);color:var(--color-text-primary)">${esc(cat.name)}</div>
-                        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cat.description || 'No description')}</div>
+                        <div class="u-sm-muted">${esc(cat.description || 'No description')}</div>
                       </div>
                     </div>
                     <div style="display:flex;gap:var(--space-2);flex-shrink:0">
@@ -89,7 +89,7 @@ export default async function helpdeskSettings(container) {
                           <div style="display:flex;align-items:center;gap:var(--space-2);background:var(--color-bg-secondary);border-radius:var(--radius-full);padding:var(--space-1) var(--space-3) var(--space-1) var(--space-1)">
                             <div style="width:24px;height:24px;border-radius:var(--radius-full);background:${avColor(h.user?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:var(--font-weight-semibold)">${initials(h.user?.full_name || '?')}</div>
                             <span style="font-size:var(--text-sm);color:var(--color-text-primary)">${esc(h.user?.full_name || h.user?.email || '—')}</span>
-                            <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(h.user?.designation || h.user?.role || '')}</span>
+                            <span class="u-meta">${esc(h.user?.designation || h.user?.role || '')}</span>
                             <button style="background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:var(--text-sm);padding:0 2px" data-remove-handler="${h.id}" title="Remove handler">&times;</button>
                           </div>
                         `).join('')}
@@ -216,7 +216,7 @@ export default async function helpdeskSettings(container) {
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(e.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(e.full_name)}</div>
               <div style="flex:1;min-width:0">
                 <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(e.full_name)}</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(e.designation || e.role || '')} · ${esc(e.email)}</div>
+                <div class="u-meta">${esc(e.designation || e.role || '')} · ${esc(e.email)}</div>
               </div>
             </label>
           `).join('')}

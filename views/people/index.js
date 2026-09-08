@@ -84,7 +84,7 @@ export default async function peopleHub(container) {
             </div>
             <div>
               <div style="font-weight:var(--font-weight-semibold);margin-bottom:var(--space-1)">${esc(s.title)}</div>
-              <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(s.desc)}</div>
+              <div class="u-sm-muted">${esc(s.desc)}</div>
             </div>
           </div>
         </div>

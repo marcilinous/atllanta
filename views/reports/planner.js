@@ -94,7 +94,7 @@ export default async function teamPlanner(container) {
             <option value="">All Departments</option>
             ${(depts || []).map(d => `<option value="${d.id}" ${filterDept === d.id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}
           </select>
-          <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <div class="u-row">
             <button class="btn btn-secondary btn-sm" id="planner-prev">&larr;</button>
             <span style="font-weight:var(--font-weight-semibold);min-width:180px;text-align:center;font-size:var(--text-sm)">${weekLabel}</span>
             <button class="btn btn-secondary btn-sm" id="planner-next">&rarr;</button>
@@ -124,7 +124,7 @@ export default async function teamPlanner(container) {
               ${team.map(u => `
                 <tr>
                   <td style="padding:var(--space-2) var(--space-3);position:sticky;left:0;background:var(--color-surface);z-index:1;border-bottom:1px solid var(--color-border-light)">
-                    <div style="display:flex;align-items:center;gap:var(--space-2)">
+                    <div class="u-row">
                       <div style="width:28px;height:28px;border-radius:var(--radius-full);background:${avColor(u.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(u.full_name)}</div>
                       <div>
                         <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(u.full_name)}</div>

@@ -152,12 +152,12 @@ export default async function leaveApprovals(container) {
           return `<tr>
             ${isPending && filtered.length > 1 ? `<td><input type="checkbox" class="leave-check" data-id="${r.id}" data-uid="${r.user_id}" data-ltid="${r.leave_type_id}" data-days="${r.days}"></td>` : ''}
             <td>
-              <div style="display:flex;align-items:center;gap:var(--space-2)">
+              <div class="u-row">
                 <div style="width:28px;height:28px;border-radius:var(--radius-full);background:${avColor(r.requester?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(r.requester?.full_name || r.requester?.email || '?')}</div>
                 <span style="font-weight:var(--font-weight-medium);font-size:var(--text-sm)">${esc(r.requester?.full_name || r.requester?.email || '—')}</span>
               </div>
             </td>
-            <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(r.requester?.department?.name || '—')}</td>
+            <td class="u-sm-muted">${esc(r.requester?.department?.name || '—')}</td>
             <td><span class="badge badge-neutral">${esc(r.leave_type?.code || '—')}</span></td>
             <td style="font-size:var(--text-sm)">${formatDate(r.start_date)}</td>
             <td style="font-size:var(--text-sm)">${formatDate(r.end_date)}</td>
@@ -170,7 +170,7 @@ export default async function leaveApprovals(container) {
                 <button class="btn btn-secondary btn-sm" data-reject="${r.id}" data-uid="${r.user_id}">Reject</button>
               </div>
             </td>` : `<td><span class="badge badge-${statusColors[r.status] || 'neutral'}"><span class="badge-dot"></span>${r.status}</span></td>`}
-            ${!isPending ? `<td style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${r.reviewed_at ? formatDate(r.reviewed_at) : '—'}${r.review_comment ? `<div title="${esc(r.review_comment)}" style="cursor:help">Note</div>` : ''}</td>` : ''}
+            ${!isPending ? `<td class="u-meta">${r.reviewed_at ? formatDate(r.reviewed_at) : '—'}${r.review_comment ? `<div title="${esc(r.review_comment)}" style="cursor:help">Note</div>` : ''}</td>` : ''}
           </tr>`;
         }).join('')}</tbody>
       </table></div></div>`;
@@ -195,7 +195,7 @@ export default async function leaveApprovals(container) {
       el.querySelectorAll('[data-reject]').forEach(btn => {
         btn.addEventListener('click', () => {
           const f = document.createElement('div');
-          f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+          f.innerHTML = `<div class="u-stack">
             <div class="form-group"><label class="form-label">Rejection Reason</label><textarea class="form-input" id="rej-reason" rows="3" placeholder="Optional reason for the employee..."></textarea></div>
             <button class="btn" id="rej-confirm" style="background:var(--color-error);color:white;border:none">Reject Leave</button>
           </div>`;
@@ -254,8 +254,8 @@ export default async function leaveApprovals(container) {
           const sel = getChecked();
           if (!sel.length) return;
           const f = document.createElement('div');
-          f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
-            <p style="font-size:var(--text-sm);color:var(--color-text-secondary)">Rejecting ${sel.length} leave request${sel.length > 1 ? 's' : ''}.</p>
+          f.innerHTML = `<div class="u-stack">
+            <p class="u-sm-muted">Rejecting ${sel.length} leave request${sel.length > 1 ? 's' : ''}.</p>
             <div class="form-group"><label class="form-label">Rejection Reason</label><textarea class="form-input" id="bulk-rej-reason" rows="3" placeholder="Optional reason..."></textarea></div>
             <button class="btn" id="bulk-rej-confirm" style="background:var(--color-error);color:white;border:none">Reject ${sel.length} Request${sel.length > 1 ? 's' : ''}</button>
           </div>`;

@@ -118,7 +118,7 @@ export default async function helpdeskView(container) {
           <div style="width:36px;height:36px;border-radius:var(--radius-full);background:${avColor(creatorName)};display:flex;align-items:center;justify-content:center;color:#fff;font-size:var(--text-sm);font-weight:var(--font-weight-semibold)">${initials(creatorName)}</div>
           <div>
             <div style="font-weight:var(--font-weight-medium)">${esc(creatorName)}</div>
-            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${timeAgo(ticket.created_at)}</div>
+            <div class="u-meta">${timeAgo(ticket.created_at)}</div>
           </div>
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
@@ -126,7 +126,7 @@ export default async function helpdeskView(container) {
           ${priorityBadge(ticket.priority)}
           ${statusBadge(ticket.status)}
         </div>
-        ${assigneeName ? `<div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Assigned to: <strong>${esc(assigneeName)}</strong></div>` : ''}
+        ${assigneeName ? `<div class="u-sm-muted">Assigned to: <strong>${esc(assigneeName)}</strong></div>` : ''}
         <div>
           <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);color:var(--color-text-secondary);margin-bottom:var(--space-1)">Description</div>
           <div style="font-size:var(--text-base);white-space:pre-wrap">${esc(ticket.description || 'No description provided.')}</div>
@@ -189,7 +189,7 @@ export default async function helpdeskView(container) {
             <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(a.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(a.full_name)}</div>
             <div>
               <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(a.full_name)}</div>
-              <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(a.designation || a.email)}</div>
+              <div class="u-meta">${esc(a.designation || a.email)}</div>
             </div>
           </button>
         `).join('')}

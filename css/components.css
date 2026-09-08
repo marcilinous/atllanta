@@ -20,7 +20,7 @@
 
 .btn-primary {
   background: var(--color-accent);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
 .btn-primary:hover { background: var(--color-accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -39,9 +39,9 @@
 
 .btn-danger {
   background: var(--color-error);
-  color: var(--color-text-inverse);
+  color: var(--color-on-accent);
 }
-.btn-danger:hover { background: #B91C1C; }
+.btn-danger:hover { filter: brightness(0.94); }
 
 .btn-sm { height: 30px; padding: var(--space-1) var(--space-3); font-size: var(--text-xs); }
 .btn-lg { height: 42px; padding: var(--space-3) var(--space-6); font-size: var(--text-base); }
@@ -74,7 +74,7 @@
 .form-input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px var(--color-accent-light);
 }
 
 .form-input::placeholder { color: var(--color-text-tertiary); }
@@ -560,7 +560,8 @@ select.form-input { cursor: pointer; }
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  font-size: var(--text-sm);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 .notif-content { flex: 1; min-width: 0; }
@@ -967,3 +968,18 @@ select.form-input { cursor: pointer; }
 @media (max-width: 768px) {
   .leave-balance-card { flex: 0 0 150px; padding: var(--space-2) var(--space-3); }
 }
+
+/* ============================================================
+   Layout utilities — compose these instead of inlining token-laced
+   style="" strings. Targets the most-repeated inline patterns; the
+   Phase 3b unwind converts existing views onto them. (DESIGN.md §9)
+   ============================================================ */
+.u-row       { display: flex; align-items: center; gap: var(--space-2); }
+.u-row-3     { display: flex; align-items: center; gap: var(--space-3); }
+.u-row-wrap  { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.u-stack     { display: grid; gap: var(--space-3); }
+.u-stack-4   { display: grid; gap: var(--space-4); }
+.u-center    { text-align: center; }
+.u-muted     { color: var(--color-text-secondary); }
+.u-meta      { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.u-sm-muted  { font-size: var(--text-sm); color: var(--color-text-secondary); }

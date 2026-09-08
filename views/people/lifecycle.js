@@ -121,11 +121,11 @@ export default async function lifecycleView(container) {
             const ini = initials(emp.full_name || emp.email);
             return `<tr>
               <td>
-                <div style="display:flex;align-items:center;gap:var(--space-2)">
+                <div class="u-row">
                   <div style="width:28px;height:28px;border-radius:var(--radius-full);background:${bg};display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:var(--font-weight-semibold);flex-shrink:0">${esc(ini)}</div>
                   <div>
                     <div style="font-weight:var(--font-weight-medium)">${esc(emp.full_name)}</div>
-                    <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(emp.email)}</div>
+                    <div class="u-meta">${esc(emp.email)}</div>
                   </div>
                 </div>
               </td>

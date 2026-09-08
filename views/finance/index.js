@@ -88,7 +88,7 @@ export default async function financeView(container) {
       listEl.innerHTML = `<div class="empty-state">
         <svg width="40" height="40" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
         <p>${activeTab === 'approvals' ? 'No pending expense claims' : 'No expenses yet'}</p>
-        ${activeTab === 'my' ? '<p style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Click "New Expense" to submit a claim</p>' : ''}
+        ${activeTab === 'my' ? '<p class="u-meta">Click "New Expense" to submit a claim</p>' : ''}
       </div>`;
       return;
     }

@@ -1,18 +1,44 @@
-# CLAUDE.md — Atllanta Development Handover
+# CLAUDE.md — Atllanta Foundation & Requirements
 
-> **What this file is:** The single source of truth for developing Atllanta. Read this completely before writing any code. Every architectural decision, naming convention, schema, and constraint is here. When in doubt, this file wins.
+> **What this file is:** The single source of truth for what Atllanta is, how it
+> is structured, and what it must do. Read it completely before writing any code.
+> Every architectural decision, tenancy rule, module boundary, naming convention,
+> and requirement is here. When in doubt, this file wins.
+>
+> **Status:** This document describes the **canonical target**. Part of the code
+> still runs on an older agency/`client_id` model and is being migrated onto this
+> base (see §13, Alignment Status). Where code and this file disagree, this file
+> is the direction; the code is the debt.
 
 ---
 
 ## 1. What Is Atllanta
 
-Atllanta is a **Business Operating System** — a unified platform that connects people, customers, work, and operations into one product with shared identity, AI, search, workflows, and design.
+Atllanta is a **single-tenant-per-company Business Operating System** — one product
+that connects people, customers, work, and operations under one identity, one
+permission model, one design system, and one AI assistant.
 
-**Current state:** Atllanta exists as a CV-to-JD matching and interview scheduling tool with Groq LLM integration.
+**One company = one `organization`.** Every user belongs to exactly one org and
+holds exactly one role. Every business-data table carries `org_id` and is isolated
+by a single Postgres row-level-security pattern.
 
-**Target state:** Expand into a full Business OS while keeping the recruitment features as a core differentiator under the People app.
+Atllanta is composed of **four business modules** on **one shared Platform layer**:
 
-**One-line pitch:** Companies come for the AI hiring tool, stay for the employee management platform.
+1. **HRMS / People** — employee lifecycle: directory, attendance, leave, assets,
+   expenses, helpdesk, announcements, documents.
+2. **Recruitment & Interview Automation** — CV↔JD matching (Groq), candidate
+   pipeline, and automated interview scheduling (Google Meet).
+3. **CRM** — customers, contacts, leads, and a configurable sales pipeline.
+4. **Analytics** — cross-module dashboards and reporting.
+
+**One-line pitch:** Companies come for the AI hiring tool, stay for the operating
+system that runs the rest of the company.
+
+**Build history to know:** Atllanta began as an agency recruitment SaaS
+(`organizations → clients → jobs`) and later grew an HR/People layer scoped by
+`org_id`. That left two tenancy models fused together. The canonical model below
+(single `org_id`, no agency tier) is the resolution. Do not add new code on the
+old `client_id`/`memberships` model.
 
 ---
 
@@ -24,999 +50,315 @@ Atllanta is a **Business Operating System** — a unified platform that connects
 | Auth | **Supabase Auth** | ✅ |
 | Storage | **Supabase Storage** | ✅ |
 | Hosting | **Vercel** | ✅ |
-| Frontend | **Vanilla JS + HTML + CSS** (no React/Next.js unless explicitly requested) | ✅ |
+| Frontend | **Vanilla JS + HTML + CSS** (no framework) | ✅ |
 | AI / LLM | **Groq (LLaMA)** — already integrated | ✅ |
-| Vector Search | **pgvector** (Supabase extension) | Later |
 | Email | **Resend** | ✅ |
-| WhatsApp | **Interakt or AiSensy** (BSP) | Later |
-| Maps | **Google Maps JS API** | Later |
+| Vector search | pgvector (Supabase) | Later |
+| WhatsApp / Maps | BSP / Google Maps | Later |
 
 **Hard rules:**
-- Zero monthly cost during build/pilot phase — free tiers only
-- No React, no Next.js, no TypeScript unless Sachin explicitly asks
-- No npm packages for things vanilla JS can do
-- No Tailwind — write CSS directly
-- Supabase client library (`@supabase/supabase-js`) via CDN, not npm
+- Zero monthly cost during build/pilot — free tiers only.
+- No React, Next.js, TypeScript, or Tailwind unless the owner explicitly asks.
+- No npm packages for what vanilla JS covers.
+- Supabase client (`@supabase/supabase-js`) via CDN, not npm.
+- **`anon` key + RLS only. Never `service_role` in frontend or AI paths.** If the
+  user can't see it in the UI, the AI can't see it either.
 
 ---
 
-## 3. Architecture
+## 3. Architecture — Modular Monolith
 
-### 3.1 Pattern: Modular Monolith
-
-One Supabase project. One Vercel deployment. Modules are separated by folder structure and database schema boundaries — not by services or repos.
+One Supabase project. One Vercel deployment. Modules are separated by folder and
+schema boundaries, not services or repos.
 
 ```
 Atllanta (single deployment)
 │
-├── Platform Layer (shared services — every module uses these)
-│     ├── Identity (auth, orgs, roles, permissions)
-│     ├── Notifications (email, push, WhatsApp)
-│     ├── Workflow Engine (event bus, recipes)
-│     ├── Search (global search across modules)
-│     ├── Files (document storage)
-│     ├── Audit (action logging)
-│     └── AI Assistant (Groq-powered Q&A and actions)
+├── Platform Layer (shared — every module uses these, no business logic)
+│     ├── Identity (auth, org, roles, permissions)
+│     ├── Tenancy + RLS (single org_id isolation)
+│     ├── Event bus (events table + processor)
+│     ├── Notifications (in-app, email via Resend)
+│     ├── Audit (append-only action log)
+│     ├── Files (Supabase Storage)
+│     ├── Global search
+│     └── AI Assistant (Groq, permission-aware)
 │
-├── Application Layer (business logic — each module owns its data)
-│     ├── People
-│     │     ├── Employees
-│     │     ├── Attendance
-│     │     ├── Leave
-│     │     └── Recruitment (CV-JD matching, shortlisting, interview scheduling)
-│     ├── Customers (later)
-│     ├── Work (later)
-│     ├── Operations (later)
-│     └── Finance Integrations (later)
+├── Application Layer (four modules — each OWNS its data)
+│     ├── HRMS / People
+│     ├── Recruitment & Interview Automation
+│     ├── CRM
+│     └── Analytics (owns no business tables — reads via APIs/views)
 │
-└── Infrastructure
-      ├── Supabase (Postgres + Auth + Storage + Edge Functions)
-      └── Vercel (static hosting + serverless functions)
+└── Infrastructure: Supabase (Postgres + Auth + Storage + Edge Functions), Vercel
 ```
 
-### 3.2 Core Rules
-
-1. **Modules own their data.** The recruitment module never reads the attendance table directly — it calls the attendance API or listens to attendance events.
-2. **No shared business logic.** Only shared platform services (auth, files, notifications, audit).
-3. **Every mutation publishes an event.** Format: `module.entity.action` — e.g., `people.employee.created`, `recruitment.candidate.shortlisted`, `attendance.checkin.completed`.
-4. **All data access goes through RLS.** No `service_role` key in frontend code. Ever.
-5. **Every API endpoint checks permissions.** The AI assistant queries through the same permission layer as the UI.
+### Core rules (enforced, not aspirational)
+1. **Modules own their data.** A module never reads another module's tables
+   directly — it calls that module's API or reacts to its events.
+2. **No shared business logic.** Only shared *platform* services (auth, files,
+   notifications, audit, events, search, AI).
+3. **Every mutation publishes an event.** Format `module.entity.action`, e.g.
+   `people.employee.created`, `recruitment.candidate.shortlisted`,
+   `crm.deal.won`, `leave.request.approved`.
+4. **All data access goes through RLS.** No `service_role` key in frontend code.
+5. **Every endpoint checks permission** through the same layer as the UI. The AI
+   assistant is not an exception.
 
 ---
 
-## 4. Multi-Tenancy
+## 4. Multi-Tenancy (the base)
 
-**Model:** Shared database, row-level security per organization.
+**Model:** shared database, one org per company, row-level security per org.
 
-Every table that holds org-specific data has an `org_id` column. Every query is filtered by the authenticated user's `org_id` via Postgres RLS policies.
+Every business table has `org_id uuid not null references organizations(id)`.
+A single security-definer helper resolves the caller's org, and every table gets
+the same four policies:
 
 ```sql
--- Standard RLS pattern for every org-scoped table
-ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+-- One helper, used by every policy
+create or replace function auth_org_id() returns uuid
+  language sql security definer stable
+  as $$ select org_id from users where id = auth.uid() $$;
 
-CREATE POLICY "Org isolation" ON table_name
-  USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
-
-CREATE POLICY "Org insert" ON table_name
-  FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
+-- Standard policy set on EVERY org-scoped table
+alter table <t> enable row level security;
+create policy "org_select" on <t> for select using (org_id = auth_org_id());
+create policy "org_insert" on <t> for insert with check (org_id = auth_org_id());
+create policy "org_update" on <t> for update using (org_id = auth_org_id());
+create policy "org_delete" on <t> for delete using (org_id = auth_org_id());
 ```
 
-**Critical test:** Before building any feature, write a test that creates two orgs, inserts data in both, and verifies that user A cannot see user B's data under any query path. This test must pass at all times.
+**Canonical tenant key is `org_id`.** Not `organization_id`, not `client_id`.
+The agency tier (`clients`, `memberships`, `auth_accessible_client_ids()`,
+`org_type`) is being removed — see §13.
+
+**Critical test (must pass at all times):** create two orgs, insert data in both,
+and verify user A cannot read user B's data under *any* query path, on every table,
+under the `anon` key.
 
 ---
 
-## 5. Database Schema
+## 5. Roles & Permissions
 
-### 5.1 Platform Tables
+Four fixed roles on `users.role`:
 
-```sql
--- ============================================================
--- ORGANIZATIONS
--- ============================================================
-CREATE TABLE organizations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  logo_url TEXT,
-  timezone TEXT DEFAULT 'Asia/Kolkata',
-  currency TEXT DEFAULT 'INR',
-  fiscal_year_start INTEGER DEFAULT 4, -- April
-  date_format TEXT DEFAULT 'DD/MM/YYYY',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
+| Role | Scope |
+|------|-------|
+| `owner` | Full control of the org, billing, deletion. |
+| `admin` | Manage users, settings, all module data. |
+| `manager` | Approve/act within their team/department. |
+| `member` | Self-service: own attendance, leave, profile, assigned work. |
 
--- ============================================================
--- USERS (extends Supabase auth.users)
--- ============================================================
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  full_name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  phone TEXT,
-  avatar_url TEXT,
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'manager', 'member')),
-  designation TEXT,
-  department_id UUID REFERENCES departments(id),
-  team_id UUID REFERENCES teams(id),
-  reporting_manager_id UUID REFERENCES users(id),
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'on_notice', 'exited')),
-  date_of_joining DATE,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- DEPARTMENTS
--- ============================================================
-CREATE TABLE departments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  name TEXT NOT NULL,
-  head_id UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- TEAMS
--- ============================================================
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  department_id UUID NOT NULL REFERENCES departments(id),
-  name TEXT NOT NULL,
-  lead_id UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- AUDIT LOG (append-only)
--- ============================================================
-CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  user_id UUID REFERENCES users(id),
-  module TEXT NOT NULL, -- 'people', 'recruitment', 'attendance', etc.
-  entity_type TEXT NOT NULL, -- 'employee', 'candidate', 'leave_request', etc.
-  entity_id UUID NOT NULL,
-  action TEXT NOT NULL, -- 'created', 'updated', 'deleted', 'approved', 'rejected'
-  old_values JSONB,
-  new_values JSONB,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
--- No UPDATE or DELETE policies on audit_logs. Append only.
-
--- ============================================================
--- EVENTS (internal event bus)
--- ============================================================
-CREATE TABLE events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  event_type TEXT NOT NULL, -- 'people.employee.created', 'recruitment.candidate.shortlisted'
-  actor_id UUID REFERENCES users(id),
-  payload JSONB NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
-  attempts INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  processed_at TIMESTAMPTZ
-);
-CREATE INDEX idx_events_pending ON events(status, created_at) WHERE status = 'pending';
-
--- ============================================================
--- NOTIFICATIONS
--- ============================================================
-CREATE TABLE notifications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  user_id UUID NOT NULL REFERENCES users(id),
-  title TEXT NOT NULL,
-  body TEXT,
-  module TEXT NOT NULL,
-  entity_type TEXT,
-  entity_id UUID,
-  channel TEXT NOT NULL CHECK (channel IN ('in_app', 'email', 'push', 'sms', 'whatsapp')),
-  status TEXT DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'dismissed')),
-  sent_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- FILES
--- ============================================================
-CREATE TABLE files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  uploaded_by UUID NOT NULL REFERENCES users(id),
-  file_name TEXT NOT NULL,
-  file_path TEXT NOT NULL, -- Supabase Storage path
-  file_size INTEGER,
-  mime_type TEXT,
-  entity_type TEXT, -- 'employee', 'candidate', 'expense', etc.
-  entity_id UUID,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 5.2 People — Attendance Tables
-
-```sql
--- ============================================================
--- WORK SCHEDULES
--- ============================================================
-CREATE TABLE work_schedules (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  name TEXT NOT NULL, -- 'Default', 'Night Shift', etc.
-  shift_start TIME NOT NULL DEFAULT '09:00',
-  shift_end TIME NOT NULL DEFAULT '18:00',
-  weekly_offs INTEGER[] DEFAULT '{1,7}', -- 1=Sunday, 7=Saturday
-  is_default BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- ATTENDANCE
--- ============================================================
-CREATE TABLE attendance (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  user_id UUID NOT NULL REFERENCES users(id),
-  date DATE NOT NULL,
-  check_in TIMESTAMPTZ,
-  check_out TIMESTAMPTZ,
-  check_in_lat DECIMAL(10,7),
-  check_in_lng DECIMAL(10,7),
-  check_out_lat DECIMAL(10,7),
-  check_out_lng DECIMAL(10,7),
-  status TEXT DEFAULT 'present' CHECK (status IN ('present', 'absent', 'half_day', 'late', 'on_leave', 'holiday', 'weekly_off')),
-  total_hours DECIMAL(4,2),
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, date)
-);
-
--- ============================================================
--- ATTENDANCE REGULARIZATION
--- ============================================================
-CREATE TABLE attendance_regularizations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  user_id UUID NOT NULL REFERENCES users(id),
-  attendance_id UUID NOT NULL REFERENCES attendance(id),
-  reason TEXT NOT NULL,
-  requested_check_in TIMESTAMPTZ,
-  requested_check_out TIMESTAMPTZ,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  reviewed_by UUID REFERENCES users(id),
-  reviewed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 5.3 People — Leave Tables
-
-```sql
--- ============================================================
--- LEAVE TYPES
--- ============================================================
-CREATE TABLE leave_types (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  name TEXT NOT NULL, -- 'Casual Leave', 'Sick Leave', 'Earned Leave', etc.
-  code TEXT NOT NULL, -- 'CL', 'SL', 'EL'
-  annual_quota INTEGER NOT NULL DEFAULT 12,
-  carry_forward BOOLEAN DEFAULT false,
-  max_carry_forward INTEGER DEFAULT 0,
-  max_consecutive_days INTEGER,
-  requires_document BOOLEAN DEFAULT false, -- e.g., medical certificate for SL > 2 days
-  is_paid BOOLEAN DEFAULT true,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(org_id, code)
-);
-
--- ============================================================
--- LEAVE BALANCES
--- ============================================================
-CREATE TABLE leave_balances (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  user_id UUID NOT NULL REFERENCES users(id),
-  leave_type_id UUID NOT NULL REFERENCES leave_types(id),
-  year INTEGER NOT NULL,
-  opening_balance DECIMAL(4,1) DEFAULT 0,
-  accrued DECIMAL(4,1) DEFAULT 0,
-  used DECIMAL(4,1) DEFAULT 0,
-  balance DECIMAL(4,1) GENERATED ALWAYS AS (opening_balance + accrued - used) STORED,
-  UNIQUE(user_id, leave_type_id, year)
-);
-
--- ============================================================
--- LEAVE REQUESTS
--- ============================================================
-CREATE TABLE leave_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  user_id UUID NOT NULL REFERENCES users(id),
-  leave_type_id UUID NOT NULL REFERENCES leave_types(id),
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  days DECIMAL(3,1) NOT NULL, -- supports half-days (0.5)
-  reason TEXT,
-  document_url TEXT,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
-  reviewed_by UUID REFERENCES users(id),
-  reviewed_at TIMESTAMPTZ,
-  review_comment TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- HOLIDAYS
--- ============================================================
-CREATE TABLE holidays (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  name TEXT NOT NULL,
-  date DATE NOT NULL,
-  is_optional BOOLEAN DEFAULT false,
-  year INTEGER NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 5.4 People — Recruitment Tables (Atllanta Core)
-
-```sql
--- ============================================================
--- JOBS (Job Descriptions)
--- ============================================================
-CREATE TABLE jobs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  title TEXT NOT NULL,
-  department_id UUID REFERENCES departments(id),
-  description TEXT, -- raw JD text
-  parsed_skills JSONB, -- AI-extracted: {must_have: [...], nice_to_have: [...]}
-  experience_min INTEGER, -- years
-  experience_max INTEGER,
-  location TEXT,
-  employment_type TEXT DEFAULT 'full_time' CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'intern')),
-  salary_min INTEGER,
-  salary_max INTEGER,
-  status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'on_hold', 'closed')),
-  created_by UUID NOT NULL REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- CANDIDATES
--- ============================================================
-CREATE TABLE candidates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  full_name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  resume_url TEXT, -- Supabase Storage path
-  resume_text TEXT, -- extracted plain text from resume
-  parsed_skills JSONB, -- AI-extracted: {skills: [...], experience_years: N, education: [...]}
-  source TEXT, -- 'manual', 'bulk_upload', 'career_page', 'referral'
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- JOB APPLICATIONS (links candidates to jobs with match scores)
--- ============================================================
-CREATE TABLE job_applications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  job_id UUID NOT NULL REFERENCES jobs(id),
-  candidate_id UUID NOT NULL REFERENCES candidates(id),
-  match_score DECIMAL(5,2), -- 0 to 100
-  match_breakdown JSONB, -- {skills_match: 85, experience_match: 70, education_match: 90, overall: 81.5}
-  match_method TEXT DEFAULT 'tfidf' CHECK (match_method IN ('tfidf', 'llm', 'manual')),
-  status TEXT DEFAULT 'applied' CHECK (status IN ('applied', 'screening', 'shortlisted', 'interview_scheduled', 'interviewed', 'offered', 'hired', 'rejected')),
-  shortlisted_at TIMESTAMPTZ,
-  shortlisted_by UUID REFERENCES users(id),
-  rejection_reason TEXT,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(job_id, candidate_id)
-);
-
--- ============================================================
--- INTERVIEW SCHEDULE
--- ============================================================
-CREATE TABLE interviews (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  job_application_id UUID NOT NULL REFERENCES job_applications(id),
-  round_number INTEGER DEFAULT 1,
-  round_name TEXT, -- 'Phone Screen', 'Technical', 'HR', 'Final'
-  interviewer_id UUID REFERENCES users(id),
-  scheduled_at TIMESTAMPTZ NOT NULL,
-  duration_minutes INTEGER DEFAULT 30,
-  location TEXT, -- 'Google Meet', 'Office Room 3', etc.
-  meeting_link TEXT,
-  status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled', 'no_show', 'rescheduled')),
-  rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-  feedback TEXT,
-  decision TEXT CHECK (decision IN ('advance', 'reject', 'hold', 'hire')),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- ============================================================
--- INTERVIEW SLOTS (available time slots for scheduling)
--- ============================================================
-CREATE TABLE interview_slots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id UUID NOT NULL REFERENCES organizations(id),
-  interviewer_id UUID NOT NULL REFERENCES users(id),
-  date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  is_booked BOOLEAN DEFAULT false,
-  interview_id UUID REFERENCES interviews(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### 5.5 Enable RLS on All Tables
-
-```sql
--- Run this for EVERY table listed above
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE work_schedules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
-ALTER TABLE attendance_regularizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leave_types ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leave_balances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
-ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE candidates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE interviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE interview_slots ENABLE ROW LEVEL SECURITY;
-
--- Standard org-isolation policy (apply to every org-scoped table)
--- Replace 'TABLE_NAME' for each table
-CREATE POLICY "org_isolation_select" ON TABLE_NAME
-  FOR SELECT USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
-
-CREATE POLICY "org_isolation_insert" ON TABLE_NAME
-  FOR INSERT WITH CHECK (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
-
-CREATE POLICY "org_isolation_update" ON TABLE_NAME
-  FOR UPDATE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
-
-CREATE POLICY "org_isolation_delete" ON TABLE_NAME
-  FOR DELETE USING (org_id = (SELECT org_id FROM users WHERE id = auth.uid()));
-```
-
-### 5.6 Indexes
-
-```sql
--- Performance-critical indexes
-CREATE INDEX idx_users_org ON users(org_id);
-CREATE INDEX idx_users_department ON users(department_id);
-CREATE INDEX idx_users_manager ON users(reporting_manager_id);
-CREATE INDEX idx_attendance_user_date ON attendance(user_id, date);
-CREATE INDEX idx_attendance_org_date ON attendance(org_id, date);
-CREATE INDEX idx_leave_requests_user ON leave_requests(user_id, status);
-CREATE INDEX idx_leave_requests_org_status ON leave_requests(org_id, status);
-CREATE INDEX idx_jobs_org_status ON jobs(org_id, status);
-CREATE INDEX idx_candidates_org ON candidates(org_id);
-CREATE INDEX idx_job_applications_job ON job_applications(job_id, status);
-CREATE INDEX idx_job_applications_score ON job_applications(job_id, match_score DESC);
-CREATE INDEX idx_interviews_application ON interviews(job_application_id);
-CREATE INDEX idx_interviews_interviewer ON interviews(interviewer_id, scheduled_at);
-CREATE INDEX idx_notifications_user ON notifications(user_id, status);
-CREATE INDEX idx_audit_logs_org ON audit_logs(org_id, created_at DESC);
-CREATE INDEX idx_events_pending ON events(status, created_at) WHERE status = 'pending';
-
--- Full-text search indexes
-ALTER TABLE users ADD COLUMN fts tsvector
-  GENERATED ALWAYS AS (to_tsvector('english', coalesce(full_name,'') || ' ' || coalesce(email,'') || ' ' || coalesce(designation,''))) STORED;
-CREATE INDEX idx_users_fts ON users USING gin(fts);
-
-ALTER TABLE candidates ADD COLUMN fts tsvector
-  GENERATED ALWAYS AS (to_tsvector('english', coalesce(full_name,'') || ' ' || coalesce(email,'') || ' ' || coalesce(resume_text,''))) STORED;
-CREATE INDEX idx_candidates_fts ON candidates USING gin(fts);
-
-ALTER TABLE jobs ADD COLUMN fts tsvector
-  GENERATED ALWAYS AS (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,''))) STORED;
-CREATE INDEX idx_jobs_fts ON jobs USING gin(fts);
-```
+No custom-permission UI. Role checks live in one place (`js/auth.js` + RLS), and
+the UI hides what a role can't do (`data-role` on nav in `index.html`).
 
 ---
 
-## 6. File Structure
+## 6. Canonical Data Model
 
+`org_id` on every business table. Names below are the target; where the live
+schema still differs (recruitment tables on `client_id`), §13 tracks the gap.
+
+### 6.1 Platform & Identity
 ```
-atllanta/
-├── index.html                    # App shell — sidebar + main content area
-├── login.html                    # Login / signup page
-├── css/
-│   ├── tokens.css                # Design tokens (colors, spacing, typography, radius)
-│   ├── base.css                  # Reset, global styles, dark mode
-│   ├── layout.css                # Sidebar, topbar, content grid
-│   └── components.css            # Button, input, table, modal, toast, card, badge, empty-state
-├── js/
-│   ├── supabase.js               # Supabase client init, auth helpers
-│   ├── router.js                 # Client-side view router (hash-based)
-│   ├── auth.js                   # Login, signup, logout, session check
-│   ├── api.js                    # Shared API helpers (CRUD, RLS-aware queries)
-│   ├── events.js                 # Event publishing helper
-│   ├── notifications.js          # Notification fetching + display
-│   ├── search.js                 # Global search logic
-│   ├── audit.js                  # Audit log writer
-│   └── ai.js                    # Groq LLM integration (prompt builder, response parser)
-├── views/
-│   ├── dashboard.js              # Org dashboard — today's attendance, pending approvals, shortcuts
-│   ├── employees/
-│   │   ├── list.js               # Employee directory with search/filter
-│   │   ├── profile.js            # Single employee profile
-│   │   └── import.js             # Bulk CSV/XLSX import
-│   ├── attendance/
-│   │   ├── checkin.js            # Check-in / check-out UI
-│   │   ├── dashboard.js          # Today's attendance overview
-│   │   ├── report.js            # Monthly attendance report
-│   │   └── regularize.js        # Regularization requests
-│   ├── leave/
-│   │   ├── apply.js              # Apply for leave
-│   │   ├── calendar.js           # Team leave calendar
-│   │   ├── balances.js           # My leave balances
-│   │   ├── approvals.js          # Manager: pending leave approvals
-│   │   └── settings.js           # Admin: leave types, policies, holidays
-│   ├── recruitment/
-│   │   ├── jobs.js               # Job listings (create, edit, open/close)
-│   │   ├── job-detail.js         # Single job — candidates, shortlist, pipeline
-│   │   ├── upload-resumes.js     # Bulk resume upload + parsing
-│   │   ├── matcher.js            # CV-JD matching engine UI (run matching, view scores)
-│   │   ├── shortlist.js          # Shortlisted candidates per job
-│   │   ├── interviews.js         # Interview scheduling + calendar
-│   │   └── candidate-profile.js  # Single candidate — resume, scores, interview history
-│   ├── settings/
-│   │   ├── org.js                # Organization settings
-│   │   ├── users.js              # User management, invite, roles
-│   │   ├── departments.js        # Departments & teams
-│   │   └── integrations.js       # Connected integrations
-│   └── ai/
-│       └── assistant.js          # AI chat panel
-├── workers/
-│   └── event-processor.js        # Supabase Edge Function — polls events table, runs workflow recipes
-├── api/
-│   ├── parse-resume.js           # Vercel serverless — PDF/DOCX text extraction + Groq skill parsing
-│   ├── parse-jd.js               # Vercel serverless — JD text → structured skills via Groq
-│   ├── match.js                  # Vercel serverless — TF-IDF + Groq scoring
-│   └── ai-query.js              # Vercel serverless — AI assistant backend (permission-aware)
-├── supabase/
-│   └── migrations/
-│       ├── 001_platform.sql      # Organizations, users, departments, teams, audit, events, notifications, files
-│       ├── 002_attendance.sql    # Work schedules, attendance, regularizations
-│       ├── 003_leave.sql         # Leave types, balances, requests, holidays
-│       ├── 004_recruitment.sql   # Jobs, candidates, applications, interviews, slots
-│       └── 005_rls_policies.sql  # All RLS policies
-├── public/
-│   └── favicon.ico
-├── vercel.json
-└── README.md
+organizations(id, name, slug, logo_url, timezone, currency, plan_tier,
+              payment_status, created_at, updated_at)
+users(id → auth.users, org_id, full_name, email, phone, avatar_url,
+      role owner|admin|manager|member, designation, department_id, team_id,
+      reporting_manager_id, status, date_of_joining)
+departments(id, org_id, name, head_id)
+teams(id, org_id, department_id, name, lead_id)
+invitations(id, org_id, email, role, token, status, expires_at)
+audit_logs(id, org_id, user_id, module, entity_type, entity_id, action,
+           old_values jsonb, new_values jsonb, created_at)   -- append only
+events(id, org_id, event_type, actor_id, payload jsonb, status, attempts,
+       created_at, processed_at)
+notifications(id, org_id, user_id, title, body, module, entity_type, entity_id,
+              channel, status, sent_at)
+files(id, org_id, uploaded_by, file_name, file_path, file_size, mime_type,
+      entity_type, entity_id, created_at)
 ```
+
+### 6.2 HRMS / People
+```
+attendance, attendance_regularizations, work_schedules, holidays,
+leave_types, leave_balances, leave_requests,
+assets, asset_assignments, expenses, expense_categories,
+helpdesk_categories, helpdesk_category_handlers, helpdesk_tickets,
+announcements, posts
+```
+
+### 6.3 Recruitment & Interview Automation
+```
+jobs, candidates, applications (match_score, match_summary, stage),
+interviews, interview_slots
+```
+(These tables exist; they migrate `client_id → org_id` in Phase 1.)
+
+### 6.4 CRM (to build)
+```
+crm_accounts(id, org_id, name, industry, website, owner_id, created_at)
+crm_contacts(id, org_id, account_id, full_name, email, phone, title)
+crm_leads(id, org_id, full_name, company, email, phone, source, status, owner_id)
+crm_pipelines(id, org_id, name, stages jsonb)     -- configurable stages
+crm_deals(id, org_id, account_id, pipeline_id, title, value, currency, stage,
+          owner_id, expected_close, status open|won|lost, created_at)
+crm_activities(id, org_id, entity_type, entity_id, type note|call|task|email,
+               body, due_at, done, actor_id, created_at)
+```
+
+### 6.5 Analytics
+Owns no business tables. Reads through each module's API or dedicated SQL views
+(`analytics_*` views / materialized views), never by selecting another module's
+tables directly.
+
+### 6.6 Indexes & FTS
+Every `org_id` gets an index. Keep the existing FTS columns on `users`,
+`candidates`, `jobs` (generated `tsvector` + GIN). Add module-local indexes on
+hot filter columns (status, dates, owner).
 
 ---
 
-## 7. UI Layout
+## 7. Module Boundaries & Event Contracts
 
-**Pattern:** Sidebar-navigated multi-view layout.
+Cross-module needs are met by **events** or a **module API**, never a foreign
+table read.
 
-```
-┌──────────────────────────────────────────────────────┐
-│ ┌──────┐  ┌──────────────────────────────────────┐   │
-│ │      │  │  Topbar: Org name | Search | AI | 🔔  │   │
-│ │  64px │  ├──────────────────────────────────────┤   │
-│ │ icon  │  │                                      │   │
-│ │ side  │  │                                      │   │
-│ │ bar   │  │         Main Content Area            │   │
-│ │      │  │                                      │   │
-│ │ 🏠   │  │         (view loaded by router)       │   │
-│ │ 👥   │  │                                      │   │
-│ │ 📅   │  │                                      │   │
-│ │ 🌿   │  │                                      │   │
-│ │ 💼   │  │                                      │   │
-│ │ ⚙️   │  │                                      │   │
-│ │      │  │                                      │   │
-│ └──────┘  └──────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────┘
-```
+| Event | → Reactions |
+|-------|-------------|
+| `people.employee.created` | Create leave balances for the year → notify manager + HR |
+| `leave.request.created` | Notify manager; if > 3 days also HR |
+| `leave.request.approved` | Update balance + attendance → notify employee |
+| `recruitment.candidate.shortlisted` | Notify hiring manager → create interview task |
+| `attendance.checkin.completed` | If late, mark late → notify manager on 3rd late/month |
+| `crm.lead.converted` | Create account + deal → notify owner |
+| `crm.deal.won` | Notify owner + manager → (optional) analytics refresh |
 
-**Sidebar icons (top to bottom):**
-1. Dashboard (home)
-2. Employees (people)
-3. Attendance (calendar/clock)
-4. Leave (leaf/palm)
-5. Recruitment (briefcase)
-6. Settings (gear) — pinned to bottom
-
-**Topbar:**
-- Left: Organization name + logo
-- Center: Global search bar
-- Right: AI assistant toggle | Notifications bell | User avatar + dropdown
-
-**Mobile (< 768px):**
-- Sidebar collapses to bottom tab bar (5 icons max)
-- Topbar becomes sticky header with hamburger menu for settings
+The processor is `js/event-processor.js` (client trigger) / `api/event-processor.js`
+(serverless drain). Publish with `js/events.js` `publishEvent(type, payload)`.
 
 ---
 
-## 8. Design Tokens
+## 8. Requirements
 
-```css
-/* css/tokens.css */
+### 8.1 Non-functional (platform — apply to every module)
+- **Tenant isolation:** the two-org test (§4) passes on every table, always.
+- **Auth:** email/password + Google OAuth (both wired in `login.html`). **Add the
+  missing password-reset flow** — `resetPasswordForEmail` on `login.html` and a
+  `PASSWORD_RECOVERY` handler in `js/auth.js` (currently only `SIGNED_OUT` is
+  handled at `js/auth.js:55`).
+- **Security:** `anon` + RLS only; no `service_role` client-side or in AI paths;
+  every user-rendered string passes `esc()` (`js/ui.js`).
+- **Events:** every mutation publishes `module.entity.action`.
+- **Design system:** views compose `css/tokens.css` + `css/components.css`
+  classes. Do not add token-laced inline `style=""` strings (there are ~1,700 to
+  unwind). One icon system: inline SVG. No emoji as UI icons.
+- **Reuse ladder:** before new code, reuse a `js/ui.js` helper, then stdlib, then
+  a platform service. `js/ui.js` already exports `esc, toast, openModal, closeModal,
+  formatDate, timeAgo, initials, avColor, scoreBar, stagePill, showError,
+  loadingSkeleton, getAuthToken`.
 
-:root {
-  /* Colors — neutral base with a single accent */
-  --color-bg: #FFFFFF;
-  --color-bg-secondary: #F7F8FA;
-  --color-bg-tertiary: #EDEEF1;
-  --color-surface: #FFFFFF;
-  --color-border: #E2E4E9;
-  --color-border-light: #F0F1F3;
-
-  --color-text-primary: #1A1D23;
-  --color-text-secondary: #6B7080;
-  --color-text-tertiary: #9CA0AB;
-  --color-text-inverse: #FFFFFF;
-
-  --color-accent: #2563EB;        /* Primary action */
-  --color-accent-hover: #1D4FD8;
-  --color-accent-light: #EFF6FF;
-
-  --color-success: #16A34A;
-  --color-success-light: #F0FDF4;
-  --color-warning: #D97706;
-  --color-warning-light: #FFFBEB;
-  --color-error: #DC2626;
-  --color-error-light: #FEF2F2;
-  --color-info: #2563EB;
-  --color-info-light: #EFF6FF;
-
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-
-  --text-xs: 0.75rem;     /* 12px */
-  --text-sm: 0.8125rem;   /* 13px */
-  --text-base: 0.875rem;  /* 14px — body default */
-  --text-md: 1rem;        /* 16px */
-  --text-lg: 1.125rem;    /* 18px */
-  --text-xl: 1.25rem;     /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-3xl: 1.875rem;   /* 30px */
-
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-
-  --line-height-tight: 1.25;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.625;
-
-  /* Spacing — 4px base */
-  --space-1: 0.25rem;   /* 4px */
-  --space-2: 0.5rem;    /* 8px */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-10: 2.5rem;   /* 40px */
-  --space-12: 3rem;     /* 48px */
-  --space-16: 4rem;     /* 64px */
-
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
-
-  /* Sidebar */
-  --sidebar-width: 64px;
-  --topbar-height: 56px;
-
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 200ms ease;
-}
-
-/* Dark mode */
-[data-theme="dark"] {
-  --color-bg: #0F1117;
-  --color-bg-secondary: #1A1D27;
-  --color-bg-tertiary: #252830;
-  --color-surface: #1A1D27;
-  --color-border: #2E3240;
-  --color-border-light: #252830;
-
-  --color-text-primary: #F0F1F3;
-  --color-text-secondary: #9CA0AB;
-  --color-text-tertiary: #6B7080;
-
-  --color-accent: #3B82F6;
-  --color-accent-hover: #60A5FA;
-  --color-accent-light: #1E293B;
-
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
-}
-```
+### 8.2 Functional — per module
+- **HRMS / People:** directory + profile + org chart; attendance check-in/out +
+  regularization; leave apply/approve + balances + calendar + holidays; assets;
+  expenses; helpdesk tickets; announcements; document store; lifecycle & letters.
+- **Recruitment & Interview Automation:** create job/JD → Groq skill parse; upload
+  resumes (single + bulk) → parse; match → ranked scores + breakdown; shortlist/
+  reject pipeline; schedule interviews with slots + Google Meet; candidate profile
+  with scores + interview history.
+- **CRM:** accounts; contacts; leads with source/status; deals on a configurable
+  pipeline; activity/note/task timeline; convert lead → account+deal; owner
+  assignment. All `org_id`-scoped + RLS + events.
+- **Analytics:** per-module KPI dashboards; date-range + department filters;
+  export; reads via module APIs / `analytics_*` views only. Replaces the ad-hoc
+  `views/reports/*` screens.
 
 ---
 
-## 9. AI Integration (Groq)
-
-### 9.1 Current: CV-JD Matching
-
-Already built. The matching flow:
+## 9. File Structure (actual)
 
 ```
-1. User uploads resumes (PDF/DOCX)
-2. api/parse-resume.js extracts text → sends to Groq → gets structured skills/experience
-3. User creates job with JD text
-4. api/parse-jd.js sends JD to Groq → gets must-have/nice-to-have skills
-5. api/match.js compares parsed resume vs parsed JD → generates match_score + breakdown
-6. Results stored in job_applications table
-7. UI shows ranked candidates with score breakdown
+index.html            login.html          schedule.html
+css/    tokens.css  base.css  layout.css  components.css
+js/     supabase.js auth.js  router.js  api.js  events.js  event-processor.js
+        notifications.js  search.js  audit.js  ai.js  ui.js  config.js
+views/  dashboard.js  me/  inbox.js  approvals.js  onboarding.js
+        employees/  attendance/  leave/  people/  documents/  finance/
+        helpdesk/  announcements/  audit/            (HRMS/People)
+        recruitment/                                 (Recruitment & Interviews)
+        reports/                                     (→ folds into Analytics)
+        ai/  settings/  admin/
+api/    parse-resume.js  match.js  screen-job.js  extract-candidate.js
+        schedule.js  google-auth.js  ai-query.js  bulk-import.js  reports.js
+        create-org.js  send-notification.js  event-processor.js
+lib/    supabaseServer.js  googleMeet.js
+supabase/migrations/*.sql   supabase/seed.sql
 ```
 
-### 9.2 New: AI Assistant
-
-The AI assistant is a **permission-aware Q&A and action layer** over the entire platform.
-
-**Read-only queries (Phase 4):**
-- "Who is absent today?" → query attendance table WHERE date = today AND status = 'absent'
-- "Show pending leave approvals" → query leave_requests WHERE status = 'pending' AND reviewer = current user's reports
-- "How many candidates are shortlisted for Backend Engineer?" → query job_applications
-- "Summarize Ravi's attendance this month" → aggregate attendance for user
-
-**Action execution (Phase 5):**
-- "Approve Ravi's leave" → update leave_request, requires confirmation dialog
-- "Schedule interview with Priya for Thursday 2 PM" → insert into interviews table
-- "Shortlist top 5 candidates for Product Manager role" → update job_applications status
-
-**Implementation pattern:**
-
-```javascript
-// js/ai.js — simplified flow
-async function handleAIQuery(userMessage) {
-  // 1. Send to Groq with system prompt that defines available actions
-  const response = await callGroq({
-    system: `You are Atllanta AI. You help with HR tasks.
-             Available data: employees, attendance, leave, jobs, candidates, interviews.
-             The current user's role is: ${currentUser.role}.
-             The current user's org_id is: ${currentUser.org_id}.
-             Today's date is: ${new Date().toISOString().split('T')[0]}.
-             
-             For data queries, respond with JSON:
-             {"action": "query", "table": "...", "filters": {...}, "display": "table|text|chart"}
-             
-             For mutations, respond with JSON:
-             {"action": "mutate", "table": "...", "operation": "update|insert", "data": {...}, "confirm": true}`,
-    user: userMessage
-  });
-
-  // 2. Parse Groq response
-  const intent = JSON.parse(response);
-
-  // 3. Execute query through RLS-protected Supabase client (NEVER service_role)
-  if (intent.action === 'query') {
-    const data = await supabase.from(intent.table).select('*').match(intent.filters);
-    // Display results
-  }
-
-  if (intent.action === 'mutate' && intent.confirm) {
-    // Show confirmation dialog BEFORE executing
-    showConfirmDialog(intent, async () => {
-      await supabase.from(intent.table)[intent.operation](intent.data);
-    });
-  }
-}
-```
-
-**Hard rule:** The AI NEVER uses the Supabase `service_role` key. All queries go through the standard `anon` key with RLS. If the user can't see it in the UI, the AI can't see it either.
+New modules add a `views/<module>/` folder, a migration, and (if needed) `api/`
+endpoints — never a new tenancy model.
 
 ---
 
-## 10. Event System
+## 10. Design System
 
-Every state change publishes an event. Workers (Supabase Edge Functions or pg_cron) process them.
-
-```javascript
-// js/events.js
-async function publishEvent(eventType, payload) {
-  await supabase.from('events').insert({
-    org_id: currentUser.org_id,
-    event_type: eventType,
-    actor_id: currentUser.id,
-    payload: payload,
-    status: 'pending'
-  });
-}
-
-// Usage examples:
-publishEvent('people.employee.created', { employee_id: '...', name: '...' });
-publishEvent('recruitment.candidate.shortlisted', { job_id: '...', candidate_id: '...', score: 85 });
-publishEvent('leave.request.approved', { leave_request_id: '...', approved_by: '...' });
-publishEvent('attendance.checkin.completed', { user_id: '...', time: '...' });
-```
-
-**Predefined workflow recipes (Phase 3):**
-
-| Event | → Actions |
-|-------|-----------|
-| `people.employee.created` | Create leave balances for current year → Notify reporting manager → Notify HR |
-| `leave.request.created` | Notify reporting manager (email + in_app) → If > 3 days, also notify HR |
-| `leave.request.approved` | Update leave balance → Update attendance status → Notify employee |
-| `recruitment.candidate.shortlisted` | Notify hiring manager → Create interview scheduling task |
-| `attendance.checkin.completed` | If late (> 15 min after shift start), mark as 'late' → Notify manager if 3rd late this month |
+Tokens in `css/tokens.css` (colors, spacing 4px base, typography, radius, shadow,
+dark mode via `[data-theme="dark"]`). Components in `css/components.css` (button,
+input, table, modal, toast, card, badge, empty-state, skeleton). Accent
+`--color-accent: #2563EB`. **Compose classes; don't inline token strings.**
 
 ---
 
-## 11. API Endpoints
+## 11. AI Integration (Groq)
 
-All API routes are Vercel serverless functions under `/api/`.
-
-```
-POST   /api/parse-resume          # Upload resume → extract text → Groq parse → return structured data
-POST   /api/parse-jd              # JD text → Groq parse → return structured skills
-POST   /api/match                 # Job ID + candidate IDs → run matching → store scores
-POST   /api/ai-query              # Natural language query → Groq → execute → return results
-POST   /api/bulk-import           # CSV/XLSX → parse → insert employees/candidates
-POST   /api/send-notification     # Send email/WhatsApp notification
-GET    /api/reports/attendance     # Attendance report (date range, department)
-GET    /api/reports/leave          # Leave report (date range, type, department)
-GET    /api/reports/recruitment    # Recruitment pipeline report (job, stage counts)
-```
-
-Everything else (CRUD operations on employees, leave requests, attendance, etc.) goes through **direct Supabase client calls** from the frontend, protected by RLS. No need for API routes for standard CRUD.
+- **CV↔JD matching** (built): resume/JD → Groq structured parse → score +
+  breakdown stored on `applications`. Keep prompts that work; restructure only
+  surrounding code.
+- **AI Assistant** (permission-aware): natural-language query → Groq intent JSON
+  → executed through the **same `anon`+RLS Supabase client** as the UI. Mutations
+  require a confirmation dialog. Never `service_role`.
 
 ---
 
-## 12. Development Phases
+## 12. Conventions
 
-### Phase 0 — Skeleton (Week 1)
-- [ ] Create Supabase project, run all migration SQL files
-- [ ] Verify RLS policies work (cross-tenant isolation test)
-- [ ] Set up Vercel project, connect repo
-- [ ] Build app shell: `index.html` with sidebar, topbar, content area
-- [ ] Implement `router.js` — hash-based view loading
-- [ ] Build 8 base components: button, input, table, modal, toast, card, badge, empty-state
-- [ ] Build `login.html` with Supabase Auth (email + Google OAuth)
-- [ ] Build org creation flow (post-signup)
-- [ ] Deploy to Vercel, verify end-to-end auth flow
-
-### Phase 1 — Recruitment Features (Weeks 2–4)
-*This is the existing Atllanta functionality, migrated into the new structure.*
-- [ ] Jobs view — create/edit JD, auto-parse skills via Groq
-- [ ] Resume upload — single + bulk, text extraction, Groq parsing
-- [ ] Matching engine — run CV-JD match, display ranked results with score breakdown
-- [ ] Shortlist view — filter by score threshold, manually shortlist/reject
-- [ ] Interview scheduling — create slots, schedule interviews, calendar view
-- [ ] Candidate profile — resume, match scores across jobs, interview history
-
-### Phase 2 — Employee Management (Weeks 5–7)
-- [ ] Employee directory — list, search, filter by department/team/status
-- [ ] Employee profile page — personal info, employment info, documents tab
-- [ ] Bulk import via CSV
-- [ ] Department and team management (settings)
-- [ ] Org chart (basic — generated from reporting_manager_id)
-
-### Phase 3 — Attendance (Weeks 8–10)
-- [ ] Check-in / check-out button with timestamp
-- [ ] GPS capture on check-in (optional, permission-based)
-- [ ] Today's attendance dashboard — present/absent/late/on-leave counts
-- [ ] Monthly attendance report per employee
-- [ ] Manager view — team attendance
-- [ ] Attendance regularization (request → approve)
-- [ ] Work schedule configuration
-
-### Phase 4 — Leave (Weeks 11–13)
-- [ ] Leave type configuration (admin)
-- [ ] Holiday calendar (admin)
-- [ ] Leave balance display per employee
-- [ ] Apply for leave form
-- [ ] Approval flow — manager inbox, approve/reject with comment
-- [ ] Team leave calendar view
-- [ ] Leave reports
-
-### Phase 5 — Platform Services (Weeks 14–17)
-- [ ] Event bus — events table, worker polling, 5 workflow recipes
-- [ ] Notification service — in-app notifications + email via Resend
-- [ ] Global search — single search bar querying users, candidates, jobs
-- [ ] Audit log — auto-log every mutation, admin viewer
-- [ ] AI assistant panel — read-only Q&A via Groq
-- [ ] Universal approvals inbox — leave + attendance regularizations in one view
-
-### Phase 6 — Polish & Launch (Weeks 18–20)
-- [ ] Dark mode
-- [ ] Mobile responsive pass (all views)
-- [ ] Empty states for every view
-- [ ] Error handling pass (every API call)
-- [ ] Loading states (skeleton screens)
-- [ ] Onboarding flow (new org: create → configure leave → invite → first check-in)
-- [ ] PWA manifest + service worker (basic offline support)
+- Tables/columns `snake_case`; JS files `kebab-case`; JS functions `camelCase`;
+  CSS classes `kebab-case`; events `module.entity.action`.
+- `const` by default, `let` when reassigned, never `var`; `async/await`; early
+  returns; every Supabase call checks `error`.
+- Git: branch `feature/…`|`fix/…`|`chore/…`; commits imperative and short.
 
 ---
 
-## 13. Migration from Current Atllanta
+## 13. Alignment Status (code vs. this document)
 
-The current Atllanta codebase has matching and interview scheduling with Groq. The migration:
+This file is the target. The code is being brought onto it in phases (full detail
+in the approved plan `enchanted-sleeping-lemon.md`):
 
-1. **Keep:** Groq integration, matching algorithm logic, resume parsing logic
-2. **Move:** matching logic into `api/match.js`, resume parsing into `api/parse-resume.js`, JD parsing into `api/parse-jd.js`
-3. **Replace:** any existing database with the schema defined in Section 5 above
-4. **Replace:** any existing auth with Supabase Auth
-5. **Replace:** any existing file storage with Supabase Storage
-6. **Add:** RLS policies on every table
-7. **Add:** event publishing on every mutation
-8. **Wrap:** existing UI into the new sidebar layout and design system
+- **Phase 0 (this file)** — canonical definition + requirements. ✅
+- **Phase 1** — unify tenancy: migrate recruitment tables `client_id → org_id`;
+  fold `memberships` into `users`; drop `clients`; replace
+  `auth_accessible_client_ids()` + `auth_user_org_ids()` with one `auth_org_id()`;
+  delete the `roleMap` shim (`js/auth.js:29`); standardize `organization_id → org_id`.
+- **Phase 2** — enforce module boundaries; add password-reset flow.
+- **Phase 3** — design-system cleanup (inline-style removal, SVG icons, dedupe
+  `index.html` helpers against `js/ui.js`).
+- **Phase 4** — build CRM. **Phase 5** — build Analytics as a real module.
 
-The existing Groq prompts for resume/JD parsing should be preserved as-is if they work well. Only restructure the surrounding code to fit the new file structure.
-
----
-
-## 14. Conventions
-
-**Naming:**
-- Database tables: `snake_case`, plural (`users`, `leave_requests`, `job_applications`)
-- Database columns: `snake_case` (`created_at`, `org_id`, `match_score`)
-- JS files: `kebab-case` (`job-detail.js`, `upload-resumes.js`)
-- JS functions: `camelCase` (`handleCheckIn`, `parseResume`, `calculateMatchScore`)
-- CSS classes: `kebab-case` (`btn-primary`, `card-header`, `sidebar-nav`)
-- Event types: `module.entity.action` (`people.employee.created`, `recruitment.candidate.shortlisted`)
-
-**Git:**
-- Branch: `feature/recruitment-matching`, `fix/attendance-rls`, `chore/design-tokens`
-- Commits: imperative mood, short (`Add leave request approval flow`, `Fix RLS policy for candidates table`)
-
-**Code style:**
-- No semicolons in JS (or always — just be consistent)
-- Use `const` by default, `let` when reassignment needed, never `var`
-- `async/await` over `.then()` chains
-- Early returns over nested conditionals
-- Every Supabase call must check for errors: `const { data, error } = await supabase...`
+Until Phase 1 lands, recruitment code still queries `client_id`/`memberships`.
+Do not extend that model; new work targets `org_id`.
 
 ---
 
-## 15. What NOT to Build
+## 14. What NOT to Build
 
 | Item | Reason |
 |------|--------|
-| Payroll | Compliance minefield (PF/ESI/PT/TDS). Not until paying customers demand it. |
-| Visual workflow builder | Predefined recipes only. A drag-and-drop builder is a product in itself. |
-| Custom role permissions UI | Four fixed roles (owner/admin/manager/member) are enough for Phase 1–5. |
-| Native mobile app | PWA first. Native only after daily usage is proven. |
-| CRM / Customers module | Phase 6+. Build only after People app has real users. |
-| Microservices | Everything stays in the monolith until a named scaling trigger fires. |
-| Elasticsearch | Postgres full-text search handles the first 100K records per org. |
-| React / Next.js migration | Stay vanilla JS unless Sachin explicitly asks to switch. |
+| Agency/reseller multi-client tier | Explicitly collapsed to one-org-per-company. |
+| Payroll | Compliance minefield. Not until paying customers demand it. |
+| Visual workflow builder | Predefined event recipes only. |
+| Custom role-permission UI | Four fixed roles are enough. |
+| Native mobile app | PWA first. |
+| Microservices / Elasticsearch | Monolith + Postgres FTS until a named scaling trigger. |
+| React / Next.js migration | Stay vanilla JS unless the owner asks. |

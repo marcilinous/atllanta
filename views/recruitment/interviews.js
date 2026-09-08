@@ -1,17 +1,17 @@
 import sb from '../../js/supabase.js';
-import { esc, toast, stagePill, openModal, closeModal, getAuthToken, clientId, initials, avColor, formatDate } from '../../js/ui.js';
+import { esc, toast, stagePill, openModal, closeModal, getAuthToken, orgId, initials, avColor, formatDate } from '../../js/ui.js';
 import { getOrg, getUser } from '../../js/auth.js';
 import { logAction } from '../../js/audit.js';
 import { publishEvent } from '../../js/events.js';
 
 export default async function interviewsView(container) {
   const org = getOrg();
-  const cid = org?.id || await clientId();
+  const cid = org?.id || await orgId();
   if (!cid) {
     container.innerHTML = '<div class="empty-state"><div class="empty-state-title">No organization found</div></div>';
     return;
   }
-  const orgCol = org ? 'org_id' : 'client_id';
+  const orgCol = 'org_id';
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
@@ -47,7 +47,7 @@ export default async function interviewsView(container) {
     sb.from('jobs').select('*').eq(orgCol, cid),
     sb.from('candidates').select('*').eq(orgCol, cid),
     sb.from('job_applications').select('*').in('status', ['interview_scheduled', 'interviewed', 'shortlisted', 'screened', 'new', 'offered']),
-    sb.from('memberships').select('user_id, full_name, email, role').eq('organization_id', org?.id || cid),
+    sb.from('users').select('user_id:id, full_name, email, role').eq('org_id', org?.id || cid),
   ]);
   if (jobsErr) toast('Failed to load jobs: ' + jobsErr.message);
   if (candsErr) toast('Failed to load candidates: ' + candsErr.message);
@@ -87,7 +87,7 @@ export default async function interviewsView(container) {
   if (!interviewApps.length) {
     content.innerHTML += `
       <div class="card" style="padding:var(--space-6);text-align:center">
-        <div style="color:var(--color-text-secondary)">No interviews scheduled yet.</div>
+        <div class="u-muted">No interviews scheduled yet.</div>
         <div style="font-size:var(--text-sm);color:var(--color-text-tertiary);margin-top:var(--space-2)">Assign slots to a candidate above, then send a scheduling link.</div>
       </div>`;
     return;
@@ -111,8 +111,8 @@ export default async function interviewsView(container) {
         </div>
         <div style="flex:1">
           <div style="font-weight:var(--font-weight-semibold)">${esc(c?.full_name || 'Unknown')}</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(j?.title || '')} · ${a.status.replaceAll('_', ' ')}${(() => { const mgr = j?.hiring_manager_id ? allMembers.find(m => m.user_id === j.hiring_manager_id) : null; return mgr ? ` · 👤 ${esc(mgr.full_name || mgr.email)}` : ''; })()}</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${a.interview_at ? '' : ' (manual)'}</div>
+          <div class="u-sm-muted">${esc(j?.title || '')} · ${a.status.replaceAll('_', ' ')}${(() => { const mgr = j?.hiring_manager_id ? allMembers.find(m => m.user_id === j.hiring_manager_id) : null; return mgr ? ` · 👤 ${esc(mgr.full_name || mgr.email)}` : ''; })()}</div>
+          <div class="u-sm-muted">${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${a.interview_at ? '' : ' (manual)'}</div>
           ${a.meet_link ? `<a href="${esc(a.meet_link)}" target="_blank" rel="noopener" style="font-size:var(--text-sm);color:var(--color-accent)">Google Meet</a>` : ''}
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
@@ -135,7 +135,7 @@ export default async function interviewsView(container) {
       const app = allApps.find(a => a.id === btn.dataset.app);
       const f = document.createElement('div');
       f.innerHTML = `
-        <div style="display:grid;gap:var(--space-3)">
+        <div class="u-stack">
           <select class="form-input" id="int-stage">${stages.map(s => `<option value="${s}" ${s === app?.status ? 'selected' : ''}>${s.replaceAll('_', ' ')}</option>`).join('')}</select>
           <button class="btn btn-primary" id="int-stage-save">Update</button>
         </div>`;
@@ -160,8 +160,8 @@ export default async function interviewsView(container) {
       const user = getUser();
       const f = document.createElement('div');
       f.innerHTML = `
-        <div style="display:grid;gap:var(--space-3)">
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.full_name || '—')} for ${esc(job?.title || '—')}</div>
+        <div class="u-stack">
+          <div class="u-sm-muted">${esc(cand?.full_name || '—')} for ${esc(job?.title || '—')}</div>
           <div class="form-group">
             <label class="form-label">Rating</label>
             <div style="display:flex;gap:var(--space-2)" id="fb-stars">
@@ -248,8 +248,8 @@ export default async function interviewsView(container) {
 
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.full_name)} for ${esc(job?.title)}${hiringMgr ? ` · Manager: ${esc(hiringMgr.full_name || hiringMgr.email)}` : ''}</div>
+      <div class="u-stack-4">
+        <div class="u-sm-muted">${esc(cand?.full_name)} for ${esc(job?.title)}${hiringMgr ? ` · Manager: ${esc(hiringMgr.full_name || hiringMgr.email)}` : ''}</div>
         <div style="display:flex;gap:var(--space-2);align-items:flex-end">
           <div class="form-group" style="flex:1"><label class="form-label">Date</label><input type="date" class="form-input" id="sl-date" min="${new Date().toISOString().slice(0, 10)}"></div>
           <div class="form-group"><label class="form-label">Start</label><input type="time" class="form-input" id="sl-start" value="10:00"></div>
@@ -257,7 +257,7 @@ export default async function interviewsView(container) {
           <button class="btn btn-primary btn-sm" id="sl-add" style="margin-bottom:4px">Add</button>
         </div>
         <div style="display:flex;gap:var(--space-2)">
-          <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Quick add:</span>
+          <span class="u-sm-muted">Quick add:</span>
           <button class="btn btn-secondary btn-sm" data-quick="30">+30 min slots</button>
           <button class="btn btn-secondary btn-sm" data-quick="60">+1 hr slots</button>
         </div>
@@ -415,13 +415,13 @@ export default async function interviewsView(container) {
       timelineEl.innerHTML = `
         <div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-            <div style="display:flex;align-items:center;gap:var(--space-2)">
+            <div class="u-row">
               <button class="btn btn-secondary btn-sm" id="tl-prev">&larr;</button>
               <span style="font-weight:var(--font-weight-semibold);min-width:200px;text-align:center">${weekLabel}</span>
               <button class="btn btn-secondary btn-sm" id="tl-next">&rarr;</button>
               <button class="btn btn-secondary btn-sm" id="tl-this-week" style="margin-left:var(--space-2)">This Week</button>
             </div>
-            <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">
+            <div class="u-sm-muted">
               ${scheduled.length} interview${scheduled.length !== 1 ? 's' : ''} total
             </div>
           </div>

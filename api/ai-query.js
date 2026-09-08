@@ -30,13 +30,13 @@ export default async function handler(req, res) {
 
   const sb = supabaseAdmin();
   const { data: membership } = await sb
-    .from("memberships")
-    .select("organization_id, role")
-    .eq("user_id", user.id)
+    .from("users")
+    .select("org_id, role")
+    .eq("id", user.id)
     .limit(1)
     .single();
 
-  const orgId = membership?.organization_id;
+  const orgId = membership?.org_id;
   const role = membership?.role || "member";
   const today = new Date().toISOString().split("T")[0];
 

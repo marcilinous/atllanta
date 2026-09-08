@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   // Load job + candidate + org, and verify the caller can access this client
   const { data: job } = await db
     .from("jobs")
-    .select("id, title, jd_raw_text, description, client_id, clients(id, organization_id, name)")
+    .select("id, title, jd_raw_text, description, org_id")
     .eq("id", app.job_id)
     .single();
   const { data: candidate } = await db
@@ -80,19 +80,16 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Job or candidate not found" });
   }
 
-  const orgId = job.clients.organization_id;
-  const { data: membership } = await db
-    .from("memberships")
-    .select("id, role, client_id")
-    .eq("user_id", user.id)
-    .eq("organization_id", orgId)
+  const { data: profile } = await db
+    .from("users")
+    .select("org_id, role")
+    .eq("id", user.id)
     .maybeSingle();
 
-  const allowed =
-    membership &&
-    (["agency_admin", "super_admin"].includes(membership.role) ||
-      membership.client_id === job.client_id);
-  if (!allowed) return res.status(403).json({ error: "No access to this client" });
+  const allowed = profile && profile.org_id && profile.org_id === job.org_id;
+  if (!allowed) return res.status(403).json({ error: "No access to this job" });
+
+  const orgId = job.org_id;
 
   const jd = job.jd_raw_text || job.description || "";
   const resume = candidate.resume_text || candidate.resume_raw_text || "";

@@ -353,7 +353,7 @@ export default async function assetsView(container) {
               <td style="font-size:var(--text-sm)">${esc(a.type)}</td>
               <td style="font-size:var(--text-sm);color:var(--color-text-tertiary)">${esc(a.serial_number || '—')}</td>
               <td>${a.assignee ? `
-                <div style="display:flex;align-items:center;gap:var(--space-2)">
+                <div class="u-row">
                   <div style="width:24px;height:24px;border-radius:var(--radius-full);background:${avColor(a.assignee.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:8px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(a.assignee.full_name)}</div>
                   <span style="font-size:var(--text-sm)">${esc(a.assignee.full_name)}</span>
                 </div>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>

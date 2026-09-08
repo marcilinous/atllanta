@@ -56,7 +56,7 @@ export default async function announcementsView(container) {
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
                   <span style="font-weight:var(--font-weight-medium)">${esc(name)}</span>
-                  <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${formatDate(a.created_at)}</span>
+                  <span class="u-meta">${formatDate(a.created_at)}</span>
                   ${a.pinned ? '<span class="badge" style="background:var(--color-accent-light);color:var(--color-accent);font-size:var(--text-xs)">Pinned</span>' : ''}
                 </div>
                 <h4 style="margin:var(--space-2) 0 var(--space-1);font-size:var(--text-md);font-weight:var(--font-weight-semibold)">${esc(a.title)}</h4>
@@ -124,7 +124,7 @@ export default async function announcementsView(container) {
           <label class="form-label">Body</label>
           <textarea class="form-input" name="body" rows="5" required placeholder="Write your announcement...">${esc(existing?.body || '')}</textarea>
         </div>
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <div class="u-row">
           <input type="checkbox" name="pinned" id="ann-pin" ${existing?.pinned ? 'checked' : ''}>
           <label for="ann-pin" class="form-label" style="margin:0">Pin to top</label>
         </div>

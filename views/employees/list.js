@@ -57,22 +57,6 @@ export default async function employeeList(container) {
   allEmployees = users || [];
   departments = depts || [];
 
-  // If users table is empty, fall back to memberships
-  if (!allEmployees.length) {
-    const { data: members, error: membersErr } = await sb.from('memberships').select('*').order('created_at', { ascending: false });
-    if (membersErr) { console.error(membersErr); }
-    if (members?.length) {
-      allEmployees = members.map(m => ({
-        id: m.user_id || m.id,
-        full_name: m.email,
-        email: m.email,
-        role: m.role,
-        status: 'active',
-        created_at: m.created_at,
-      }));
-    }
-  }
-
   const deptSelect = document.getElementById('emp-dept-filter');
   departments.forEach(d => {
     const opt = document.createElement('option');
@@ -122,7 +106,7 @@ export default async function employeeList(container) {
         return `<tr style="cursor:pointer" data-emp-id="${e.id}">
           ${isAdmin ? `<td><input type="checkbox" class="emp-check" data-id="${e.id}" onclick="event.stopPropagation()"></td>` : ''}
           <td>
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <div class="u-row-3">
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(e.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(e.full_name)}</div>
               <div>
                 <div style="font-weight:var(--font-weight-medium)">${esc(e.full_name || '—')}</div>
@@ -199,7 +183,7 @@ export default async function employeeList(container) {
         const ids = getSelected();
         if (!ids.length) return;
         const f = document.createElement('div');
-        f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+        f.innerHTML = `<div class="u-stack">
           <div class="form-group"><label class="form-label">Department</label>
             <select class="form-input" id="bulk-dept-select">
               <option value="">None</option>
@@ -255,7 +239,7 @@ export default async function employeeList(container) {
   document.getElementById('add-employee-btn').addEventListener('click', () => {
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="ae-name" required></div>
         <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="ae-email" required></div>
         <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" id="ae-phone"></div>

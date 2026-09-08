@@ -23,7 +23,7 @@ export default async function onboarding(container) {
       <div style="max-width:640px;margin:var(--space-8) auto;padding:0 var(--space-4)">
         <div style="text-align:center;margin-bottom:var(--space-8)">
           <h1 style="font-size:var(--text-2xl);font-weight:var(--font-weight-bold);margin-bottom:var(--space-2)">Set up your workspace</h1>
-          <p style="color:var(--color-text-secondary)">Step ${step} of ${totalSteps}</p>
+          <p class="u-muted">Step ${step} of ${totalSteps}</p>
           <div style="display:flex;gap:var(--space-2);margin-top:var(--space-4);justify-content:center">
             ${Array.from({ length: totalSteps }, (_, i) => `
               <div style="width:48px;height:4px;border-radius:var(--radius-full);background:${i < step ? 'var(--color-accent)' : 'var(--color-border)'}"></div>
@@ -43,7 +43,7 @@ export default async function onboarding(container) {
   function renderOrgStep(el) {
     el.innerHTML = `
       <h2 style="font-size:var(--text-lg);font-weight:var(--font-weight-semibold);margin-bottom:var(--space-4)">Organization Details</h2>
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group">
           <label class="form-label">Organization Name *</label>
           <input type="text" class="form-input" id="ob-name" value="${esc(orgData.name)}" placeholder="e.g. Acme Corp">
@@ -104,7 +104,7 @@ export default async function onboarding(container) {
     el.innerHTML = `
       <h2 style="font-size:var(--text-lg);font-weight:var(--font-weight-semibold);margin-bottom:var(--space-2)">Configure Leave Types</h2>
       <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-4)">Defaults are pre-filled. You can change these later in Settings.</p>
-      <div id="leave-types-list" style="display:grid;gap:var(--space-3)">
+      <div id="leave-types-list" class="u-stack">
         ${leaveTypes.map((lt, i) => `
           <div style="display:flex;gap:var(--space-3);align-items:center;padding:var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-lg)">
             <div style="flex:1">
@@ -205,7 +205,7 @@ export default async function onboarding(container) {
 
   async function createWorkspace() {
     const el = document.getElementById('step-content');
-    el.innerHTML = `<div style="text-align:center;padding:var(--space-8)"><div style="color:var(--color-text-secondary)">Creating your workspace...</div></div>`;
+    el.innerHTML = `<div style="text-align:center;padding:var(--space-8)"><div class="u-muted">Creating your workspace...</div></div>`;
 
     const org = getOrg();
     if (org) {
@@ -236,12 +236,11 @@ export default async function onboarding(container) {
       }
 
       for (const inv of invites) {
-        const { error: invErr } = await sb.from('memberships').insert({
-          organization_id: org.id,
-          user_id: null,
+        const { error: invErr } = await sb.from('invitations').insert({
+          org_id: org.id,
           email: inv.email,
           role: inv.role,
-          status: 'invited',
+          status: 'pending',
         }).select().maybeSingle();
         if (invErr) toast('Invite error: ' + invErr.message);
       }

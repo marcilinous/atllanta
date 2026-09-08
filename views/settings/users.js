@@ -44,9 +44,9 @@ export default async function settingsUsers(container) {
 
   async function loadMembers() {
     const { data: members, error } = await sb
-      .from('memberships')
+      .from('users')
       .select('*')
-      .eq('organization_id', org.id)
+      .eq('org_id', org.id)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -86,10 +86,10 @@ export default async function settingsUsers(container) {
       <thead><tr><th>Member</th><th>Role</th><th>Invited</th><th>Joined</th>${isAdmin ? '<th>Actions</th>' : ''}</tr></thead>
       <tbody>${filtered.map(m => {
         const displayName = m.full_name || m.email || '—';
-        const isSelf = m.user_id === user?.id;
+        const isSelf = m.id === user?.id;
         return `<tr>
           <td>
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <div class="u-row-3">
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(displayName)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(displayName)}</div>
               <div>
                 <div style="font-weight:var(--font-weight-medium)">${esc(displayName)}${isSelf ? ' <span style="color:var(--color-text-tertiary);font-weight:normal">(you)</span>' : ''}</div>
@@ -98,8 +98,8 @@ export default async function settingsUsers(container) {
             </div>
           </td>
           <td><span class="badge badge-${roleColors[m.role] || 'neutral'}">${esc(m.role || 'member')}</span></td>
-          <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${m.invited_at ? formatDate(m.invited_at) : '—'}</td>
-          <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${m.created_at ? formatDate(m.created_at) : '—'}</td>
+          <td class="u-sm-muted">${m.invited_at ? formatDate(m.invited_at) : '—'}</td>
+          <td class="u-sm-muted">${m.created_at ? formatDate(m.created_at) : '—'}</td>
           ${isAdmin ? `<td>
             <div style="display:flex;gap:var(--space-2);align-items:center">
               ${!isSelf ? `<select class="form-input" data-role-change="${m.id}" style="height:30px;width:auto;font-size:var(--text-xs);padding:0 var(--space-2)">
@@ -108,7 +108,7 @@ export default async function settingsUsers(container) {
                 <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
                 <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>
               </select>
-              <button class="btn btn-ghost btn-sm" data-remove-member="${m.id}" style="color:var(--color-error)" title="Remove member">&times;</button>` : '<span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">—</span>'}
+              <button class="btn btn-ghost btn-sm" data-remove-member="${m.id}" style="color:var(--color-error)" title="Remove member">&times;</button>` : '<span class="u-meta">—</span>'}
             </div>
           </td>` : ''}
         </tr>`;
@@ -122,7 +122,7 @@ export default async function settingsUsers(container) {
           const memberId = select.dataset.roleChange;
           const newRole = select.value;
           const member = allMembers.find(m => m.id === memberId);
-          const { error } = await sb.from('memberships').update({ role: newRole }).eq('id', memberId);
+          const { error } = await sb.from('users').update({ role: newRole }).eq('id', memberId);
           if (error) {
             toast('Failed to update role: ' + error.message);
             loadMembers();
@@ -139,7 +139,7 @@ export default async function settingsUsers(container) {
           if (!confirm('Remove this member from the organization?')) return;
           const memberId = btn.dataset.removeMember;
           const member = allMembers.find(m => m.id === memberId);
-          const { error } = await sb.from('memberships').delete().eq('id', memberId);
+          const { error } = await sb.from('users').delete().eq('id', memberId);
           if (error) {
             toast('Failed to remove member: ' + error.message);
             return;
@@ -162,7 +162,7 @@ export default async function settingsUsers(container) {
     document.getElementById('invite-btn')?.addEventListener('click', () => {
       const f = document.createElement('div');
       f.innerHTML = `
-        <div style="display:grid;gap:var(--space-4)">
+        <div class="u-stack-4">
           <div class="form-group">
             <label class="form-label">Email Address</label>
             <input type="email" class="form-input" id="invite-email" placeholder="colleague@company.com" required>
@@ -215,8 +215,8 @@ export default async function settingsUsers(container) {
           if (result.new_account && result.temp_password) {
             const info = document.createElement('div');
             info.innerHTML = `
-              <div style="display:grid;gap:var(--space-4)">
-                <div style="text-align:center">
+              <div class="u-stack-4">
+                <div class="u-center">
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" width="48" height="48" style="margin:0 auto var(--space-3)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                   <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">Account Created</div>
                 </div>

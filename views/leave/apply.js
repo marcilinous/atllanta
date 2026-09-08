@@ -150,7 +150,7 @@ export default async function leaveModule(container) {
             </div>
             <div class="form-group"><label class="form-label">Reason</label><textarea class="form-input" id="leave-reason" rows="3" placeholder="Optional reason..."></textarea></div>
             <div class="form-group" id="leave-doc-group" style="display:none">
-              <label class="form-label">Attachment <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">(medical certificate, etc.)</span></label>
+              <label class="form-label">Attachment <span class="u-meta">(medical certificate, etc.)</span></label>
               <input type="file" class="form-input" id="leave-doc" accept=".pdf,.jpg,.jpeg,.png" style="padding:var(--space-2)">
             </div>
             <button type="submit" class="btn btn-primary" style="width:100%">Submit Request</button>
@@ -307,7 +307,7 @@ export default async function leaveModule(container) {
         <td>${r.days}</td>
         <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.reason || '—')}</td>
         <td><span class="badge badge-${statusColors[r.status] || 'neutral'}"><span class="badge-dot"></span>${r.status}</span></td>
-        <td>${r.status === 'pending' ? `<button class="btn btn-ghost btn-sm" data-cancel="${r.id}">Cancel</button>` : (r.review_comment ? `<span style="font-size:var(--text-xs);color:var(--color-text-tertiary)" title="${esc(r.review_comment)}">Note</span>` : '')}</td>
+        <td>${r.status === 'pending' ? `<button class="btn btn-ghost btn-sm" data-cancel="${r.id}">Cancel</button>` : (r.review_comment ? `<span class="u-meta" title="${esc(r.review_comment)}">Note</span>` : '')}</td>
       </tr>`).join('')}</tbody>
     </table></div></div>`;
 
@@ -356,7 +356,7 @@ export default async function leaveModule(container) {
     el.innerHTML = `<div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
         <span class="card-title">Team Calendar</span>
-        <div style="display:flex;align-items:center;gap:var(--space-3)">
+        <div class="u-row-3">
           <button class="btn btn-ghost btn-sm" id="cal-prev">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
@@ -437,7 +437,7 @@ export default async function leaveModule(container) {
       <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Actions</th></tr></thead>
       <tbody>${pending.map(r => `<tr>
         <td>
-          <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <div class="u-row">
             <div style="width:28px;height:28px;border-radius:var(--radius-full);background:${avColor(r.requester?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(r.requester?.full_name || r.requester?.email || '?')}</div>
             <span style="font-weight:var(--font-weight-medium);font-size:var(--text-sm)">${esc(r.requester?.full_name || r.requester?.email || '—')}</span>
           </div>
@@ -474,7 +474,7 @@ export default async function leaveModule(container) {
     el.querySelectorAll('[data-reject]').forEach(btn => {
       btn.addEventListener('click', () => {
         const f = document.createElement('div');
-        f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+        f.innerHTML = `<div class="u-stack">
           <div class="form-group"><label class="form-label">Rejection Reason</label><textarea class="form-input" id="rej-reason" rows="3" placeholder="Optional reason..."></textarea></div>
           <button class="btn btn-primary" id="rej-confirm">Reject Leave</button>
         </div>`;
@@ -541,17 +541,17 @@ export default async function leaveModule(container) {
         <div class="att-mini-stat"><div class="att-mini-stat-value" style="color:var(--color-error)">${rejected}</div><div class="att-mini-stat-label">Rejected</div></div>
       </div>
       ${reportData.length ? `<div class="table-wrap"><table class="table">
-        <thead><tr><th>Employee</th>${leaveTypeCodes.map(c => `<th style="text-align:center">${esc(c)}</th>`).join('')}<th style="text-align:center">Used</th><th style="text-align:center">Balance</th></tr></thead>
+        <thead><tr><th>Employee</th>${leaveTypeCodes.map(c => `<th class="u-center">${esc(c)}</th>`).join('')}<th class="u-center">Used</th><th class="u-center">Balance</th></tr></thead>
         <tbody>${reportData.map(u => `<tr>
           <td>
-            <div style="display:flex;align-items:center;gap:var(--space-2)">
+            <div class="u-row">
               <div style="width:24px;height:24px;border-radius:var(--radius-full);background:${avColor(u.name)};display:flex;align-items:center;justify-content:center;color:white;font-size:8px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(u.name)}</div>
               <span style="font-weight:var(--font-weight-medium);font-size:var(--text-sm)">${esc(u.name)}</span>
             </div>
           </td>
           ${leaveTypeCodes.map(c => {
             const t = u.types[c];
-            return `<td style="text-align:center">${t ? `<span style="color:var(--color-error)">${t.used}</span>/${t.total}` : '—'}</td>`;
+            return `<td class="u-center">${t ? `<span style="color:var(--color-error)">${t.used}</span>/${t.total}` : '—'}</td>`;
           }).join('')}
           <td style="text-align:center;font-weight:var(--font-weight-semibold);color:var(--color-error)">${u.totalUsed}</td>
           <td style="text-align:center;font-weight:var(--font-weight-semibold);color:var(--color-success)">${u.totalBalance}</td>

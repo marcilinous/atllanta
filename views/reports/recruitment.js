@@ -59,28 +59,28 @@ export default async function recruitmentReport(container) {
     <div class="stat-grid" style="margin-bottom:var(--space-6)">
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-accent)">${totalOpen}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Open Positions</div>
+        <div class="u-sm-muted">Open Positions</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-text-primary)">${totalApps}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Total Applications</div>
+        <div class="u-sm-muted">Total Applications</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-success)">${totalHired}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Total Hired</div>
+        <div class="u-sm-muted">Total Hired</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-warning)">${avgScore}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Avg Match Score</div>
+        <div class="u-sm-muted">Avg Match Score</div>
       </div></div>
     </div>
 
     <div class="card" style="margin-bottom:var(--space-6)">
       <div class="card-body">
         <h3 style="font-size:var(--text-md);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-4)">Pipeline Funnel</h3>
-        <div style="display:grid;gap:var(--space-3)">
+        <div class="u-stack">
           ${stages.filter(s => s !== 'rejected').map(s => `
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <div class="u-row-3">
               <div style="width:120px;font-size:var(--text-sm);color:var(--color-text-secondary);text-align:right;flex-shrink:0">${stageLabels[s]}</div>
               <div style="flex:1;height:28px;background:var(--color-bg-secondary);border-radius:var(--radius-md);overflow:hidden;position:relative">
                 <div style="height:100%;width:${(stageCounts[s] / maxStageCount) * 100}%;background:var(--color-accent);border-radius:var(--radius-md);transition:width 0.3s ease;min-width:${stageCounts[s] ? '2px' : '0'}"></div>
@@ -88,7 +88,7 @@ export default async function recruitmentReport(container) {
               </div>
             </div>
           `).join('')}
-          <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <div class="u-row-3">
             <div style="width:120px;font-size:var(--text-sm);color:var(--color-error);text-align:right;flex-shrink:0">Rejected</div>
             <div style="flex:1;height:28px;background:var(--color-bg-secondary);border-radius:var(--radius-md);overflow:hidden;position:relative">
               <div style="height:100%;width:${(stageCounts.rejected / maxStageCount) * 100}%;background:var(--color-error);border-radius:var(--radius-md);min-width:${stageCounts.rejected ? '2px' : '0'}"></div>

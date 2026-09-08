@@ -78,7 +78,7 @@ export default async function departmentsView(container) {
       return;
     }
 
-    el.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+    el.innerHTML = `<div class="u-stack-4">
       ${departments.map(dept => {
         const deptTeams = teams.filter(t => t.department_id === dept.id);
         const deptUsers = users.filter(u => u.department_id === dept.id);
@@ -86,7 +86,7 @@ export default async function departmentsView(container) {
 
         return `<div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <div class="u-row-3">
               <div style="width:36px;height:36px;border-radius:var(--radius-lg);background:var(--color-accent-light);display:flex;align-items:center;justify-content:center;font-size:var(--text-md);font-weight:var(--font-weight-bold);color:var(--color-accent);flex-shrink:0">${esc(dept.name.charAt(0).toUpperCase())}</div>
               <div>
                 <div class="card-title" style="margin:0">${esc(dept.name)}</div>
@@ -111,9 +111,9 @@ export default async function departmentsView(container) {
                   <div style="display:flex;align-items:center;gap:var(--space-3);flex:1">
                     <div style="width:6px;height:6px;border-radius:var(--radius-full);background:var(--color-accent);flex-shrink:0"></div>
                     <div style="flex:1">
-                      <div style="display:flex;align-items:center;gap:var(--space-2)">
+                      <div class="u-row">
                         <span style="font-weight:var(--font-weight-medium);font-size:var(--text-sm)">${esc(t.name)}</span>
-                        <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${teamUsers.length} member${teamUsers.length !== 1 ? 's' : ''}</span>
+                        <span class="u-meta">${teamUsers.length} member${teamUsers.length !== 1 ? 's' : ''}</span>
                       </div>
                       ${t.lead?.full_name ? `<div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Lead: ${esc(t.lead.full_name)}</div>` : ''}
                     </div>
@@ -199,7 +199,7 @@ export default async function departmentsView(container) {
     const deptUsers = dept ? users.filter(u => u.department_id === dept.id) : [];
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group">
           <label class="form-label">Department Name <span style="color:var(--color-error)">*</span></label>
           <input type="text" class="form-input" id="dept-name" value="${esc(dept?.name || '')}" placeholder="e.g. Engineering, Marketing, HR">
@@ -243,7 +243,7 @@ export default async function departmentsView(container) {
     const teamUsers = team ? users.filter(u => u.team_id === team.id) : [];
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group">
           <label class="form-label">Team Name <span style="color:var(--color-error)">*</span></label>
           <input type="text" class="form-input" id="team-name" value="${esc(team?.name || '')}" placeholder="e.g. Backend, Design, Sales Ops">

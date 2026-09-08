@@ -139,30 +139,24 @@ export async function getAuthToken() {
   return session?.access_token || '';
 }
 
-export async function getClientId() {
+// One org per user: resolve the caller's org_id from the users row.
+export async function getOrgId() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return null;
-  const { data: membership } = await sb
-    .from('memberships')
-    .select('client_id')
-    .eq('user_id', session.user.id)
-    .order('created_at')
-    .limit(1)
+  const { data: profile } = await sb
+    .from('users')
+    .select('org_id')
+    .eq('id', session.user.id)
     .single();
-  if (membership?.client_id) return membership.client_id;
-  const { data: clients } = await sb
-    .from('clients')
-    .select('id')
-    .order('created_at')
-    .limit(1);
-  return clients?.[0]?.id || null;
+  return profile?.org_id || null;
 }
 
-let cachedClientId = null;
-export async function clientId() {
-  if (cachedClientId) return cachedClientId;
-  cachedClientId = await getClientId();
-  return cachedClientId;
+// Cached org_id resolver for hot paths.
+let cachedOrgId = null;
+export async function orgId() {
+  if (cachedOrgId) return cachedOrgId;
+  cachedOrgId = await getOrgId();
+  return cachedOrgId;
 }
 
 export function showError(container, message, retryFn) {
