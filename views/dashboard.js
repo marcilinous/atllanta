@@ -133,14 +133,14 @@ export default async function dashboard(container) {
       </div>
       <div id="att-status" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--color-bg-secondary);border-radius:var(--radius-full)">
         <div style="width:8px;height:8px;border-radius:var(--radius-full);background:var(--color-text-tertiary)"></div>
-        <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">Loading...</span>
+        <span class="u-sm-muted">Loading...</span>
       </div>
     </div>
 
     <div class="dash-two-col">
       <div>
         <div id="composer" style="margin-bottom:var(--space-4)"></div>
-        <div id="feed" style="display:grid;gap:var(--space-4)">
+        <div id="feed" class="u-stack-4">
           <div class="card" style="padding:var(--space-6);text-align:center"><div class="skeleton skeleton-text"></div></div>
         </div>
       </div>
@@ -155,7 +155,7 @@ export default async function dashboard(container) {
         <div class="leaves-content">
           <div style="padding:var(--space-4);border-bottom:1px solid var(--color-border-light)">
             <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">Organization Holidays</div>
-            <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${today.getFullYear()} holiday calendar</div>
+            <div class="u-meta">${today.getFullYear()} holiday calendar</div>
           </div>
           <div id="leaves-list" style="max-height:520px;overflow-y:auto">
             <div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text" style="width:70%"></div></div>
@@ -195,7 +195,7 @@ export default async function dashboard(container) {
     }
     attEl.innerHTML = `
       <div style="width:8px;height:8px;border-radius:var(--radius-full);background:${dot}"></div>
-      <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${label}</span>
+      <span class="u-sm-muted">${label}</span>
       <a href="#/me" style="font-size:var(--text-xs);color:var(--color-accent);text-decoration:none;margin-left:var(--space-1)">My Hub &rarr;</a>
     `;
   }
@@ -211,7 +211,7 @@ export default async function dashboard(container) {
       leavesListEl.innerHTML = `
         <div style="padding:var(--space-8);text-align:center">
           <div style="color:var(--color-text-tertiary);margin-bottom:var(--space-2);display:flex;justify-content:center">${ic('calendar', 28)}</div>
-          <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">No holidays configured</div>
+          <div class="u-sm-muted">No holidays configured</div>
           <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">${isAdmin ? 'Add holidays in Leave Settings' : 'Ask your admin to set up the holiday calendar'}</div>
         </div>`;
     } else {
@@ -249,7 +249,7 @@ export default async function dashboard(container) {
         <div style="width:32px;height:32px;border-radius:var(--radius-lg);background:${isToday ? 'var(--color-success-light)' : isPast ? 'var(--color-bg-tertiary)' : 'var(--color-accent-light)'};display:flex;align-items:center;justify-content:center;color:${dotColor};flex-shrink:0">${isToday ? ic('sparkle') : h.is_optional ? ic('dot') : ic('calendar')}</div>
         <div style="min-width:0">
           <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.name)}</div>
-          <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dayName}, ${dateLabel}</div>
+          <div class="u-meta">${dayName}, ${dateLabel}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           ${h.is_optional ? '<span style="font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);background:var(--color-warning-light);color:var(--color-warning)">Optional</span>' : ''}
@@ -410,7 +410,7 @@ export default async function dashboard(container) {
       <div class="card" style="padding:var(--space-8);text-align:center">
         <div style="color:var(--color-text-tertiary);margin-bottom:var(--space-3);display:flex;justify-content:center">${ic('inbox', 28)}</div>
         <div style="font-weight:var(--font-weight-semibold);margin-bottom:var(--space-1)">Your noticeboard is empty</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${isManager ? 'Post an announcement to get things started.' : 'Updates and announcements from your organization will appear here.'}</div>
+        <div class="u-sm-muted">${isManager ? 'Post an announcement to get things started.' : 'Updates and announcements from your organization will appear here.'}</div>
       </div>`;
   } else {
     feedEl.innerHTML = feedItems.map(item => {
@@ -434,7 +434,7 @@ export default async function dashboard(container) {
                 <div style="width:40px;height:40px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);flex-shrink:0">${initials(authorName)}</div>
                 <div style="flex:1;min-width:0">
                   <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago} ${typeBadge}</div>
+                  <div class="u-meta">${ago} ${typeBadge}</div>
                 </div>
                 ${canDelete || canPin || canUnpin ? `<div class="post-actions" style="position:relative">
                   <button class="btn btn-ghost btn-sm post-menu-btn" data-post-id="${item.id}" style="padding:2px 6px;font-size:var(--text-base)">⋯</button>
@@ -459,7 +459,7 @@ export default async function dashboard(container) {
                 <div style="width:36px;height:36px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-xs);flex-shrink:0">${initials(authorName)}</div>
                 <div>
                   <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-sm)">${esc(authorName)}</div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${ago}</div>
+                  <div class="u-meta">${ago}</div>
                 </div>
               </div>
               ${item.title ? `<h4 style="margin:0 0 var(--space-1);font-size:var(--text-md);font-weight:var(--font-weight-semibold)">${esc(item.title)}</h4>` : ''}
@@ -473,7 +473,7 @@ export default async function dashboard(container) {
         <div style="display:flex;gap:var(--space-3);padding:var(--space-2) var(--space-3);align-items:center">
           <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${color};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(authorName)}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:var(--text-sm)"><span style="font-weight:var(--font-weight-medium)">${esc(authorName)}</span> <span style="color:var(--color-text-secondary)">${formatPostContent(esc(item.content))}</span></div>
+            <div style="font-size:var(--text-sm)"><span style="font-weight:var(--font-weight-medium)">${esc(authorName)}</span> <span class="u-muted">${formatPostContent(esc(item.content))}</span></div>
             <div style="font-size:10px;color:var(--color-text-tertiary)">${ago}</div>
           </div>
           <span style="color:var(--color-text-tertiary);display:flex">${ic(item.icon)}</span>

@@ -64,7 +64,7 @@ export default async function employeeProfile(container) {
       <div class="card">
         <div class="card-header"><span class="card-title">Personal Information</span></div>
         <div class="card-body">
-          <div style="display:grid;gap:var(--space-4)">
+          <div class="u-stack-4">
             <div>
               <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-bottom:var(--space-1)">Full Name</div>
               <div style="font-size:var(--text-sm)">${esc(emp.full_name)}</div>
@@ -84,7 +84,7 @@ export default async function employeeProfile(container) {
       <div class="card">
         <div class="card-header"><span class="card-title">Employment Details</span></div>
         <div class="card-body">
-          <div style="display:grid;gap:var(--space-4)">
+          <div class="u-stack-4">
             <div>
               <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-bottom:var(--space-1)">Department</div>
               <div style="font-size:var(--text-sm)">${esc(emp.department?.name || '—')}</div>
@@ -134,7 +134,7 @@ export default async function employeeProfile(container) {
       if (managersErr) { console.error(managersErr); }
 
       const f = document.createElement('div');
-      f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+      f.innerHTML = `<div class="u-stack-4">
         <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="ed-name" value="${esc(emp.full_name || '')}"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
           <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="ed-email" value="${esc(emp.email || '')}"></div>

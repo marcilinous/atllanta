@@ -14,7 +14,7 @@ export default async function jobDetail(container) {
 
   container.innerHTML = `
     <div class="page-header">
-      <div style="display:flex;align-items:center;gap:var(--space-3)">
+      <div class="u-row-3">
         <a href="#/recruitment" class="btn btn-ghost btn-sm">&larr; Jobs</a>
         <h1 class="page-title" id="job-title">Loading...</h1>
       </div>
@@ -73,10 +73,10 @@ export default async function jobDetail(container) {
           <div class="card-header"><span class="card-title">Job Details</span><span class="badge badge-${job.status === 'open' ? 'success' : job.status === 'closed' ? 'error' : 'warning'}">${job.status}</span></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);font-size:var(--text-sm);margin-bottom:var(--space-4)">
-              <div><span style="color:var(--color-text-secondary)">Type:</span> ${esc(job.employment_type || '—')}</div>
-              <div><span style="color:var(--color-text-secondary)">Location:</span> ${esc(job.location || '—')}</div>
-              <div><span style="color:var(--color-text-secondary)">Experience:</span> ${job.experience_min || '—'} – ${job.experience_max || '—'} years</div>
-              <div><span style="color:var(--color-text-secondary)">Salary:</span> ${job.salary_min && job.salary_max ? `${job.salary_min.toLocaleString()} – ${job.salary_max.toLocaleString()}` : '—'}</div>
+              <div><span class="u-muted">Type:</span> ${esc(job.employment_type || '—')}</div>
+              <div><span class="u-muted">Location:</span> ${esc(job.location || '—')}</div>
+              <div><span class="u-muted">Experience:</span> ${job.experience_min || '—'} – ${job.experience_max || '—'} years</div>
+              <div><span class="u-muted">Salary:</span> ${job.salary_min && job.salary_max ? `${job.salary_min.toLocaleString()} – ${job.salary_max.toLocaleString()}` : '—'}</div>
             </div>
             ${job.description ? `<div style="font-size:var(--text-sm);white-space:pre-wrap;color:var(--color-text-secondary)">${esc(job.description)}</div>` : ''}
           </div>
@@ -93,10 +93,10 @@ export default async function jobDetail(container) {
                     <tr>
                       <td>
                         <a href="#/recruitment/candidate?id=${a.candidate_id}" style="color:var(--color-accent);text-decoration:none">${esc(a.candidate?.full_name || '—')}</a>
-                        <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${esc(a.candidate?.email || '')}</div>
+                        <div class="u-meta">${esc(a.candidate?.email || '')}</div>
                       </td>
                       <td>
-                        <div style="display:flex;align-items:center;gap:var(--space-2)">
+                        <div class="u-row">
                           <div style="width:60px;height:6px;background:var(--color-bg-tertiary);border-radius:var(--radius-full)">
                             <div style="width:${a.match_score || 0}%;height:100%;background:${(a.match_score || 0) >= 70 ? 'var(--color-success)' : (a.match_score || 0) >= 40 ? 'var(--color-warning)' : 'var(--color-error)'};border-radius:var(--radius-full)"></div>
                           </div>

@@ -49,7 +49,7 @@ export default async function expenseCategoriesView(container) {
           <label class="form-label">Spending Limit (${org.currency || 'INR'})</label>
           <input class="form-input" name="spending_limit" type="number" step="0.01" min="0" placeholder="Leave empty for no limit" value="${existing?.spending_limit || ''}">
         </div>
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <div class="u-row">
           <input type="checkbox" id="cat-active" name="is_active" ${existing?.is_active !== false ? 'checked' : ''}>
           <label for="cat-active" class="form-label" style="margin:0">Active</label>
         </div>
@@ -124,7 +124,7 @@ export default async function expenseCategoriesView(container) {
             <tr>
               <td style="font-weight:var(--font-weight-medium)">${esc(c.name)}</td>
               <td><span class="badge badge-neutral">${esc(c.code)}</span></td>
-              <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(c.description || '—')}</td>
+              <td class="u-sm-muted">${esc(c.description || '—')}</td>
               <td style="font-size:var(--text-sm)">${c.spending_limit ? (org.currency || 'INR') + ' ' + parseFloat(c.spending_limit).toLocaleString() : '—'}</td>
               <td>${c.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-neutral">Inactive</span>'}</td>
               <td>

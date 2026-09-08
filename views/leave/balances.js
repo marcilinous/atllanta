@@ -40,7 +40,7 @@ export default async function leaveBalances(container) {
 
     ${isManager ? `<div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
-        <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <div class="u-row">
           <button class="btn btn-secondary btn-sm" id="bal-year-prev">&larr;</button>
           <span style="font-weight:var(--font-weight-semibold);min-width:50px;text-align:center" id="bal-year-label">${viewYear}</span>
           <button class="btn btn-secondary btn-sm" id="bal-year-next">&rarr;</button>
@@ -156,13 +156,13 @@ export default async function leaveBalances(container) {
       <thead><tr>
         <th style="position:sticky;left:0;background:var(--color-bg-secondary);z-index:2;min-width:180px">Employee</th>
         ${typeCodes.map(c => `<th style="text-align:center;min-width:70px">${esc(c)}<br><span style="font-size:9px;font-weight:var(--font-weight-normal);color:var(--color-text-tertiary)">used/total</span></th>`).join('')}
-        <th style="text-align:center">Total Used</th>
-        <th style="text-align:center">Total Balance</th>
+        <th class="u-center">Total Used</th>
+        <th class="u-center">Total Balance</th>
         ${isAdmin ? '<th></th>' : ''}
       </tr></thead>
       <tbody>${teamData.map(u => `<tr>
         <td style="position:sticky;left:0;background:var(--color-surface);z-index:1">
-          <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <div class="u-row">
             <div style="width:24px;height:24px;border-radius:var(--radius-full);background:${avColor(u.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:8px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(u.full_name)}</div>
             <div>
               <div style="font-weight:var(--font-weight-medium)">${esc(u.full_name)}</div>
@@ -175,7 +175,7 @@ export default async function leaveBalances(container) {
           if (!b) return '<td style="text-align:center;color:var(--color-text-tertiary)">—</td>';
           const pct = b.total > 0 ? (b.used / b.total) * 100 : 0;
           const color = pct > 80 ? 'var(--color-error)' : pct > 50 ? 'var(--color-warning)' : '';
-          return `<td style="text-align:center"><span style="${color ? 'color:' + color + ';font-weight:var(--font-weight-semibold)' : ''}">${b.used}</span>/${b.total}</td>`;
+          return `<td class="u-center"><span style="${color ? 'color:' + color + ';font-weight:var(--font-weight-semibold)' : ''}">${b.used}</span>/${b.total}</td>`;
         }).join('')}
         <td style="text-align:center;font-weight:var(--font-weight-semibold);color:var(--color-error)">${u.totalUsed}</td>
         <td style="text-align:center;font-weight:var(--font-weight-semibold);color:var(--color-success)">${u.totalBal}</td>
@@ -194,7 +194,7 @@ export default async function leaveBalances(container) {
     const u = teamData.find(t => t.id === userId);
     if (!u) return;
     const f = document.createElement('div');
-    f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+    f.innerHTML = `<div class="u-stack-4">
       <div style="font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">Adjusting balances for ${esc(u.full_name)} (${viewYear})</div>
       <div class="form-group">
         <label class="form-label">Leave Type</label>
@@ -259,7 +259,7 @@ export default async function leaveBalances(container) {
   if (isAdmin) {
     document.getElementById('adjust-bal-btn')?.addEventListener('click', () => {
       const f = document.createElement('div');
-      f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+      f.innerHTML = `<div class="u-stack">
         <div class="form-group"><label class="form-label">Select Employee</label>
           <select class="form-input" id="adj-user-select">
             ${teamData.map(u => `<option value="${u.id}">${esc(u.full_name)}</option>`).join('')}

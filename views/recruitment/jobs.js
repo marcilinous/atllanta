@@ -104,7 +104,7 @@ export default async function recruitmentJobs(container) {
         const candRows = sorted.map(a => {
           const c = candidates.find(x => x.id === a.candidate_id);
           return `<div class="table-row" style="display:grid;grid-template-columns:1fr 120px 120px 80px;align-items:center;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-border-light);cursor:pointer" data-act="candidate-detail" data-cand-id="${a.candidate_id}" data-app-id="${a.id}">
-            <div style="display:flex;align-items:center;gap:var(--space-3)">
+            <div class="u-row-3">
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(c?.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(c?.full_name)}</div>
               <div>
                 <div style="font-weight:var(--font-weight-medium)">${esc(c?.full_name || 'Unknown')}</div>
@@ -157,9 +157,9 @@ export default async function recruitmentJobs(container) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="flex-shrink:0;transition:transform .2s;${isExpanded ? 'transform:rotate(180deg)' : ''}"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div style="display:flex;gap:var(--space-6);margin-top:var(--space-3)">
-              <div style="text-align:center"><div style="font-weight:var(--font-weight-semibold)">${appCount}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Pipeline</div></div>
-              <div style="text-align:center"><div style="font-weight:var(--font-weight-semibold)">${shortlisted}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Shortlisted</div></div>
-              <div style="text-align:center"><div style="font-weight:var(--font-weight-semibold)">${hired}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Hired</div></div>
+              <div class="u-center"><div style="font-weight:var(--font-weight-semibold)">${appCount}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Pipeline</div></div>
+              <div class="u-center"><div style="font-weight:var(--font-weight-semibold)">${shortlisted}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Shortlisted</div></div>
+              <div class="u-center"><div style="font-weight:var(--font-weight-semibold)">${hired}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Hired</div></div>
             </div>
           </div>
           ${detailHTML}
@@ -240,7 +240,7 @@ export default async function recruitmentJobs(container) {
     await loadOrgMembers();
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group">
           <label class="form-label">Job Title</label>
           <input type="text" class="form-input" id="jf-title" placeholder="e.g. Senior Backend Engineer">
@@ -298,8 +298,8 @@ export default async function recruitmentJobs(container) {
 
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
-        <p style="color:var(--color-text-secondary)">${esc(job.title)}</p>
+      <div class="u-stack-4">
+        <p class="u-muted">${esc(job.title)}</p>
         <div class="form-group">
           <label class="form-label">Hiring Manager</label>
           <select class="form-input" id="am-manager">
@@ -330,7 +330,7 @@ export default async function recruitmentJobs(container) {
   async function showUploadModal(jobId) {
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div id="drop-zone" style="border:2px dashed var(--color-border);border-radius:var(--radius-lg);padding:var(--space-8);text-align:center;cursor:pointer;transition:border-color var(--transition-fast)">
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" width="32" height="32" style="margin:0 auto var(--space-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <div style="font-weight:var(--font-weight-medium)">Drop resume files here</div>
@@ -379,7 +379,7 @@ export default async function recruitmentJobs(container) {
         <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);background:var(--color-bg-secondary);border-radius:var(--radius-md)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span style="flex:1;font-size:var(--text-sm)">${esc(f.name)}</span>
-          <span style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${(f.size / 1024).toFixed(0)} KB</span>
+          <span class="u-meta">${(f.size / 1024).toFixed(0)} KB</span>
           <span class="file-status" data-idx="${i}"></span>
           <button class="btn btn-ghost btn-sm" data-remove="${i}" style="padding:2px">&times;</button>
         </div>
@@ -500,8 +500,8 @@ export default async function recruitmentJobs(container) {
 
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
-        <p style="color:var(--color-text-secondary)">${esc(job.title)} — ${jobApps.length} candidate${jobApps.length !== 1 ? 's' : ''}, ${unscored.length} unscored</p>
+      <div class="u-stack-4">
+        <p class="u-muted">${esc(job.title)} — ${jobApps.length} candidate${jobApps.length !== 1 ? 's' : ''}, ${unscored.length} unscored</p>
         <div class="form-group">
           <label class="form-label">Scoring Method</label>
           <div style="display:flex;gap:var(--space-2)">
@@ -576,7 +576,7 @@ export default async function recruitmentJobs(container) {
 
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-3)">
+      <div class="u-stack">
         <div class="form-group">
           <label class="form-label">Current: ${stagePill(app.status)}</label>
           <select class="form-input" id="stage-select">
@@ -611,12 +611,12 @@ export default async function recruitmentJobs(container) {
 
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div style="display:flex;align-items:center;gap:var(--space-4)">
           <div style="width:48px;height:48px;border-radius:var(--radius-full);background:${avColor(cand?.full_name)};display:flex;align-items:center;justify-content:center;color:white;font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">${initials(cand?.full_name)}</div>
           <div>
             <div style="font-weight:var(--font-weight-semibold);font-size:var(--text-lg)">${esc(cand?.full_name || 'Unknown')}</div>
-            <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(cand?.email || '')} ${cand?.phone ? '· ' + esc(cand.phone) : ''}</div>
+            <div class="u-sm-muted">${esc(cand?.email || '')} ${cand?.phone ? '· ' + esc(cand.phone) : ''}</div>
           </div>
         </div>
         <div style="display:flex;gap:var(--space-4)">
@@ -629,7 +629,7 @@ export default async function recruitmentJobs(container) {
             <div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:var(--space-1)">Stage</div>
           </div>
         </div>
-        ${app.match_summary ? `<div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">AI Assessment</div><div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(app.match_summary)}</div></div>` : ''}
+        ${app.match_summary ? `<div class="card" style="padding:var(--space-3)"><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">AI Assessment</div><div class="u-sm-muted">${esc(app.match_summary)}</div></div>` : ''}
         ${matchData.strengths?.length ? `<div><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">Strengths</div><div style="display:flex;flex-wrap:wrap;gap:var(--space-1)">${matchData.strengths.map(s => `<span class="badge badge-success">${esc(s)}</span>`).join('')}</div></div>` : ''}
         ${matchData.gaps?.length ? `<div><div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium);margin-bottom:var(--space-2)">Gaps</div><div style="display:flex;flex-wrap:wrap;gap:var(--space-1)">${matchData.gaps.map(g => `<span class="badge badge-error">${esc(g)}</span>`).join('')}</div></div>` : ''}
         ${cand?.resume_text ? `<details><summary style="cursor:pointer;font-size:var(--text-sm);font-weight:var(--font-weight-medium)">Resume Text</summary><pre style="white-space:pre-wrap;font-size:var(--text-xs);color:var(--color-text-secondary);max-height:300px;overflow:auto;margin-top:var(--space-2);padding:var(--space-3);background:var(--color-bg-secondary);border-radius:var(--radius-md)">${esc(cand.resume_text)}</pre></details>` : ''}

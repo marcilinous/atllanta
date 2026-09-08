@@ -75,7 +75,7 @@ export default async function aiAssistant(container) {
 
   function statBlock(items) {
     return `<div style="display:flex;gap:var(--space-4);margin-top:var(--space-2)">${items.map(([label, value, color]) =>
-      `<div style="text-align:center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);${color ? 'color:' + color : ''}">${value}</div><div style="font-size:10px;color:var(--color-text-tertiary)">${label}</div></div>`
+      `<div class="u-center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);${color ? 'color:' + color : ''}">${value}</div><div style="font-size:10px;color:var(--color-text-tertiary)">${label}</div></div>`
     ).join('')}</div>`;
   }
 

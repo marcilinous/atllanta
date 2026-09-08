@@ -236,15 +236,15 @@ export default async function leaveReport(container) {
       <thead><tr>
         <th style="position:sticky;left:0;background:var(--color-bg-secondary);z-index:2;min-width:180px">Employee</th>
         <th>Department</th>
-        ${allCodes.map(c => `<th style="text-align:center">${esc(c)}</th>`).join('')}
-        <th style="text-align:center">Approved</th>
-        <th style="text-align:center">Pending</th>
-        <th style="text-align:center">Total</th>
-        <th style="text-align:center">Requests</th>
+        ${allCodes.map(c => `<th class="u-center">${esc(c)}</th>`).join('')}
+        <th class="u-center">Approved</th>
+        <th class="u-center">Pending</th>
+        <th class="u-center">Total</th>
+        <th class="u-center">Requests</th>
       </tr></thead>
       <tbody>${employees.map(emp => `<tr>
         <td style="position:sticky;left:0;background:var(--color-surface);z-index:1">
-          <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <div class="u-row">
             <div style="width:24px;height:24px;border-radius:var(--radius-full);background:${avColor(emp.name)};display:flex;align-items:center;justify-content:center;color:white;font-size:8px;font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(emp.name)}</div>
             <span style="font-weight:var(--font-weight-medium)">${esc(emp.name)}</span>
           </div>
@@ -252,12 +252,12 @@ export default async function leaveReport(container) {
         <td style="color:var(--color-text-secondary);font-size:var(--text-xs)">${esc(emp.dept)}</td>
         ${allCodes.map(c => {
           const d = emp.byType[c];
-          return `<td style="text-align:center">${d ? `<span style="font-weight:var(--font-weight-semibold)">${d}</span>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>`;
+          return `<td class="u-center">${d ? `<span style="font-weight:var(--font-weight-semibold)">${d}</span>` : '<span style="color:var(--color-text-tertiary)">—</span>'}</td>`;
         }).join('')}
         <td style="text-align:center;font-weight:var(--font-weight-semibold);color:var(--color-success)">${emp.approvedDays}</td>
         <td style="text-align:center;font-weight:var(--font-weight-semibold);color:${emp.pendingDays > 0 ? 'var(--color-warning)' : 'var(--color-text-tertiary)'}">${emp.pendingDays || '—'}</td>
         <td style="text-align:center;font-weight:var(--font-weight-bold)">${emp.totalDays}</td>
-        <td style="text-align:center">
+        <td class="u-center">
           <button class="btn btn-ghost btn-sm" data-detail="${emp.uid}" style="font-size:var(--text-xs)">View ${emp.requests.length}</button>
         </td>
       </tr>`).join('')}</tbody>
@@ -277,9 +277,9 @@ export default async function leaveReport(container) {
     detailEl.innerHTML = `
       <div style="margin-bottom:var(--space-3);font-weight:var(--font-weight-medium)">${esc(emp.name)} — ${esc(range.label)}</div>
       <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-4)">
-        <div style="text-align:center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);color:var(--color-success)">${emp.approvedDays}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Approved</div></div>
-        <div style="text-align:center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);color:var(--color-warning)">${emp.pendingDays}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Pending</div></div>
-        <div style="text-align:center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold)">${emp.requests.length}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Requests</div></div>
+        <div class="u-center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);color:var(--color-success)">${emp.approvedDays}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Approved</div></div>
+        <div class="u-center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold);color:var(--color-warning)">${emp.pendingDays}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Pending</div></div>
+        <div class="u-center"><div style="font-size:var(--text-lg);font-weight:var(--font-weight-bold)">${emp.requests.length}</div><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Requests</div></div>
       </div>
       <div class="table-wrap"><table class="table" style="font-size:var(--text-sm)">
         <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>

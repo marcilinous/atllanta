@@ -38,12 +38,12 @@ export default async function profileSettings(container) {
             <div style="width:64px;height:64px;border-radius:var(--radius-full);background:${av};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xl);font-weight:var(--font-weight-bold);flex-shrink:0">${esc(ini)}</div>
             <div>
               <div style="font-size:var(--text-lg);font-weight:var(--font-weight-semibold)">${esc(name)}</div>
-              <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(email)}</div>
+              <div class="u-sm-muted">${esc(email)}</div>
               <div style="font-size:var(--text-xs);color:var(--color-text-tertiary);margin-top:var(--space-1)">${esc(profile?.designation || '—')} ${profile?.department?.name ? '&middot; ' + esc(profile.department.name) : ''}</div>
             </div>
           </div>
 
-          <div style="display:grid;gap:var(--space-4)">
+          <div class="u-stack-4">
             <div class="form-group">
               <label class="form-label">Full Name</label>
               <input type="text" class="form-input" id="prof-name" value="${esc(name)}">
@@ -104,11 +104,11 @@ export default async function profileSettings(container) {
       <div class="card">
         <div class="card-header"><span class="card-title">Preferences</span></div>
         <div class="card-body">
-          <div style="display:grid;gap:var(--space-4)">
+          <div class="u-stack-4">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div>
                 <div style="font-weight:var(--font-weight-medium)">Theme</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Choose your preferred appearance</div>
+                <div class="u-meta">Choose your preferred appearance</div>
               </div>
               <select class="form-input" id="pref-theme" style="width:auto">
                 <option value="light" ${savedTheme === 'light' ? 'selected' : ''}>Light</option>
@@ -118,7 +118,7 @@ export default async function profileSettings(container) {
             <div style="display:flex;justify-content:space-between;align-items:center;padding-top:var(--space-3);border-top:1px solid var(--color-border-light)">
               <div>
                 <div style="font-weight:var(--font-weight-medium)">Email Notifications</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Receive email alerts for approvals and updates</div>
+                <div class="u-meta">Receive email alerts for approvals and updates</div>
               </div>
               <label style="position:relative;display:inline-block;width:44px;height:24px">
                 <input type="checkbox" id="pref-email-notif" checked style="opacity:0;width:0;height:0">
@@ -137,14 +137,14 @@ export default async function profileSettings(container) {
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
               <div style="font-weight:var(--font-weight-medium)">Password</div>
-              <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Update your account password</div>
+              <div class="u-meta">Update your account password</div>
             </div>
             <button class="btn btn-secondary btn-sm" id="change-pw-btn">Change Password</button>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--color-border-light)">
             <div>
               <div style="font-weight:var(--font-weight-medium)">Active Sessions</div>
-              <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">You are currently signed in</div>
+              <div class="u-meta">You are currently signed in</div>
             </div>
             <span class="badge badge-success"><span class="badge-dot"></span>Active</span>
           </div>
@@ -199,7 +199,7 @@ export default async function profileSettings(container) {
 
     const pwDiv = document.createElement('div');
     pwDiv.innerHTML = `
-      <div style="display:grid;gap:var(--space-3)">
+      <div class="u-stack">
         <div class="form-group">
           <label class="form-label">New Password</label>
           <input type="password" class="form-input" id="new-pw" minlength="6" placeholder="Minimum 6 characters">

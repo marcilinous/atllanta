@@ -96,7 +96,7 @@ export default async function leaveSettings(container) {
   function editType(type) {
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="lt-name" value="${esc(type?.name || '')}" placeholder="e.g. Casual Leave"></div>
         <div class="form-group"><label class="form-label">Code</label><input type="text" class="form-input" id="lt-code" value="${esc(type?.code || '')}" placeholder="e.g. CL" maxlength="10"></div>
         <div class="form-group"><label class="form-label">Annual Quota (days)</label><input type="number" class="form-input" id="lt-quota" value="${type?.annual_quota ?? 12}" min="0"></div>
@@ -159,7 +159,7 @@ export default async function leaveSettings(container) {
 
     el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4);flex-wrap:wrap;gap:var(--space-3)">
-        <div style="display:flex;align-items:center;gap:var(--space-3)">
+        <div class="u-row-3">
           <button class="btn btn-ghost btn-sm" id="hol-prev-yr" style="padding:var(--space-1) var(--space-2)">&larr;</button>
           <span style="font-weight:var(--font-weight-semibold);font-size:var(--text-md)">${year}</span>
           <button class="btn btn-ghost btn-sm" id="hol-next-yr" style="padding:var(--space-1) var(--space-2)">&rarr;</button>
@@ -178,7 +178,7 @@ export default async function leaveSettings(container) {
           const isPast = h.date < todayStr;
           return `<tr style="${isPast ? 'opacity:0.5' : ''}">
           <td style="font-weight:var(--font-weight-medium)">${formatDate(h.date)}</td>
-          <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${dayName}</td>
+          <td class="u-sm-muted">${dayName}</td>
           <td>${esc(h.name)}${h.date === todayStr ? ' <span class="badge badge-success" style="margin-left:var(--space-1)">Today</span>' : ''}</td>
           <td>${h.is_optional ? '<span class="badge badge-warning">Optional</span>' : '<span class="badge badge-success">Mandatory</span>'}</td>
           <td>
@@ -224,7 +224,7 @@ export default async function leaveSettings(container) {
   function editHoliday(h, year, el) {
     const f = document.createElement('div');
     f.innerHTML = `
-      <div style="display:grid;gap:var(--space-4)">
+      <div class="u-stack-4">
         <div class="form-group"><label class="form-label">Holiday Name</label><input type="text" class="form-input" id="hol-name" value="${esc(h?.name || '')}" placeholder="e.g. Diwali"></div>
         <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="hol-date" value="${h?.date || ''}"></div>
         <label class="form-label"><input type="checkbox" id="hol-optional" ${h?.is_optional ? 'checked' : ''}> Optional Holiday</label>
@@ -289,7 +289,7 @@ export default async function leaveSettings(container) {
               <input type="checkbox" class="tpl-check" data-idx="${i}" checked>
               <div style="flex:1">
                 <div style="font-size:var(--text-sm);font-weight:var(--font-weight-medium)">${esc(t.name)}</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">${dayName}${t.optional ? ' · Optional' : ''}</div>
+                <div class="u-meta">${dayName}${t.optional ? ' · Optional' : ''}</div>
               </div>
             </label>`;
           }).join('')}

@@ -113,7 +113,7 @@ export default async function integrationsView(container) {
       </div>
     </div>
 
-    <div style="display:grid;gap:var(--space-3)">
+    <div class="u-stack">
       <h3 style="font-size:var(--text-base);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary)">Planned Integrations</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--space-4)">
         ${integrations.filter(i => i.status === 'coming_soon').map(i => `
@@ -125,7 +125,7 @@ export default async function integrationsView(container) {
                   <span style="font-weight:var(--font-weight-semibold)">${esc(i.name)}</span>
                   ${statusBadge(i.status)}
                 </div>
-                <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">${esc(i.desc)}</div>
+                <div class="u-sm-muted">${esc(i.desc)}</div>
               </div>
             </div>
           </div>

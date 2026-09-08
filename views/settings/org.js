@@ -106,7 +106,7 @@ export default async function settingsOrg(container) {
               </div>
               <div>
                 <div style="font-weight:var(--font-weight-semibold);margin-bottom:var(--space-1)">${esc(org.name)}</div>
-                <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Slug: ${esc(org.slug || '—')}</div>
+                <div class="u-meta">Slug: ${esc(org.slug || '—')}</div>
                 ${isAdmin ? '<div style="font-size:var(--text-xs);color:var(--color-accent);margin-top:var(--space-1);cursor:pointer" id="change-logo-link">Change logo</div>' : ''}
               </div>
             </div>
@@ -162,7 +162,7 @@ export default async function settingsOrg(container) {
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
               <div style="font-weight:var(--font-weight-medium)">Delete Organization</div>
-              <div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Permanently delete this organization and all its data. This cannot be undone.</div>
+              <div class="u-meta">Permanently delete this organization and all its data. This cannot be undone.</div>
             </div>
             <button class="btn btn-sm" style="background:var(--color-error);color:white;border:none" disabled>Contact Support</button>
           </div>
@@ -282,7 +282,7 @@ export default async function settingsOrg(container) {
 
       document.getElementById('add-dept-btn')?.addEventListener('click', () => {
         const f = document.createElement('div');
-        f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+        f.innerHTML = `<div class="u-stack">
           <div class="form-group"><label class="form-label">Department Name</label><input type="text" class="form-input" id="dept-name"></div>
           <div class="form-group"><label class="form-label">Department Head (optional)</label><select class="form-input" id="dept-head"><option value="">— None —</option>${userOpts}</select></div>
           <button class="btn btn-primary" id="dept-save">Create</button>
@@ -302,7 +302,7 @@ export default async function settingsOrg(container) {
       contentEl.querySelectorAll('[data-edit-dept]').forEach(btn => {
         btn.addEventListener('click', () => {
           const f = document.createElement('div');
-          f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+          f.innerHTML = `<div class="u-stack">
             <div class="form-group"><label class="form-label">Department Name</label><input type="text" class="form-input" id="dept-name" value="${btn.dataset.deptName}"></div>
             <div class="form-group"><label class="form-label">Department Head</label><select class="form-input" id="dept-head"><option value="">— None —</option>${userOpts}</select></div>
             <button class="btn btn-primary" id="dept-save">Save Changes</button>
@@ -324,7 +324,7 @@ export default async function settingsOrg(container) {
       contentEl.querySelectorAll('[data-add-team]').forEach(btn => {
         btn.addEventListener('click', () => {
           const f = document.createElement('div');
-          f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+          f.innerHTML = `<div class="u-stack">
             <div class="form-group"><label class="form-label">Team Name</label><input type="text" class="form-input" id="team-name"></div>
             <div class="form-group"><label class="form-label">Team Lead (optional)</label><select class="form-input" id="team-lead"><option value="">— None —</option>${userOpts}</select></div>
             <button class="btn btn-primary" id="team-save">Create</button>
@@ -345,7 +345,7 @@ export default async function settingsOrg(container) {
       contentEl.querySelectorAll('[data-edit-team]').forEach(btn => {
         btn.addEventListener('click', () => {
           const f = document.createElement('div');
-          f.innerHTML = `<div style="display:grid;gap:var(--space-3)">
+          f.innerHTML = `<div class="u-stack">
             <div class="form-group"><label class="form-label">Team Name</label><input type="text" class="form-input" id="team-name" value="${btn.dataset.teamName}"></div>
             <div class="form-group"><label class="form-label">Team Lead</label><select class="form-input" id="team-lead"><option value="">— None —</option>${userOpts}</select></div>
             <button class="btn btn-primary" id="team-save">Save Changes</button>
@@ -426,7 +426,7 @@ export default async function settingsOrg(container) {
             </tr>`).join('')}</tbody>
           </table></div>` : `<div style="text-align:center;padding:var(--space-6)">
             <div style="color:var(--color-text-tertiary);margin-bottom:var(--space-3)">No leave types configured yet</div>
-            ${isAdmin ? '<div style="font-size:var(--text-xs);color:var(--color-text-tertiary)">Leave types define how employees can request time off — casual leave, sick leave, earned leave, etc.</div>' : ''}
+            ${isAdmin ? '<div class="u-meta">Leave types define how employees can request time off — casual leave, sick leave, earned leave, etc.</div>' : ''}
           </div>`}
         </div>
       </div>`;
@@ -435,7 +435,7 @@ export default async function settingsOrg(container) {
       function openLeaveTypeModal(existing) {
         const isEdit = !!existing;
         const f = document.createElement('div');
-        f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+        f.innerHTML = `<div class="u-stack-4">
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-3)">
             <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="lt-name" placeholder="e.g. Casual Leave" value="${isEdit ? esc(existing.name) : ''}"></div>
             <div class="form-group"><label class="form-label">Code</label><input type="text" class="form-input" id="lt-code" placeholder="e.g. CL" style="text-transform:uppercase" value="${isEdit ? esc(existing.code) : ''}"></div>
@@ -446,7 +446,7 @@ export default async function settingsOrg(container) {
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
             <div class="form-group">
-              <label style="display:flex;align-items:center;gap:var(--space-2)"><input type="checkbox" id="lt-carry" ${isEdit && existing.carry_forward ? 'checked' : ''}> Carry forward unused days</label>
+              <label class="u-row"><input type="checkbox" id="lt-carry" ${isEdit && existing.carry_forward ? 'checked' : ''}> Carry forward unused days</label>
             </div>
             <div class="form-group" id="lt-carry-max-group" style="display:${isEdit && existing.carry_forward ? 'block' : 'none'}">
               <label class="form-label">Max Carry Forward</label>
@@ -454,9 +454,9 @@ export default async function settingsOrg(container) {
             </div>
           </div>
           <div style="display:flex;gap:var(--space-4);flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:var(--space-2)"><input type="checkbox" id="lt-paid" ${isEdit ? (existing.is_paid ? 'checked' : '') : 'checked'}> Paid leave</label>
-            <label style="display:flex;align-items:center;gap:var(--space-2)"><input type="checkbox" id="lt-doc" ${isEdit && existing.requires_document ? 'checked' : ''}> Requires supporting document</label>
-            <label style="display:flex;align-items:center;gap:var(--space-2)"><input type="checkbox" id="lt-active" ${isEdit ? (existing.is_active ? 'checked' : '') : 'checked'}> Active</label>
+            <label class="u-row"><input type="checkbox" id="lt-paid" ${isEdit ? (existing.is_paid ? 'checked' : '') : 'checked'}> Paid leave</label>
+            <label class="u-row"><input type="checkbox" id="lt-doc" ${isEdit && existing.requires_document ? 'checked' : ''}> Requires supporting document</label>
+            <label class="u-row"><input type="checkbox" id="lt-active" ${isEdit ? (existing.is_active ? 'checked' : '') : 'checked'}> Active</label>
           </div>
           <button class="btn btn-primary" id="lt-save">${isEdit ? 'Save Changes' : 'Create Leave Type'}</button>
         </div>`;
@@ -539,7 +539,7 @@ export default async function settingsOrg(container) {
       contentEl.innerHTML = `
         <div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
-            <div style="display:flex;align-items:center;gap:var(--space-2)">
+            <div class="u-row">
               <button class="btn btn-secondary btn-sm" id="hol-prev">&larr;</button>
               <span style="font-weight:var(--font-weight-semibold);min-width:60px;text-align:center" id="hol-year">${year}</span>
               <button class="btn btn-secondary btn-sm" id="hol-next">&rarr;</button>
@@ -558,7 +558,7 @@ export default async function settingsOrg(container) {
                 const isPast = h.date < today;
                 return `<tr style="${isPast ? 'opacity:0.5' : ''}">
                   <td>${dt.toLocaleDateString('en', { day: 'numeric', month: 'short' })}</td>
-                  <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${dt.toLocaleDateString('en', { weekday: 'long' })}</td>
+                  <td class="u-sm-muted">${dt.toLocaleDateString('en', { weekday: 'long' })}</td>
                   <td style="font-weight:var(--font-weight-medium)">${esc(h.name)}</td>
                   <td><span class="badge badge-${h.is_optional ? 'warning' : 'success'}">${h.is_optional ? 'Optional' : 'Mandatory'}</span></td>
                   ${isAdmin ? `<td>
@@ -620,10 +620,10 @@ export default async function settingsOrg(container) {
     function openHolidayModal(existing, year) {
       const isEdit = !!existing;
       const f = document.createElement('div');
-      f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+      f.innerHTML = `<div class="u-stack-4">
         <div class="form-group"><label class="form-label">Holiday Name</label><input type="text" class="form-input" id="hol-name" placeholder="e.g. Independence Day" value="${isEdit ? esc(existing.name) : ''}"></div>
         <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="hol-date" value="${isEdit ? existing.date : ''}"></div>
-        <div class="form-group"><label style="display:flex;align-items:center;gap:var(--space-2)"><input type="checkbox" id="hol-optional" ${isEdit && existing.is_optional ? 'checked' : ''}> Optional holiday</label></div>
+        <div class="form-group"><label class="u-row"><input type="checkbox" id="hol-optional" ${isEdit && existing.is_optional ? 'checked' : ''}> Optional holiday</label></div>
         <button class="btn btn-primary" id="hol-save">${isEdit ? 'Save Changes' : 'Add Holiday'}</button>
       </div>`;
       openModal(isEdit ? 'Edit Holiday' : 'Add Holiday', f);
@@ -663,7 +663,7 @@ export default async function settingsOrg(container) {
           ${isAdmin ? '<button class="btn btn-primary btn-sm" id="add-ws-btn">+ Add Schedule</button>' : ''}
         </div>
         <div class="card-body">
-          ${(schedules || []).length ? `<div style="display:grid;gap:var(--space-3)">
+          ${(schedules || []).length ? `<div class="u-stack">
             ${(schedules || []).map(s => {
               const offs = (s.weekly_offs || []).map(d => DAY_NAMES[d % 7] || d);
               return `<div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);position:relative">
@@ -696,7 +696,7 @@ export default async function settingsOrg(container) {
       function openScheduleModal(existing) {
         const isEdit = !!existing;
         const f = document.createElement('div');
-        f.innerHTML = `<div style="display:grid;gap:var(--space-4)">
+        f.innerHTML = `<div class="u-stack-4">
           <div class="form-group"><label class="form-label">Schedule Name</label><input type="text" class="form-input" id="ws-name" placeholder="e.g. Default, Night Shift" value="${isEdit ? esc(existing.name) : ''}"></div>
           <div style="display:flex;gap:var(--space-3)">
             <div class="form-group" style="flex:1"><label class="form-label">Shift Start</label><input type="time" class="form-input" id="ws-start" value="${isEdit ? existing.shift_start : '09:00'}"></div>
@@ -713,7 +713,7 @@ export default async function settingsOrg(container) {
               }).join('')}
             </div>
           </div>
-          <div class="form-group"><label style="display:flex;align-items:center;gap:var(--space-2)"><input type="checkbox" id="ws-default" ${isEdit && existing.is_default ? 'checked' : ''}> Set as default schedule</label></div>
+          <div class="form-group"><label class="u-row"><input type="checkbox" id="ws-default" ${isEdit && existing.is_default ? 'checked' : ''}> Set as default schedule</label></div>
           <button class="btn btn-primary" id="ws-save">${isEdit ? 'Save Changes' : 'Create Schedule'}</button>
         </div>`;
         openModal(isEdit ? 'Edit Work Schedule' : 'Add Work Schedule', f);

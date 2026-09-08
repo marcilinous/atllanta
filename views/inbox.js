@@ -134,14 +134,14 @@ export default async function inboxView(container) {
 
     content.innerHTML = `<div class="card">
       ${pending.length > 1 ? `<div style="padding:var(--space-2) var(--space-4);background:var(--color-accent-light);border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
-        <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${pending.length} pending</span>
+        <span class="u-sm-muted">${pending.length} pending</span>
         <button class="btn btn-primary btn-sm" id="bulk-approve-leave">Approve All (${pending.length})</button>
       </div>` : ''}
       <div class="table-wrap"><table class="table">
       <thead><tr><th>Employee</th><th>Leave Type</th><th>Period</th><th>Days</th><th>Reason</th>${showHistory ? '<th>Status</th>' : '<th>Pending</th>'}<th>Actions</th></tr></thead>
       <tbody>${requests.map(r => `<tr>
         <td>
-          <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <div class="u-row">
             <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(r.requester?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(r.requester?.full_name || r.requester?.email || '?')}</div>
             <div>
               <div style="font-weight:var(--font-weight-medium);font-size:var(--text-sm)">${esc(r.requester?.full_name || r.requester?.email || '—')}</div>
@@ -160,7 +160,7 @@ export default async function inboxView(container) {
           ${r.status === 'pending' ? `<div style="display:flex;gap:var(--space-1)">
             <button class="btn btn-primary btn-sm" data-action="approve-leave" data-id="${r.id}" data-uid="${r.user_id}" data-ltid="${r.leave_type_id}" data-days="${r.days}">Approve</button>
             <button class="btn btn-secondary btn-sm" data-action="reject-leave" data-id="${r.id}" data-uid="${r.user_id}">Reject</button>
-          </div>` : `${r.review_comment ? `<span style="font-size:var(--text-xs);color:var(--color-text-tertiary)" title="${esc(r.review_comment)}">Note</span>` : '—'}`}
+          </div>` : `${r.review_comment ? `<span class="u-meta" title="${esc(r.review_comment)}">Note</span>` : '—'}`}
         </td>
       </tr>`).join('')}</tbody>
     </table></div></div>`;
@@ -203,7 +203,7 @@ export default async function inboxView(container) {
       btn.addEventListener('click', () => {
         const f = document.createElement('div');
         f.innerHTML = `
-          <div style="display:grid;gap:var(--space-3)">
+          <div class="u-stack">
             <div class="form-group"><label class="form-label">Rejection Reason</label><textarea class="form-input" id="reject-reason" rows="3" placeholder="Optional reason..."></textarea></div>
             <button class="btn btn-primary" id="confirm-reject">Reject Leave</button>
           </div>`;
@@ -260,7 +260,7 @@ export default async function inboxView(container) {
 
     content.innerHTML = `<div class="card">
       ${pending.length > 1 ? `<div style="padding:var(--space-2) var(--space-4);background:var(--color-accent-light);border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:var(--space-3)">
-        <span style="font-size:var(--text-sm);color:var(--color-text-secondary)">${pending.length} pending</span>
+        <span class="u-sm-muted">${pending.length} pending</span>
         <button class="btn btn-primary btn-sm" id="bulk-approve-reg">Approve All (${pending.length})</button>
       </div>` : ''}
       <div class="table-wrap"><table class="table">
@@ -272,7 +272,7 @@ export default async function inboxView(container) {
         const reqOut = r.requested_check_out ? new Date(r.requested_check_out).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : '—';
         return `<tr>
           <td>
-            <div style="display:flex;align-items:center;gap:var(--space-2)">
+            <div class="u-row">
               <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(r.requester?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(r.requester?.full_name || '?')}</div>
               <span style="font-size:var(--text-sm)">${esc(r.requester?.full_name || r.requester?.email || '—')}</span>
             </div>
@@ -343,7 +343,7 @@ export default async function inboxView(container) {
       btn.addEventListener('click', () => {
         const f = document.createElement('div');
         f.innerHTML = `
-          <div style="display:grid;gap:var(--space-3)">
+          <div class="u-stack">
             <div class="form-group"><label class="form-label">Rejection Reason</label><textarea class="form-input" id="reg-reject-reason" rows="3" placeholder="Optional reason..."></textarea></div>
             <button class="btn btn-primary" id="confirm-reg-reject">Reject Regularization</button>
           </div>`;
@@ -396,7 +396,7 @@ export default async function inboxView(container) {
       <thead><tr><th>Raised By</th><th>Subject</th><th>Category</th><th>Priority</th>${showHistory ? '<th>Status</th>' : '<th>Pending</th>'}<th>Actions</th></tr></thead>
       <tbody>${tickets.map(t => `<tr>
         <td>
-          <div style="display:flex;align-items:center;gap:var(--space-2)">
+          <div class="u-row">
             <div style="width:32px;height:32px;border-radius:var(--radius-full);background:${avColor(t.creator?.full_name || '')};display:flex;align-items:center;justify-content:center;color:white;font-size:var(--text-xs);font-weight:var(--font-weight-semibold);flex-shrink:0">${initials(t.creator?.full_name || '?')}</div>
             <span style="font-size:var(--text-sm)">${esc(t.creator?.full_name || '—')}</span>
           </div>

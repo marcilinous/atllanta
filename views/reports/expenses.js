@@ -65,19 +65,19 @@ export default async function expenseReport(container) {
     <div class="stat-grid" style="margin-bottom:var(--space-6)">
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-text-primary)">${currency} ${totalAmount.toLocaleString()}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Total Expenses</div>
+        <div class="u-sm-muted">Total Expenses</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-warning)">${currency} ${pendingAmount.toLocaleString()}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Pending (${pending.length})</div>
+        <div class="u-sm-muted">Pending (${pending.length})</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-success)">${currency} ${approvedAmount.toLocaleString()}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Approved (${approved.length})</div>
+        <div class="u-sm-muted">Approved (${approved.length})</div>
       </div></div>
       <div class="card"><div class="card-body" style="text-align:center">
         <div style="font-size:var(--text-3xl);font-weight:var(--font-weight-bold);color:var(--color-info)">${currency} ${reimbursedAmount.toLocaleString()}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Reimbursed (${reimbursed.length})</div>
+        <div class="u-sm-muted">Reimbursed (${reimbursed.length})</div>
       </div></div>
     </div>
 
@@ -85,9 +85,9 @@ export default async function expenseReport(container) {
       <div class="card">
         <div class="card-body">
           <h3 style="font-size:var(--text-md);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-4)">By Category</h3>
-          <div style="display:grid;gap:var(--space-3)">
+          <div class="u-stack">
             ${catEntries.map(c => `
-              <div style="display:flex;align-items:center;gap:var(--space-3)">
+              <div class="u-row-3">
                 <div style="width:100px;font-size:var(--text-sm);color:var(--color-text-secondary);text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.name)}">${esc(c.name)}</div>
                 <div style="flex:1;height:24px;background:var(--color-bg-secondary);border-radius:var(--radius-md);overflow:hidden;position:relative">
                   <div style="height:100%;width:${(c.total / maxCatTotal) * 100}%;background:var(--color-accent);border-radius:var(--radius-md);min-width:${c.total ? '2px' : '0'}"></div>
@@ -101,11 +101,11 @@ export default async function expenseReport(container) {
       <div class="card">
         <div class="card-body">
           <h3 style="font-size:var(--text-md);font-weight:var(--font-weight-semibold);margin:0 0 var(--space-4)">Monthly Trend</h3>
-          <div style="display:grid;gap:var(--space-3)">
+          <div class="u-stack">
             ${months.map(([m, v]) => {
               const label = new Date(m + '-01').toLocaleDateString('en', { month: 'short', year: '2-digit' });
               return `
-              <div style="display:flex;align-items:center;gap:var(--space-3)">
+              <div class="u-row-3">
                 <div style="width:60px;font-size:var(--text-sm);color:var(--color-text-secondary);text-align:right;flex-shrink:0">${label}</div>
                 <div style="flex:1;height:24px;background:var(--color-bg-secondary);border-radius:var(--radius-md);overflow:hidden;position:relative">
                   <div style="height:100%;width:${(v.total / maxMonthTotal) * 100}%;background:var(--color-info);border-radius:var(--radius-md);min-width:2px"></div>
