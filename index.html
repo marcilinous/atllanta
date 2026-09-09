@@ -199,6 +199,8 @@ import profileSettings from '/views/settings/profile.js';
 import crmHub from '/views/crm/index.js';
 import crmAccounts from '/views/crm/accounts.js';
 import crmAccountDetail from '/views/crm/account-detail.js';
+import crmContacts from '/views/crm/contacts.js';
+import crmLeads from '/views/crm/leads.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -455,6 +457,8 @@ registerRoute('lifecycle', lifecycleView);
 registerRoute('crm', crmHub);
 registerRoute('crm/accounts', crmAccounts);
 registerRoute('crm/account', crmAccountDetail);
+registerRoute('crm/contacts', crmContacts);
+registerRoute('crm/leads', crmLeads);
 
 initRouter(document.getElementById('main-content'));
 
