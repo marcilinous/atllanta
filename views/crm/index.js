@@ -25,6 +25,12 @@ export default async function crmHub(container) {
       route: 'crm/leads',
     },
     {
+      title: 'Sales',
+      desc: 'Revenue & activations by region, tier, and product',
+      icon: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+      route: 'crm/sales',
+    },
+    {
       title: 'Pipeline',
       desc: 'Opportunities across your sales stages',
       icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',

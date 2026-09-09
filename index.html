@@ -205,6 +205,7 @@ import crmPipeline from '/views/crm/pipeline.js';
 import crmActivities from '/views/crm/activities.js';
 import crmFieldSales from '/views/crm/field-sales.js';
 import crmPjp from '/views/crm/pjp.js';
+import crmSales from '/views/crm/sales.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -467,6 +468,7 @@ registerRoute('crm/pipeline', crmPipeline);
 registerRoute('crm/activities', crmActivities);
 registerRoute('crm/field-sales', crmFieldSales);
 registerRoute('crm/pjp', crmPjp);
+registerRoute('crm/sales', crmSales);
 
 initRouter(document.getElementById('main-content'));
 
