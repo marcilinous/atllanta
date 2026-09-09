@@ -3,6 +3,7 @@ import { getOrg, getUser, getMembership } from '../../js/auth.js';
 import { esc, toast, initials, avColor, formatDate } from '../../js/ui.js';
 import { routeParams, navigate } from '../../js/router.js';
 import { openAccountForm } from './account-form.js';
+import { renderActivityTimeline } from './activity-timeline.js';
 
 // CRM › Account detail. Read view of one account plus its related contacts,
 // opportunities, and activity timeline. Editing reuses the shared account form.
@@ -18,11 +19,10 @@ export default async function crmAccountDetail(container) {
   if (!id) { navigate('crm/accounts'); return; }
 
   async function load() {
-    const [{ data: account, error }, { data: contacts }, { data: opps }, { data: acts }, { data: users }] = await Promise.all([
+    const [{ data: account, error }, { data: contacts }, { data: opps }, { data: users }] = await Promise.all([
       sb.from('crm_accounts').select('*').eq('id', id).single(),
       sb.from('crm_contacts').select('*').eq('account_id', id).order('created_at', { ascending: false }),
       sb.from('crm_opportunities').select('*').eq('account_id', id).order('created_at', { ascending: false }),
-      sb.from('crm_activities').select('*').eq('related_type', 'account').eq('related_id', id).order('created_at', { ascending: false }).limit(20),
       sb.from('users').select('id, full_name, email'),
     ]);
 
@@ -80,7 +80,10 @@ export default async function crmAccountDetail(container) {
         <div class="u-stack-4">
           ${relatedCard('Contacts', contacts, c => `${esc([c.first_name, c.last_name].filter(Boolean).join(' ') || '—')}${c.title ? ` · <span class="u-sm-muted">${esc(c.title)}</span>` : ''}`, 'No contacts linked yet.')}
           ${relatedCard('Opportunities', opps, o => `${esc(o.name || '—')}${o.amount != null ? ` · <span class="u-sm-muted">${esc(String(o.amount))} ${esc(o.currency || '')}</span>` : ''}`, 'No opportunities yet.')}
-          ${relatedCard('Recent activity', acts, act => `<span class="badge badge-neutral">${esc(act.type || 'note')}</span> ${esc(act.subject || '')} <span class="u-sm-muted">· ${act.created_at ? formatDate(act.created_at) : ''}</span>`, 'No activity logged yet.')}
+          <div class="card">
+            <div class="card-header" style="font-weight:var(--font-weight-semibold)">Activity</div>
+            <div class="card-body"><div id="acct-activity"></div></div>
+          </div>
         </div>
       </div>
     `;
@@ -91,6 +94,9 @@ export default async function crmAccountDetail(container) {
         openAccountForm({ account, org, user, onSaved: () => { toast('Saved'); load(); } });
       });
     }
+
+    const actEl = document.getElementById('acct-activity');
+    if (actEl) renderActivityTimeline(actEl, { relatedType: 'account', relatedId: id, org, user, canEdit, ownerMap });
   }
 
   function relatedCard(title, rows, rowHtml, emptyText) {

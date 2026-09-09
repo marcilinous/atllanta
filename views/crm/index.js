@@ -30,11 +30,15 @@ export default async function crmHub(container) {
       icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
       route: 'crm/pipeline',
     },
+    {
+      title: 'Activities',
+      desc: 'Notes, calls, and tasks across records',
+      icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+      route: 'crm/activities',
+    },
   ];
 
-  const soon = [
-    { title: 'Activities', desc: 'Notes, calls, and tasks timeline', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
-  ];
+  const soon = [];
 
   container.innerHTML = `
     <div style="margin-bottom:var(--space-6)">
