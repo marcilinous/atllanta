@@ -20,7 +20,7 @@ export default async function crmHub(container) {
     },
     {
       title: 'Leads',
-      desc: 'Prospects to qualify and convert',
+      desc: 'Prospects your partners report from the field',
       icon: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3',
       route: 'crm/leads',
     },
