@@ -182,7 +182,7 @@ export default async function crmSales(container) {
         ${kpi('TSS renewals', inr(tss), pct(tss, totRev) + '% of revenue')}
         ${kpi('New licenses (TP)', inr(tp), pct(tp, totRev) + '% of revenue')}
         ${kpi('Latest ' + grain + ' growth', growthChip, periods.length ? 'vs previous ' + grain : '—')}
-        ${kpi('UAP', num(partnerTotal.uap), 'partners with ≥1 TP')}
+        ${kpi('UAP', num(partnerTotal.uap), 'newly activated (first TP)')}
         ${kpi('Transacting partners', num(partnerTotal.transacting), 'any transaction')}
       </div>
 
@@ -258,7 +258,7 @@ export default async function crmSales(container) {
       type: 'line',
       data: { labels: pPeriods, datasets: [
         { label: 'Transacting', data: pPeriods.map(p => txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
-        { label: 'UAP (TP)', data: pPeriods.map(p => uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'UAP (new)', data: pPeriods.map(p => uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
       ] },
       options: { responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } } },
