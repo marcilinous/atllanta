@@ -10,7 +10,7 @@ import { publishEvent } from '../../js/events.js';
 // org-scoped visit-selfies bucket. Reachable standalone (crm/log-visit) or
 // deep-linked with ?id=<partner> from a partner page.
 
-const VISIT_STATUS = ['Met', 'Not available', 'Follow-up', 'Order placed', 'Closed'];
+const VISIT_STATUS = ['Met owner', 'Met resource', 'Not able to meet', 'Shop closed', 'Business closed'];
 // Tally serial status is DB-constrained; label the on-site check plainly.
 const TALLY_STATUS = [['', '—'], ['shared', 'Serial shared'], ['not_shared', 'Not shared'], ['no_licence', 'No licence']];
 
