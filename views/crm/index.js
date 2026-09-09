@@ -37,8 +37,8 @@ export default async function crmHub(container) {
       route: 'crm/activities',
     },
     {
-      title: 'Field Sales',
-      desc: 'Partner action list & territory health',
+      title: 'Distribution',
+      desc: 'Command center: BDEs, territories, partners to act on',
       icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
       route: 'crm/field-sales',
     },
