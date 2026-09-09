@@ -106,9 +106,11 @@ export default async function crmSales(container) {
 
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-    const [byDim, series, leads, visits, calls, events, partners] = await Promise.all([
+    const [byDim, series, pTrend, pTotal, leads, visits, calls, events, partners] = await Promise.all([
       sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
       sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: 'all' }),
       countIn('crm_leads', 'created_at'),
       countIn('crm_visits', 'visited_at'),
       countIn('crm_calls', 'called_at'),
@@ -120,11 +122,15 @@ export default async function crmSales(container) {
       body.innerHTML = `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">Couldn't load sales</div><div class="empty-state-desc">${esc(msg)}</div></div>`;
       toast('Sales: ' + msg); return;
     }
-    await paint(byDim.data || [], series.data || [], { leads, visits, calls, events, partners });
+    const pt = pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 };
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, { leads, visits, calls, events, partners });
   }
 
-  async function paint(rows, series, activity) {
+  async function paint(rows, series, partnerTrend, partnerTotal, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
+    const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
+    const uapBy = {}, txBy = {};
+    partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
 
     let totRev = 0, totUnits = 0;
     const byCat = {}, buckets = {};
@@ -176,6 +182,8 @@ export default async function crmSales(container) {
         ${kpi('TSS renewals', inr(tss), pct(tss, totRev) + '% of revenue')}
         ${kpi('New licenses (TP)', inr(tp), pct(tp, totRev) + '% of revenue')}
         ${kpi('Latest ' + grain + ' growth', growthChip, periods.length ? 'vs previous ' + grain : '—')}
+        ${kpi('UAP', num(partnerTotal.uap), 'partners with ≥1 TP')}
+        ${kpi('Transacting partners', num(partnerTotal.transacting), 'any transaction')}
       </div>
 
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
@@ -200,6 +208,9 @@ export default async function crmSales(container) {
         </div>
         <div class="card-body"><div style="height:${Math.max(220, bucketRows.length * 26)}px"><canvas id="sx-dim"></canvas></div></div>
       </div>
+
+      <div class="card" style="margin-bottom:var(--space-4)"><div class="card-header" style="font-weight:var(--font-weight-semibold)">Active partners</div>
+        <div class="card-body"><div style="height:260px"><canvas id="sx-partners"></canvas></div></div></div>
 
       <div style="margin-bottom:var(--space-2);font-weight:var(--font-weight-semibold)">Business activity ${from || to ? `<span class="u-sm-muted" style="font-weight:normal">· ${esc(from || '…')} → ${esc(to || 'now')}</span>` : ''}</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
@@ -241,6 +252,18 @@ export default async function crmSales(container) {
       options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
         plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } },
           tooltip: { callbacks: { label: (c) => `${c.label}: ${inr(c.parsed)} (${pct(c.parsed, totRev)}%)` } } } },
+    });
+
+    charts.partners = new ChartJs(body.querySelector('#sx-partners'), {
+      type: 'line',
+      data: { labels: pPeriods, datasets: [
+        { label: 'Transacting', data: pPeriods.map(p => txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'UAP (TP)', data: pPeriods.map(p => uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
     });
 
     charts.dim = new ChartJs(body.querySelector('#sx-dim'), {
