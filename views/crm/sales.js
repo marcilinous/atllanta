@@ -36,6 +36,13 @@ const VISIT_STAGES = [
   { key: 'Shop closed', color: '#ef7c3a' },
   { key: 'Business closed', color: '#94a3b8' },
 ];
+// Lead pipeline outcomes, hottest → dropped, for the pyramid.
+const LEAD_STAGES = [
+  { key: 'hot', label: 'Hot', color: '#ef4444' },
+  { key: 'warm', label: 'Warm', color: '#F59E0B' },
+  { key: 'cold', label: 'Cold', color: '#3b82f6' },
+  { key: 'dropped', label: 'Dropped', color: '#94a3b8' },
+];
 
 const fyStart = (y) => `${y}-04-01`;
 const fyEnd = (y) => `${y + 1}-03-31`;
@@ -112,15 +119,15 @@ export default async function crmSales(container) {
     return error ? 0 : (count || 0);
   }
 
-  // Visit outcomes within the window, tallied by status (RLS-scoped select).
-  async function visitOutcomes() {
-    let q = sb.from('crm_visits').select('visit_status');
-    if (from) q = q.gte('visited_at', from);
-    if (to) q = q.lt('visited_at', nextDay(to));
+  // Tally rows on a table by a status column within the window (RLS-scoped).
+  async function tallyBy(table, statusCol, dateCol) {
+    let q = sb.from(table).select(statusCol);
+    if (from && dateCol) q = q.gte(dateCol, from);
+    if (to && dateCol) q = q.lt(dateCol, nextDay(to));
     const { data, error } = await q.limit(10000);
     const counts = {};
     if (!error) for (const r of (data || [])) {
-      const s = (r.visit_status || '').trim();
+      const s = (r[statusCol] || '').trim();
       if (s) counts[s] = (counts[s] || 0) + 1;
     }
     return counts;
@@ -128,12 +135,13 @@ export default async function crmSales(container) {
 
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-    const [byDim, series, pTrend, pTotal, visitStat, leads, visits, calls, events, partners] = await Promise.all([
+    const [byDim, series, pTrend, pTotal, visitStat, leadStat, leads, visits, calls, events, partners] = await Promise.all([
       sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
       sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: 'all' }),
-      visitOutcomes(),
+      tallyBy('crm_visits', 'visit_status', 'visited_at'),
+      tallyBy('crm_leads', 'status', 'created_at'),
       countIn('crm_leads', 'created_at'),
       countIn('crm_visits', 'visited_at'),
       countIn('crm_calls', 'called_at'),
@@ -146,10 +154,10 @@ export default async function crmSales(container) {
       toast('Sales: ' + msg); return;
     }
     const pt = pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 };
-    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, visitStat, { leads, visits, calls, events, partners });
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, visitStat, leadStat, { leads, visits, calls, events, partners });
   }
 
-  async function paint(rows, series, partnerTrend, partnerTotal, visitStat, activity) {
+  async function paint(rows, series, partnerTrend, partnerTotal, visitStat, leadStat, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
     const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
     const uapBy = {}, txBy = {};
@@ -166,23 +174,28 @@ export default async function crmSales(container) {
     const tss = byCat['TSS'] || 0, tp = byCat['TP'] || 0;
     const bucketRows = Object.entries(buckets).map(([name, rev]) => ({ name, rev })).sort((a, b) => b.rev - a.rev).slice(0, 12);
 
-    // Visit-outcome pyramid: stages best → worst, centered bars scaled to the
-    // largest stage. % is of all visits logged in the window.
-    const stageCounts = VISIT_STAGES.map(s => ({ ...s, n: (visitStat && visitStat[s.key]) || 0 }));
-    const vTotal = stageCounts.reduce((a, s) => a + s.n, 0);
-    const vMax = Math.max(1, ...stageCounts.map(s => s.n));
-    const pyramidBody = vTotal === 0
-      ? `<div class="u-sm-muted" style="padding:var(--space-3) 0">No visits logged in this window.</div>`
-      : stageCounts.map(s => {
-          const w = s.n ? Math.max(Math.round((s.n / vMax) * 100), 8) : 0;
-          return `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-            <div style="flex:0 0 132px;text-align:right;font-size:var(--text-sm)">${esc(s.key)}</div>
-            <div style="flex:1;display:flex;justify-content:center;min-width:0">
-              ${s.n ? `<div style="width:${w}%;background:${s.color};color:#fff;border-radius:var(--radius-sm);padding:6px var(--space-2);text-align:center;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);white-space:nowrap">${num(s.n)}</div>` : ''}
-            </div>
-            <div style="flex:0 0 44px;text-align:right;font-size:var(--text-sm)" class="u-sm-muted">${pct(s.n, vTotal)}%</div>
-          </div>`;
-        }).join('');
+    // Outcome pyramid: stages best → worst, centered bars scaled to the largest
+    // stage. % is of the stage total in the window.
+    const pyramid = (stages, counts, emptyMsg) => {
+      const rows = stages.map(s => ({ label: s.label || s.key, color: s.color, n: (counts && counts[s.key]) || 0 }));
+      const total = rows.reduce((a, s) => a + s.n, 0);
+      const max = Math.max(1, ...rows.map(s => s.n));
+      const html = total === 0
+        ? `<div class="u-sm-muted" style="padding:var(--space-3) 0">${esc(emptyMsg)}</div>`
+        : rows.map(s => {
+            const w = s.n ? Math.max(Math.round((s.n / max) * 100), 8) : 0;
+            return `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+              <div style="flex:0 0 132px;text-align:right;font-size:var(--text-sm)">${esc(s.label)}</div>
+              <div style="flex:1;display:flex;justify-content:center;min-width:0">
+                ${s.n ? `<div style="width:${w}%;background:${s.color};color:#fff;border-radius:var(--radius-sm);padding:6px var(--space-2);text-align:center;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);white-space:nowrap">${num(s.n)}</div>` : ''}
+              </div>
+              <div style="flex:0 0 44px;text-align:right;font-size:var(--text-sm)" class="u-sm-muted">${pct(s.n, total)}%</div>
+            </div>`;
+          }).join('');
+      return { total, html };
+    };
+    const visitPyr = pyramid(VISIT_STAGES, visitStat, 'No visits logged in this window.');
+    const leadPyr = pyramid(LEAD_STAGES, leadStat, 'No leads collected in this window.');
 
     const periods = [...new Set(series.map(s => s.period))].sort();
     const periodTotal = {}; periods.forEach(p => periodTotal[p] = 0);
@@ -253,12 +266,20 @@ export default async function crmSales(container) {
       <div class="card" style="margin-bottom:var(--space-4)"><div class="card-header" style="font-weight:var(--font-weight-semibold)">Active partners</div>
         <div class="card-body"><div style="height:260px"><canvas id="sx-partners"></canvas></div></div></div>
 
-      <div class="card" style="margin-bottom:var(--space-4)">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:var(--font-weight-semibold)">Visit outcomes</span>
-          <span class="u-sm-muted">${num(vTotal)} visits</span>
-        </div>
-        <div class="card-body">${pyramidBody}</div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:var(--font-weight-semibold)">Visit outcomes</span>
+            <span class="u-sm-muted">${num(visitPyr.total)} visits</span>
+          </div>
+          <div class="card-body">${visitPyr.html}</div></div>
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:var(--font-weight-semibold)">Lead outcomes</span>
+            <span class="u-sm-muted">${num(leadPyr.total)} leads</span>
+          </div>
+          <div class="card-body">${leadPyr.html}</div></div>
+      </div>
 
       <div style="margin-bottom:var(--space-2);font-weight:var(--font-weight-semibold)">Business activity ${from || to ? `<span class="u-sm-muted" style="font-weight:normal">· ${esc(from || '…')} → ${esc(to || 'now')}</span>` : ''}</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
