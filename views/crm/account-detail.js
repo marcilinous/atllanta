@@ -61,7 +61,7 @@ export default async function crmAccountDetail(container) {
           </div>
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-          <a href="#/crm/accounts" class="btn btn-secondary">← Accounts</a>
+          <a href="#/crm/accounts" class="btn btn-secondary" data-back>← Back</a>
           ${canEdit ? '<button class="btn btn-primary" id="edit-account-btn">Edit</button>' : ''}
         </div>
       </div>

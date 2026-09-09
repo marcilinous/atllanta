@@ -26,7 +26,7 @@ export default async function crmPjp(container) {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:var(--space-3)">
       <div><h1 class="page-title" style="margin:0">Journey Plan</h1>
         <p class="page-subtitle" style="margin:0">Plan each BDE's beat by territory, day by day</p></div>
-      <a href="#/crm" class="btn btn-secondary">← CRM</a>
+      <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
     </div>
     <div id="pjp-body"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>
   `;

@@ -26,7 +26,7 @@ export default async function crmPartners(container) {
         <p class="page-subtitle" style="margin:0">${esc(org?.name || 'Region')} · partner master directory</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        <a href="#/crm" class="btn btn-secondary">← CRM</a>
+        <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
         ${canOnboard ? '<button class="btn btn-primary" id="pt-onboard">+ Onboard partner</button>' : ''}
       </div>
     </div>

@@ -19,7 +19,7 @@ export default async function crmAccounts(container) {
         <p class="page-subtitle">Companies and partners you sell to</p>
       </div>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-        <a href="#/crm" class="btn btn-secondary">← CRM</a>
+        <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
         ${canEdit ? '<button class="btn btn-primary" id="add-account-btn">+ New Account</button>' : ''}
       </div>
     </div>

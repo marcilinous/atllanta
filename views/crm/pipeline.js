@@ -20,7 +20,7 @@ export default async function crmPipeline(container) {
         <p class="page-subtitle">Opportunities across your sales stages</p>
       </div>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-        <a href="#/crm" class="btn btn-secondary">← CRM</a>
+        <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
         ${canEdit ? '<button class="btn btn-primary" id="add-opp-btn">+ New Opportunity</button>' : ''}
       </div>
     </div>

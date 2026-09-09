@@ -41,7 +41,7 @@ export default async function crmDistribution(container) {
         <h1 class="page-title" style="margin:0">Distribution</h1>
         <p class="page-subtitle" style="margin:0">${esc(org?.name || 'Region')} · run the region through your BDEs</p>
       </div>
-      <a href="#/crm" class="btn btn-secondary">← CRM</a>
+      <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
     </div>
     <div id="fs-body"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>
   `;

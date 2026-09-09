@@ -18,7 +18,7 @@ export default async function crmContacts(container) {
         <p class="page-subtitle">People at your accounts</p>
       </div>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-        <a href="#/crm" class="btn btn-secondary">← CRM</a>
+        <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
         ${canEdit ? '<button class="btn btn-primary" id="add-contact-btn">+ New Contact</button>' : ''}
       </div>
     </div>

@@ -31,7 +31,7 @@ export default async function crmVisitForm(container) {
         <h1 class="page-title" style="margin:0">Log a visit</h1>
         <p class="page-subtitle" style="margin:0">${esc(org?.name || 'Field')} · record a partner visit</p>
       </div>
-      <a href="#/crm/field-sales" class="btn btn-secondary">← Distribution</a>
+      <a href="#/crm/field-sales" class="btn btn-secondary" data-back>← Back</a>
     </div>
     <div id="vf-body" style="max-width:640px"><div class="skeleton skeleton-text"></div></div>
   `;

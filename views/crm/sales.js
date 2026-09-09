@@ -51,7 +51,7 @@ export default async function crmSales(container) {
         <h1 class="page-title" style="margin:0">Sales</h1>
         <p class="page-subtitle" style="margin:0">${esc(org?.name || 'Region')} · revenue & activations from the Tally reports</p>
       </div>
-      <a href="#/crm" class="btn btn-secondary">← CRM</a>
+      <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
     </div>
     <div id="sales-controls"></div>
     <div id="sales-body"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>

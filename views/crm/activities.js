@@ -25,7 +25,7 @@ export default async function crmActivities(container) {
         <p class="page-subtitle">Notes, calls, and tasks across your records</p>
       </div>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-        <a href="#/crm" class="btn btn-secondary">← CRM</a>
+        <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
         <select class="form-input" id="act-filter" style="max-width:180px;height:34px">
           <option value="all">All activity</option>
           <option value="mytasks">My open tasks</option>

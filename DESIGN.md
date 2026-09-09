@@ -195,6 +195,26 @@ Mined from LibreUIUX `accessibility-compliance`.
 
 ---
 
+## 9a. Navigation — the Back control (global rule)
+
+A "Back" control ALWAYS returns the user to their **previous page** (browser
+history), never a hardcoded route. Render it with `backButton()` from `js/ui.js`,
+or put `data-back` on the control; a global handler (`js/ui.js`) calls
+`history.back()`, falling back to the element's `href` (then the dashboard) only
+on a fresh load with no history.
+
+```js
+import { backButton } from '../../js/ui.js';
+// in a page header:
+`${backButton('crm')}`            // "← Back"; 'crm' is only the fresh-load fallback
+// or, on any element:
+`<a href="#/crm" class="btn btn-secondary" data-back>← Back</a>`
+```
+
+Do NOT hardcode a back destination (`<a href="#/crm">← CRM</a>`). Label it
+"← Back", not the name of a specific screen. Wizard/step "Back" buttons (moving to
+a previous step, not a previous page) are exempt.
+
 ## 10. How to build UI (Define → Build → Review → Refine)
 
 From LibreUIUX `premium-saas-design`, adapted:

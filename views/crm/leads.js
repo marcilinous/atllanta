@@ -23,7 +23,7 @@ export default async function crmLeads(container) {
         <p class="page-subtitle">Prospects to qualify and convert</p>
       </div>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-        <a href="#/crm" class="btn btn-secondary">← CRM</a>
+        <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
         ${canEdit ? '<button class="btn btn-primary" id="add-lead-btn">+ New Lead</button>' : ''}
       </div>
     </div>

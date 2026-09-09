@@ -66,7 +66,7 @@ export default async function crmPartnerDetail(container) {
           </div>
         </div>
         <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-          <a href="#/crm/partners" class="btn btn-secondary">← Partners</a>
+          <a href="#/crm/partners" class="btn btn-secondary" data-back>← Back</a>
           <a href="#/crm/log-visit?id=${esc(id)}" class="btn btn-secondary">Log visit</a>
           <button class="btn btn-primary" id="pd-edit">Edit</button>
           ${canDelete ? '<button class="btn btn-secondary" id="pd-delete" style="color:var(--color-error)">Delete</button>' : ''}
