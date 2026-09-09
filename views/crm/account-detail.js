@@ -4,6 +4,7 @@ import { esc, toast, initials, avColor, formatDate } from '../../js/ui.js';
 import { routeParams, navigate } from '../../js/router.js';
 import { openAccountForm } from './account-form.js';
 import { renderActivityTimeline } from './activity-timeline.js';
+import { renderFieldLog } from './field-log.js';
 
 // CRM › Account detail. Read view of one account plus its related contacts,
 // opportunities, and activity timeline. Editing reuses the shared account form.
@@ -80,6 +81,7 @@ export default async function crmAccountDetail(container) {
         <div class="u-stack-4">
           ${relatedCard('Contacts', contacts, c => `${esc([c.first_name, c.last_name].filter(Boolean).join(' ') || '—')}${c.title ? ` · <span class="u-sm-muted">${esc(c.title)}</span>` : ''}`, 'No contacts linked yet.')}
           ${relatedCard('Opportunities', opps, o => `${esc(o.name || '—')}${o.amount != null ? ` · <span class="u-sm-muted">${esc(String(o.amount))} ${esc(o.currency || '')}</span>` : ''}`, 'No opportunities yet.')}
+          <div id="acct-field"></div>
           <div class="card">
             <div class="card-header" style="font-weight:var(--font-weight-semibold)">Activity</div>
             <div class="card-body"><div id="acct-activity"></div></div>
@@ -97,6 +99,9 @@ export default async function crmAccountDetail(container) {
 
     const actEl = document.getElementById('acct-activity');
     if (actEl) renderActivityTimeline(actEl, { relatedType: 'account', relatedId: id, org, user, canEdit, ownerMap });
+
+    const fieldEl = document.getElementById('acct-field');
+    if (fieldEl) renderFieldLog(fieldEl, { account, org, user, userName: membership?.full_name || user?.user_metadata?.full_name || user?.email || 'BDE' });
   }
 
   function relatedCard(title, rows, rowHtml, emptyText) {
