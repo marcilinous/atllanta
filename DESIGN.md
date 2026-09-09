@@ -195,6 +195,17 @@ Mined from LibreUIUX `accessibility-compliance`.
 
 ---
 
+## 8a. Charting — Chart.js (owner-approved exception)
+
+Analytics charts use **Chart.js** (pinned, ESM via the jsdelivr CDN the app
+already uses — `chart.js@4.4.1/auto/+esm`), lazy-loaded only on the view that
+needs it. This is a deliberate, owner-approved exception to §2's vanilla-only
+rule for charts specifically — it is a library, not a framework, and hand-rolled
+SVG was declined for the Sales snapshot. Charts pass concrete colours (Chart.js
+can't resolve CSS `var()`); read `--color-text-secondary` / `--color-border` off
+the root for theme-aware axes, and destroy chart instances before re-rendering.
+Do not reach for other chart libs; do not use Chart.js for non-analytics UI.
+
 ## 9a. Navigation — the Back control (global rule)
 
 A "Back" control ALWAYS returns the user to their **previous page** (browser
