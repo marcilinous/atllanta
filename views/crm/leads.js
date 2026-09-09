@@ -132,10 +132,6 @@ export default async function crmLeads(container) {
     const form = document.createElement('form');
     form.className = 'u-stack-4';
     form.innerHTML = `
-      <div style="background:var(--color-accent-light);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-size:var(--text-sm);color:var(--color-text-secondary)">
-        Recorded as the partner reports it — RTcompu doesn't verify the end customer.
-      </div>
-
       <div class="form-group">
         <label class="form-label">Reported by partner <span style="color:var(--color-error)">*</span></label>
         <div id="lf-partner"></div>
@@ -145,7 +141,7 @@ export default async function crmLeads(container) {
         <input class="form-input" name="company" value="${esc(l.company || '')}" placeholder="Prospect's business name"></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
-        <div class="form-group"><label class="form-label">Contact person</label><input class="form-input" name="first_name" value="${esc(l.first_name || '')}" placeholder="Name (as told)"></div>
+        <div class="form-group"><label class="form-label">Contact person</label><input class="form-input" name="first_name" value="${esc(l.first_name || '')}" placeholder="Name"></div>
         <div class="form-group"><label class="form-label">Phone</label><input class="form-input" name="phone" value="${esc(l.phone || '')}"></div>
       </div>
 

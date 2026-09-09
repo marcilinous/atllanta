@@ -215,6 +215,16 @@ Do NOT hardcode a back destination (`<a href="#/crm">← CRM</a>`). Label it
 "← Back", not the name of a specific screen. Wizard/step "Back" buttons (moving to
 a previous step, not a previous page) are exempt.
 
+## 9b. UI copy — no internal process explanations (critical)
+
+Never surface internal process, policy, or business-logic rationale in the product
+UI. No explainer banners, helper notes, or microcopy that describe *why* the
+company works a way or *how* data is treated internally (e.g. "recorded as the
+partner reports it — we don't verify the end customer"). The UI states what a
+field is and what to do — nothing about the process behind it. Keep such rationale
+in code comments / docs only. Labels and placeholders name the input plainly
+("Name", "Remarks"), never editorialize ("Name (as told)").
+
 ## 10. How to build UI (Define → Build → Review → Refine)
 
 From LibreUIUX `premium-saas-design`, adapted:
