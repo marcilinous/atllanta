@@ -36,6 +36,12 @@ export default async function crmHub(container) {
       icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
       route: 'crm/activities',
     },
+    {
+      title: 'Field Sales',
+      desc: 'Partner action list & territory health',
+      icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
+      route: 'crm/field-sales',
+    },
   ];
 
   const soon = [];
