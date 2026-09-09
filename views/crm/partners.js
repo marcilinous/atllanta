@@ -121,7 +121,7 @@ export default async function crmPartners(container) {
       </div></div>
     `;
     body.querySelectorAll('tr[data-id]').forEach(tr =>
-      tr.addEventListener('click', () => navigate('crm/partner', { id: tr.dataset.id })));
+      tr.addEventListener('click', () => navigate('crm/partner?id=' + tr.dataset.id)));
   }
 
   paintFilters();

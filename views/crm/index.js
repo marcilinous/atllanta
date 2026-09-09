@@ -60,6 +60,12 @@ export default async function crmHub(container) {
       icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
       route: 'crm/pjp',
     },
+    {
+      title: 'Log Visit',
+      desc: 'Field visit capture: outcome, Tally check, GPS, selfie',
+      icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+      route: 'crm/log-visit',
+    },
   ];
 
   const soon = [];
