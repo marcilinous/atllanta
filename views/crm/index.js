@@ -31,6 +31,12 @@ export default async function crmHub(container) {
       route: 'crm/sales',
     },
     {
+      title: 'Partners',
+      desc: 'Partner master: onboard, update, and manage details',
+      icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01',
+      route: 'crm/partners',
+    },
+    {
       title: 'Pipeline',
       desc: 'Opportunities across your sales stages',
       icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
