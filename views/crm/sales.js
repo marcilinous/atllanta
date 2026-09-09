@@ -153,7 +153,12 @@ export default async function crmSales(container) {
       body.innerHTML = `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">Couldn't load sales</div><div class="empty-state-desc">${esc(msg)}</div></div>`;
       toast('Sales: ' + msg); return;
     }
-    const pt = pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 };
+    // Partner trend is non-fatal, but don't let a failed call read as a real 0:
+    // surface it and show '—' instead.
+    const pErr = pTotal.error || pTrend.error;
+    if (pErr) toast('Partner trend: ' + pErr.message);
+    const pt = pErr ? { uap: null, transacting: null }
+      : (pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 });
     await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, visitStat, leadStat, { leads, visits, calls, events, partners });
   }
 
