@@ -24,10 +24,15 @@ export default async function crmHub(container) {
       icon: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3',
       route: 'crm/leads',
     },
+    {
+      title: 'Pipeline',
+      desc: 'Opportunities across your sales stages',
+      icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
+      route: 'crm/pipeline',
+    },
   ];
 
   const soon = [
-    { title: 'Pipeline', desc: 'Opportunities across your sales stages', icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3' },
     { title: 'Activities', desc: 'Notes, calls, and tasks timeline', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   ];
 

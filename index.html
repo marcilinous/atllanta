@@ -201,6 +201,7 @@ import crmAccounts from '/views/crm/accounts.js';
 import crmAccountDetail from '/views/crm/account-detail.js';
 import crmContacts from '/views/crm/contacts.js';
 import crmLeads from '/views/crm/leads.js';
+import crmPipeline from '/views/crm/pipeline.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -459,6 +460,7 @@ registerRoute('crm/accounts', crmAccounts);
 registerRoute('crm/account', crmAccountDetail);
 registerRoute('crm/contacts', crmContacts);
 registerRoute('crm/leads', crmLeads);
+registerRoute('crm/pipeline', crmPipeline);
 
 initRouter(document.getElementById('main-content'));
 
