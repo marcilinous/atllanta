@@ -42,6 +42,12 @@ export default async function crmHub(container) {
       icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
       route: 'crm/field-sales',
     },
+    {
+      title: 'Journey Plan',
+      desc: 'PJP: plan each BDE\'s beat by territory, day by day',
+      icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+      route: 'crm/pjp',
+    },
   ];
 
   const soon = [];
