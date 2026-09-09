@@ -12,6 +12,7 @@ import { routeParams } from '../../js/router.js';
 // remarks log. CRUD over crm_leads (anon+RLS); any member collects/updates.
 
 const PRODUCTS = ['TP', 'TSS', 'TPCA', 'Other'];
+const SOURCES = ['Partner events', 'Partner visit', 'Digital events', 'Physical event'];
 // Pipeline stages (DB-constrained status values).
 const STAGES = [
   { key: 'hot', label: 'Hot', badge: 'error' },
@@ -145,9 +146,11 @@ export default async function crmLeads(container) {
         <div class="form-group"><label class="form-label">Phone</label><input class="form-input" name="phone" value="${esc(l.phone || '')}"></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3)">
         <div class="form-group"><label class="form-label">Product interest</label>
           <select class="form-input" name="product_interest"><option value="">—</option>${PRODUCTS.map(p => `<option ${l.product_interest === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Source</label>
+          <select class="form-input" name="source"><option value="">—</option>${SOURCES.map(s => `<option ${l.source === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">Stage</label>
           <select class="form-input" name="status" id="lf-status">${opt(STAGES.map(s => [s.key, s.label]), l.status || 'warm')}</select></div>
       </div>
@@ -248,6 +251,7 @@ export default async function crmLeads(container) {
         first_name: (fd.get('first_name') || '').toString().trim() || null,
         phone: (fd.get('phone') || '').toString().trim() || null,
         product_interest: (fd.get('product_interest') || '').toString() || null,
+        source: (fd.get('source') || '').toString() || null,
         status,
         follow_up_date: status === 'dropped' ? null : followUp,
         drop_reason: status === 'dropped' ? dropReason : null,
