@@ -78,6 +78,12 @@ export default async function crmHub(container) {
       icon: 'M13 2L3 14h7l-1 8 10-12h-7l1-8z',
       route: 'crm/opportunities',
     },
+    {
+      title: 'Reports & exports',
+      desc: 'Canned CSV downloads for MIS & analysts',
+      icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
+      route: 'crm/exports',
+    },
   ];
 
   const soon = [];

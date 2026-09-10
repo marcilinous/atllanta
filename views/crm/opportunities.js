@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg } from '../../js/auth.js';
 import { esc, toast, backButton } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
+import { exportCSV } from '../../js/csv.js';
 
 // CRM › Opportunities. One engine (crm_partner_opportunity), three lenses over a
 // two-period comparison of each partner's TP count / TSS count / value:
@@ -203,6 +204,7 @@ export default async function crmOpportunities(container) {
           <span style="font-weight:var(--font-weight-semibold)" id="op-total"></span>
           <span class="u-sm-muted">${caption}</span>
           <input type="text" class="form-input" id="op-search" placeholder="Search partner, region, owner…" value="${esc(searchVal)}" style="flex:1;min-width:180px;height:34px">
+          <button class="btn btn-secondary btn-sm" id="op-export">Export CSV</button>
           <span class="u-meta" id="op-count"></span>
         </div>
         <div class="table-wrap"><table class="table">
@@ -236,6 +238,21 @@ export default async function crmOpportunities(container) {
     }
 
     document.getElementById('op-search').addEventListener('input', (e) => { searchVal = e.target.value; paintTable(); });
+    document.getElementById('op-export').addEventListener('click', () => {
+      const { list, sort } = currentSet();
+      const q = searchVal.toLowerCase();
+      let out = list.slice().sort(sort);
+      if (q) out = out.filter(r => (r.partner_name || '').toLowerCase().includes(q) || (r.region || '').toLowerCase().includes(q) || (r.hub || '').toLowerCase().includes(q) || (nameOf[r.owner_id] || '').toLowerCase().includes(q));
+      exportCSV(`opportunity-${tab}-${new Date().toISOString().slice(0, 10)}`, out, [
+        { key: 'partner_name', label: 'Partner' },
+        { key: 'region', label: 'Region' }, { key: 'hub', label: 'Hub' }, { key: 'tier', label: 'Tier' },
+        { key: 'owner', label: 'Owner', map: (r) => nameOf[r.owner_id] || '' },
+        { key: 'a_tp', label: 'TP A' }, { key: 'a_tss', label: 'TSS A' }, { key: 'a_value', label: 'Value A' },
+        { key: 'b_tp', label: 'TP B' }, { key: 'b_tss', label: 'TSS B' }, { key: 'b_value', label: 'Value B' },
+        { key: 'last_activity', label: 'Last activity' },
+      ]);
+      toast(`Exported ${out.length.toLocaleString('en-IN')} rows`);
+    });
     if (tab === 'playground') {
       document.getElementById('op-metric').addEventListener('change', (e) => { pMetric = e.target.value; render(); }); // columns change → rebuild
       const wireOp = (selId, numId, set) => {

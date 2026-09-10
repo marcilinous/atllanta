@@ -3,10 +3,23 @@ import { getOrg, getUser, getMembership } from '../../js/auth.js';
 import { esc, toast } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
 import { openPartnerForm } from './partner-form.js';
+import { exportCSV, parseCSV } from '../../js/csv.js';
 
 // CRM › Partners. Directory over crm_partner_details: search + filter the 6k
-// RTcompu partners, onboard a new one, click through to the detail card.
+// RTcompu partners, onboard a new one, bulk-import via CSV, export to CSV, and
+// click through to the detail card.
 const PAGE = 100;
+
+// Importable / exportable partner columns → [db_column, CSV header].
+const PARTNER_COLS = [
+  ['partner_name', 'Partner Name'], ['site_id', 'Site ID'], ['role', 'Role'], ['role_status', 'Role Status'],
+  ['contact_person_name', 'Contact Person'], ['email_address', 'Email'], ['mobile_number', 'Mobile'], ['alternative_mobile_no', 'Alt Mobile'],
+  ['city', 'City'], ['pincode', 'Pincode'], ['district', 'District'], ['district_new', 'District New'], ['state', 'State'], ['region', 'Region'], ['hub', 'Hub'],
+  ['tally_serial_no', 'Tally Serial No'], ['pan_no', 'PAN No'], ['gstin', 'GSTIN'],
+  ['bde_name', 'BDE Name'], ['telecaller_name', 'Telecaller Name'], ['tier', 'Tier'], ['partner_status', 'Partner Status'], ['address', 'Address'],
+];
+const EXPORT_COLS = [...PARTNER_COLS.map(([k, l]) => ({ key: k, label: l })), { key: 'created_at', label: 'Created At' }];
+const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export default async function crmPartners(container) {
   const org = getOrg();
@@ -25,9 +38,12 @@ export default async function crmPartners(container) {
         <h1 class="page-title" style="margin:0">Partners</h1>
         <p class="page-subtitle" style="margin:0">${esc(org?.name || 'Region')} · partner master directory</p>
       </div>
-      <div style="display:flex;gap:var(--space-2)">
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
         <a href="#/crm" class="btn btn-secondary" data-back>← Back</a>
+        <button class="btn btn-secondary" id="pt-export">Export CSV</button>
+        ${canOnboard ? '<button class="btn btn-secondary" id="pt-import">Import CSV</button>' : ''}
         ${canOnboard ? '<button class="btn btn-primary" id="pt-onboard">+ Onboard partner</button>' : ''}
+        <input type="file" id="pt-file" accept=".csv,text/csv" hidden>
       </div>
     </div>
     <div id="pt-filters" style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)"></div>
@@ -43,6 +59,76 @@ export default async function crmPartners(container) {
   if (onboardBtn) onboardBtn.addEventListener('click', () => {
     openPartnerForm({ org, user, onSaved: () => { toast('Partner onboarded'); load(); } });
   });
+
+  // Export: re-query the current filters without the page cap, download all matches.
+  document.getElementById('pt-export').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Exporting…';
+    let query = sb.from('crm_partner_details').select('*').order('partner_name', { ascending: true }).limit(20000);
+    if (region) query = query.eq('region', region);
+    if (hub) query = query.eq('hub', hub);
+    if (role) query = query.eq('role', role);
+    if (q) { const s = q.replace(/[,()%]/g, ' ').trim(); if (s) query = query.or(`partner_name.ilike.%${s}%,site_id.ilike.%${s}%,bde_name.ilike.%${s}%,telecaller_name.ilike.%${s}%`); }
+    const { data, error } = await query;
+    btn.disabled = false; btn.textContent = 'Export CSV';
+    if (error) { toast('Export failed: ' + error.message); return; }
+    exportCSV(`partners-${new Date().toISOString().slice(0, 10)}`, data || [], EXPORT_COLS);
+    toast(`Exported ${(data || []).length.toLocaleString('en-IN')} partners`);
+  });
+
+  // Import: pick a CSV, map headers → columns, skip existing Site IDs, insert.
+  const importBtn = document.getElementById('pt-import');
+  const fileInput = document.getElementById('pt-file');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => importMenu());
+    fileInput.addEventListener('change', async () => {
+      const f = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (!f) return;
+      const text = await f.text();
+      const parsed = parseCSV(text);
+      if (!parsed.length) { toast('No rows found in the CSV.'); return; }
+
+      // Resolve headers (accept either the column key or the human label).
+      const headerKey = {};
+      PARTNER_COLS.forEach(([k, l]) => { headerKey[norm(k)] = k; headerKey[norm(l)] = k; });
+      const known = {};
+      Object.keys(parsed[0]).forEach(h => { const k = headerKey[norm(h)]; if (k) known[h] = k; });
+      if (!Object.values(known).includes('partner_name')) { toast('CSV needs a "Partner Name" column.'); return; }
+
+      // Skip Site IDs that already exist in this org.
+      const existing = new Set();
+      const { data: cur } = await sb.from('crm_partner_details').select('site_id').limit(20000);
+      (cur || []).forEach(r => { if (r.site_id) existing.add(String(r.site_id).trim()); });
+
+      const payloads = []; let skipped = 0;
+      for (const row of parsed) {
+        const p = { org_id: org.id, created_by: user.id };
+        for (const [h, k] of Object.entries(known)) { const v = (row[h] || '').trim(); if (v) p[k] = v; }
+        if (!p.partner_name) { skipped++; continue; }
+        if (p.site_id && existing.has(String(p.site_id).trim())) { skipped++; continue; }
+        payloads.push(p);
+      }
+      if (!payloads.length) { toast(`Nothing to import (${skipped} skipped as existing/blank).`); return; }
+
+      importBtn.disabled = true; importBtn.textContent = 'Importing…';
+      let inserted = 0, failed = 0;
+      for (let i = 0; i < payloads.length; i += 500) {
+        const chunk = payloads.slice(i, i + 500);
+        const { error } = await sb.from('crm_partner_details').insert(chunk);
+        if (error) failed += chunk.length; else inserted += chunk.length;
+      }
+      importBtn.disabled = false; importBtn.textContent = 'Import CSV';
+      toast(`Imported ${inserted}${skipped ? ` · ${skipped} skipped` : ''}${failed ? ` · ${failed} failed` : ''}`);
+      load();
+    });
+  }
+
+  // Small chooser: import a file, or grab the header template first.
+  function importMenu() {
+    const choice = window.confirm('OK: choose a CSV to import.\nCancel: download the column template first.');
+    if (choice) fileInput.click();
+    else exportCSV('partner-import-template', [], PARTNER_COLS.map(([k, l]) => ({ key: k, label: l })));
+  }
 
   // Filter option lists: one lightweight pull of the four filterable columns.
   const { data: opts } = await sb.from('crm_partner_details').select('region, hub, role');

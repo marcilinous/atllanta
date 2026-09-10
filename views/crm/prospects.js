@@ -2,6 +2,7 @@ import sb from '../../js/supabase.js';
 import { getOrg, getUser } from '../../js/auth.js';
 import { esc, toast, backButton, formatDate } from '../../js/ui.js';
 import { openPartnerForm } from './partner-form.js';
+import { exportCSV } from '../../js/csv.js';
 
 // CRM › Prospects. Unregistered-partner visits grouped into one row per prospect
 // (by owner mobile, else firm name), so repeat visits collapse. "Register" opens
@@ -53,7 +54,10 @@ export default async function crmProspects(container) {
     }
 
     body.innerHTML = `
-      <div class="u-sm-muted" style="margin-bottom:var(--space-3)">${rows.length} prospect${rows.length === 1 ? '' : 's'} · register one to link its visits to a partner record.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
+        <span class="u-sm-muted">${rows.length} prospect${rows.length === 1 ? '' : 's'} · register one to link its visits to a partner record.</span>
+        <button class="btn btn-secondary btn-sm" id="pr-export">Export CSV</button>
+      </div>
       <div style="overflow-x:auto"><table class="table">
         <thead><tr><th>Firm</th><th>Owner</th><th>Mobile</th><th>Region</th><th>Visits</th><th>Last visit</th><th></th></tr></thead>
         <tbody>
@@ -68,6 +72,14 @@ export default async function crmProspects(container) {
           </tr>`).join('')}
         </tbody>
       </table></div>`;
+
+    document.getElementById('pr-export').addEventListener('click', () => {
+      exportCSV(`prospects-${new Date().toISOString().slice(0, 10)}`, rows, [
+        { key: 'firm', label: 'Firm' }, { key: 'owner', label: 'Owner' }, { key: 'mobile', label: 'Mobile' },
+        { key: 'region', label: 'Region' }, { key: 'visits', label: 'Visits' }, { key: 'last', label: 'Last visit' },
+      ]);
+      toast(`Exported ${rows.length.toLocaleString('en-IN')} prospects`);
+    });
 
     body.querySelectorAll('[data-reg]').forEach(b => b.addEventListener('click', () => {
       const r = rows[Number(b.dataset.reg)];
