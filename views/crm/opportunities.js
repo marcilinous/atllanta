@@ -185,7 +185,7 @@ export default async function crmOpportunities(container) {
 
     const opSel = (id, cur) => `<select class="form-input" id="${id}" style="max-width:74px;height:34px">${OPS.map(o => `<option value="${o.key}" ${o.key === cur ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`;
     const playgroundBar = tab !== 'playground' ? '' : `
-      <div class="control-bar">
+      <div class="control-bar nowrap">
         <div class="control-group"><span class="control-label">Metric</span>
           <select class="form-input" id="op-metric" style="max-width:170px;height:34px">${METRICS.map(x => `<option value="${x.key}" ${x.key === pMetric ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></div>
         <div class="control-group"><span class="control-label">Period A</span>
