@@ -66,6 +66,12 @@ export default async function crmHub(container) {
       icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
       route: 'crm/log-visit',
     },
+    {
+      title: 'Prospects',
+      desc: 'Unregistered partners from the field — register to onboard',
+      icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6',
+      route: 'crm/prospects',
+    },
   ];
 
   const soon = [];
