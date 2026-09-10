@@ -135,17 +135,16 @@ export default async function crmSales(container) {
 
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-    const [byDim, series, pTrend, pTotal, vSeries, visitStat, leadStat, leads, visits, calls, events, partners] = await Promise.all([
+    const [byDim, series, pTrend, pTotal, vSeries, visitOut, callOut, leadStat, leads, events, partners] = await Promise.all([
       sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
       sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: 'all' }),
       sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
-      tallyBy('crm_visits', 'visit_status', 'visited_at'),
+      sb.rpc('crm_visit_outcomes', { p_from: from, p_to: to }),
+      sb.rpc('crm_call_outcomes', { p_from: from, p_to: to }),
       tallyBy('crm_leads', 'status', 'created_at'),
       countIn('crm_leads', 'created_at'),
-      countIn('crm_visits', 'visited_at'),
-      countIn('crm_calls', 'called_at'),
       countIn('crm_events', 'event_date'),
       countIn('crm_partner_details', null),
     ]);
@@ -160,10 +159,17 @@ export default async function crmSales(container) {
     if (pErr) toast('Partner trend: ' + pErr.message);
     const pt = pErr ? { uap: null, transacting: null }
       : (pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 });
-    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, leadStat, { leads, visits, calls, events, partners });
+    // Field activity (BDE visits + calls) comes from the Support field log.
+    const visitStat = {}; (visitOut.data || []).forEach(r => { if (r.stage) visitStat[r.stage] = Number(r.cnt) || 0; });
+    const callRows = (callOut.data || []).map(r => ({ outcome: r.outcome, n: Number(r.cnt) || 0 }))
+      .filter(r => r.outcome).sort((a, b) => b.n - a.n);
+    const visitsTotal = Object.values(visitStat).reduce((a, n) => a + n, 0);
+    const callsTotal = callRows.reduce((a, r) => a + r.n, 0);
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, callRows, leadStat,
+      { leads, visits: visitsTotal, calls: callsTotal, events, partners });
   }
 
-  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, leadStat, activity) {
+  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, callRows, leadStat, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
     const uapBy = {}, txBy = {}, visitBy = {};
     partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
@@ -206,6 +212,20 @@ export default async function crmSales(container) {
     };
     const visitPyr = pyramid(VISIT_STAGES, visitStat, 'No visits logged in this window.');
     const leadPyr = pyramid(LEAD_STAGES, leadStat, 'No leads collected in this window.');
+
+    // Call / follow-up outcomes: horizontal bars scaled to the top outcome.
+    const callTotal = callRows.reduce((a, r) => a + r.n, 0);
+    const callMax = Math.max(1, ...callRows.map(r => r.n));
+    const callBody = callTotal === 0
+      ? `<div class="u-sm-muted" style="padding:var(--space-3) 0">No calls or follow-ups in this window.</div>`
+      : callRows.map(r => {
+          const w = Math.max(Math.round((r.n / callMax) * 100), 3);
+          return `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+            <div style="flex:0 0 150px;font-size:var(--text-sm)">${esc(r.outcome)}</div>
+            <div style="flex:1;min-width:0"><div style="width:${w}%;background:#2563EB;height:14px;border-radius:var(--radius-sm)"></div></div>
+            <div style="flex:0 0 88px;text-align:right;font-size:var(--text-sm)">${num(r.n)} <span class="u-sm-muted">${pct(r.n, callTotal)}%</span></div>
+          </div>`;
+        }).join('');
 
     const periods = [...new Set(series.map(s => s.period))].sort();
     const periodTotal = {}; periods.forEach(p => periodTotal[p] = 0);
@@ -294,6 +314,13 @@ export default async function crmSales(container) {
           </div>
           <div class="card-body">${leadPyr.html}</div></div>
       </div>
+
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:var(--font-weight-semibold)">Call &amp; follow-up outcomes</span>
+          <span class="u-sm-muted">${num(callTotal)} calls</span>
+        </div>
+        <div class="card-body">${callBody}</div></div>
 
       <div style="margin-bottom:var(--space-2);font-weight:var(--font-weight-semibold)">Business activity ${from || to ? `<span class="u-sm-muted" style="font-weight:normal">· ${esc(from || '…')} → ${esc(to || 'now')}</span>` : ''}</div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
