@@ -135,13 +135,14 @@ export default async function crmSales(container) {
 
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-    const [byDim, series, pTrend, pTotal, vSeries, visitOut, callOut, leadStat, leads, events, partners] = await Promise.all([
+    const [byDim, series, pTrend, pTotal, vSeries, visitOut, visitSplit, callOut, leadStat, leads, events, partners] = await Promise.all([
       sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
       sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: 'all' }),
       sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_visit_outcomes', { p_from: from, p_to: to }),
+      sb.rpc('crm_visit_split', { p_from: from, p_to: to }),
       sb.rpc('crm_call_outcomes', { p_from: from, p_to: to }),
       tallyBy('crm_leads', 'status', 'created_at'),
       countIn('crm_leads', 'created_at'),
@@ -165,11 +166,13 @@ export default async function crmSales(container) {
       .filter(r => r.outcome).sort((a, b) => b.n - a.n);
     const visitsTotal = Object.values(visitStat).reduce((a, n) => a + n, 0);
     const callsTotal = callRows.reduce((a, r) => a + r.n, 0);
-    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, callRows, leadStat,
+    const vSplit = { registered: 0, unregistered: 0 };
+    (visitSplit.data || []).forEach(r => { if (r.partner_type in vSplit) vSplit[r.partner_type] = Number(r.cnt) || 0; });
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, vSplit, callRows, leadStat,
       { leads, visits: visitsTotal, calls: callsTotal, events, partners });
   }
 
-  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, callRows, leadStat, activity) {
+  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, visitSplit, callRows, leadStat, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
     const uapBy = {}, txBy = {}, visitBy = {};
     partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
@@ -306,7 +309,12 @@ export default async function crmSales(container) {
             <span style="font-weight:var(--font-weight-semibold)">Visit outcomes</span>
             <span class="u-sm-muted">${num(visitPyr.total)} visits</span>
           </div>
-          <div class="card-body">${visitPyr.html}</div></div>
+          <div class="card-body">
+            <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3);flex-wrap:wrap">
+              <div><span class="u-sm-muted">Registered</span> <strong>${num(visitSplit.registered)}</strong> <span class="u-sm-muted">${pct(visitSplit.registered, visitSplit.registered + visitSplit.unregistered)}%</span></div>
+              <div><span class="u-sm-muted">Unregistered</span> <strong>${num(visitSplit.unregistered)}</strong> <span class="u-sm-muted">${pct(visitSplit.unregistered, visitSplit.registered + visitSplit.unregistered)}%</span></div>
+            </div>
+            ${visitPyr.html}</div></div>
         <div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-weight:var(--font-weight-semibold)">Lead outcomes</span>
