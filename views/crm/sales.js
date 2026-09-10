@@ -90,14 +90,17 @@ export default async function crmSales(container) {
 
   function paintControls() {
     controls.innerHTML = `
-      <div style="display:flex;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;align-items:center;margin-bottom:var(--space-4)">
-        <div style="display:flex;gap:var(--space-1);flex-wrap:wrap">
-          ${P.map(p => `<button class="btn btn-sm ${preset === p.key ? 'btn-primary' : 'btn-secondary'}" data-preset="${p.key}">${esc(p.label)}</button>`).join('')}
+      <div class="control-bar" style="justify-content:space-between">
+        <div class="control-group">
+          <span class="control-label">Range</span>
+          <div class="seg">
+            ${P.map(p => `<button class="seg-btn ${preset === p.key ? 'is-active' : ''}" data-preset="${p.key}">${esc(p.label)}</button>`).join('')}
+          </div>
         </div>
-        <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
-          <input class="form-input" type="date" id="sx-from" value="${esc(from)}" style="max-width:160px">
+        <div class="control-group">
+          <input class="form-input" type="date" id="sx-from" value="${esc(from)}" style="max-width:150px;height:34px">
           <span class="u-sm-muted">to</span>
-          <input class="form-input" type="date" id="sx-to" value="${esc(to)}" style="max-width:160px">
+          <input class="form-input" type="date" id="sx-to" value="${esc(to)}" style="max-width:150px;height:34px">
         </div>
       </div>`;
     controls.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
@@ -105,8 +108,7 @@ export default async function crmSales(container) {
       preset = p.key; from = p.from; to = p.to; paintControls(); load();
     }));
     const fEl = controls.querySelector('#sx-from'), tEl = controls.querySelector('#sx-to');
-    const custom = () => { from = fEl.value || ''; to = tEl.value || ''; preset = null;
-      controls.querySelectorAll('[data-preset]').forEach(b => b.className = 'btn btn-sm btn-secondary'); load(); };
+    const custom = () => { from = fEl.value || ''; to = tEl.value || ''; preset = null; paintControls(); load(); };
     fEl.addEventListener('change', custom); tEl.addEventListener('change', custom);
   }
 
@@ -277,8 +279,8 @@ export default async function crmSales(container) {
         <div class="card">
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
             <span style="font-weight:var(--font-weight-semibold)">Revenue trend</span>
-            <div style="display:flex;gap:var(--space-1)">
-              ${GRAINS.map(g => `<button class="btn btn-sm ${grain === g.key ? 'btn-primary' : 'btn-secondary'}" data-grain="${g.key}">${esc(g.label)}</button>`).join('')}
+            <div class="seg">
+              ${GRAINS.map(g => `<button class="seg-btn ${grain === g.key ? 'is-active' : ''}" data-grain="${g.key}">${esc(g.label)}</button>`).join('')}
             </div>
           </div>
           <div class="card-body"><div style="height:280px"><canvas id="sx-trend"></canvas></div></div></div>
@@ -289,8 +291,8 @@ export default async function crmSales(container) {
       <div class="card" style="margin-bottom:var(--space-4)">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
           <span style="font-weight:var(--font-weight-semibold)">By dimension</span>
-          <div style="display:flex;gap:var(--space-1);flex-wrap:wrap">
-            ${DIMS.map(d => `<button class="btn btn-sm ${dim === d.key ? 'btn-primary' : 'btn-secondary'}" data-dim="${d.key}">${esc(d.label)}</button>`).join('')}
+          <div class="seg">
+            ${DIMS.map(d => `<button class="seg-btn ${dim === d.key ? 'is-active' : ''}" data-dim="${d.key}">${esc(d.label)}</button>`).join('')}
           </div>
         </div>
         <div class="card-body"><div style="height:${Math.max(220, bucketRows.length * 26)}px"><canvas id="sx-dim"></canvas></div></div>

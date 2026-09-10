@@ -103,12 +103,12 @@ export default async function crmOpportunities(container) {
 
   function paintControls() {
     controls.innerHTML = `
-      <div style="display:flex;gap:var(--space-4);flex-wrap:wrap;align-items:flex-start;margin-bottom:var(--space-3)">
+      <div class="control-bar">
         ${periodPicker('a')}${periodPicker('b')}
       </div>
-      <div style="display:flex;gap:var(--space-1);flex-wrap:wrap;margin-bottom:var(--space-4)">
+      <div class="seg" style="margin-bottom:var(--space-4)">
         ${[['uap', 'UAP opportunity'], ['transacting', 'Transacting opportunity'], ['playground', 'Playground']]
-          .map(([k, l]) => `<button class="btn btn-sm ${tab === k ? 'btn-primary' : 'btn-secondary'}" data-tab="${k}">${l}</button>`).join('')}
+          .map(([k, l]) => `<button class="seg-btn ${tab === k ? 'is-active' : ''}" data-tab="${k}">${l}</button>`).join('')}
       </div>`;
 
     controls.querySelectorAll('[data-period]').forEach(sel => sel.addEventListener('change', () => {
@@ -186,13 +186,13 @@ export default async function crmOpportunities(container) {
     }
 
     const playgroundBar = tab !== 'playground' ? '' : `
-      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center;margin-bottom:var(--space-3)">
-        <span class="u-sm-muted">Metric</span>
-        <select class="form-input" id="op-metric" style="max-width:180px">${METRICS.map(x => `<option value="${x.key}" ${x.key === pMetric ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
-        <span class="u-sm-muted">A is</span>
-        <select class="form-input" id="op-condA" style="max-width:100px">${CONDS.map(c => `<option value="${c.key}" ${c.key === pCondA ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
-        <span class="u-sm-muted">and B is</span>
-        <select class="form-input" id="op-condB" style="max-width:100px">${CONDS.map(c => `<option value="${c.key}" ${c.key === pCondB ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
+      <div class="control-bar">
+        <div class="control-group"><span class="control-label">Metric</span>
+          <select class="form-input" id="op-metric" style="max-width:180px;height:34px">${METRICS.map(x => `<option value="${x.key}" ${x.key === pMetric ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></div>
+        <div class="control-group"><span class="control-label">A is</span>
+          <select class="form-input" id="op-condA" style="max-width:90px;height:34px">${CONDS.map(c => `<option value="${c.key}" ${c.key === pCondA ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div>
+        <div class="control-group"><span class="control-label">and B is</span>
+          <select class="form-input" id="op-condB" style="max-width:90px;height:34px">${CONDS.map(c => `<option value="${c.key}" ${c.key === pCondB ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div>
       </div>`;
 
     body.innerHTML = `
