@@ -4,15 +4,17 @@ import { esc, toast } from '../../js/ui.js';
 import { routeParams, navigate } from '../../js/router.js';
 import { publishEvent } from '../../js/events.js';
 
-// CRM › Log visit. Full field-visit collection form for BDEs: pick the partner,
-// record the outcome, verify the Tally serial, capture GPS + a selfie. Writes
-// crm_visits (RLS: member logs their own) and uploads the selfie to the
-// org-scoped visit-selfies bucket. Reachable standalone (crm/log-visit) or
-// deep-linked with ?id=<partner> from a partner page.
+// CRM › Log visit. Field-visit capture for BDEs. Two modes: a Registered partner
+// (picked from crm_partner_details, links account_id) or an Unregistered prospect
+// (a shop not yet onboarded — captured with structured region/owner fields so the
+// data stays analysable). Writes crm_visits (RLS: member logs their own) and
+// uploads the selfie to the org-scoped visit-selfies bucket. Reachable standalone
+// (crm/log-visit) or deep-linked with ?id=<partner> from a partner page.
 
 const VISIT_STATUS = ['Met owner', 'Met resource', 'Not able to meet', 'Shop closed', 'Business closed'];
 // Tally serial status is DB-constrained; label the on-site check plainly.
 const TALLY_STATUS = [['', '—'], ['shared', 'Serial shared'], ['not_shared', 'Not shared'], ['no_licence', 'No licence']];
+const FALLBACK_REGIONS = ['Bengaluru', 'Chennai', 'Rest of Karnataka', 'Rest of Tamilnadu', 'TSAP-TS', 'TSAP-AP'];
 
 export default async function crmVisitForm(container) {
   const org = getOrg();
@@ -21,8 +23,10 @@ export default async function crmVisitForm(container) {
   const userName = membership?.full_name || user?.user_metadata?.full_name || user?.email || 'BDE';
   const { id: preId } = routeParams();
 
-  let partner = null;   // selected crm_partner_details row
-  let geo = null;       // { lat, lng }
+  let mode = 'registered';   // 'registered' | 'unregistered'
+  let partner = null;        // selected crm_partner_details row (registered)
+  let regions = FALLBACK_REGIONS;
+  let geo = null;            // { lat, lng }
   let selfieFile = null;
 
   container.innerHTML = `
@@ -39,12 +43,41 @@ export default async function crmVisitForm(container) {
 
   const body = document.getElementById('vf-body');
 
-  if (preId) {
-    const { data } = await sb.from('crm_partner_details').select('*').eq('id', preId).single();
-    if (data) partner = data;
+  // Region list for the unregistered form (fall back to the known set).
+  const { data: regRows } = await sb.from('crm_partner_details').select('region').not('region', 'is', null).limit(2000);
+  if (regRows && regRows.length) {
+    const set = [...new Set(regRows.map(r => (r.region || '').trim()).filter(Boolean))].sort();
+    if (set.length) regions = set;
   }
 
-  function partnerPicker() {
+  if (preId) {
+    const { data } = await sb.from('crm_partner_details').select('*').eq('id', preId).single();
+    if (data) { partner = data; mode = 'registered'; }
+  }
+
+  function modeToggle() {
+    const btn = (m, label) => `<button type="button" class="btn btn-sm ${mode === m ? 'btn-primary' : 'btn-secondary'}" data-mode="${m}">${label}</button>`;
+    return `<div style="display:flex;gap:var(--space-1);margin-bottom:var(--space-2)">
+      ${btn('registered', 'Registered partner')}${btn('unregistered', 'New / unregistered')}
+    </div>`;
+  }
+
+  function partnerBlock() {
+    if (mode === 'unregistered') {
+      return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="form-group" style="grid-column:1 / -1"><label class="form-label">Shop / firm name <span style="color:var(--color-error)">*</span></label>
+            <input class="form-input" name="u_firm" placeholder="Partner / shop name"></div>
+          <div class="form-group"><label class="form-label">Owner name</label>
+            <input class="form-input" name="u_owner"></div>
+          <div class="form-group"><label class="form-label">Owner mobile</label>
+            <input class="form-input" name="u_mobile" inputmode="tel" placeholder="10-digit"></div>
+          <div class="form-group"><label class="form-label">Region <span style="color:var(--color-error)">*</span></label>
+            <select class="form-input" name="u_region"><option value="">Select region</option>${regions.map(r => `<option>${esc(r)}</option>`).join('')}</select></div>
+          <div class="form-group"><label class="form-label">City / town</label>
+            <input class="form-input" name="u_state"></div>
+        </div>`;
+    }
     if (partner) {
       return `<div class="card"><div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)">
         <div>
@@ -64,7 +97,8 @@ export default async function crmVisitForm(container) {
       <form id="vf-form" class="u-stack-4">
         <div class="form-group">
           <label class="form-label">Partner <span style="color:var(--color-error)">*</span></label>
-          <div id="vf-partner">${partnerPicker()}</div>
+          ${modeToggle()}
+          <div id="vf-partner">${partnerBlock()}</div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
@@ -107,12 +141,23 @@ export default async function crmVisitForm(container) {
         </div>
       </form>`;
 
+    wireMode();
     wirePartner();
     wireExtras();
     body.querySelector('#vf-form').addEventListener('submit', submit);
   }
 
+  function wireMode() {
+    body.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+      if (mode === b.dataset.mode) return;
+      mode = b.dataset.mode;
+      if (mode === 'unregistered') partner = null;
+      render();
+    }));
+  }
+
   function wirePartner() {
+    if (mode === 'unregistered') return;
     const changeBtn = body.querySelector('#vf-change');
     if (changeBtn) { changeBtn.addEventListener('click', () => { partner = null; render(); }); return; }
     const search = body.querySelector('#vf-search');
@@ -169,8 +214,24 @@ export default async function crmVisitForm(container) {
     const errEl = form.querySelector('#vf-err');
     const btn = form.querySelector('#vf-save');
     errEl.classList.add('hidden');
-    if (!partner) { errEl.textContent = 'Pick a partner first.'; errEl.classList.remove('hidden'); return; }
     const fd = new FormData(form);
+
+    // Resolve the partner side of the payload from the active mode.
+    let account_id = null, site_id = null, firm_name = null, region = null, state = null, owner_name = null, owner_mobile = null;
+    if (mode === 'registered') {
+      if (!partner) { showErr(errEl, 'Pick a partner first.'); return; }
+      account_id = partner.id; site_id = partner.site_id || null; firm_name = partner.partner_name || null;
+      region = partner.region || null; state = partner.state || null;
+    } else {
+      firm_name = (fd.get('u_firm') || '').toString().trim();
+      region = (fd.get('u_region') || '').toString().trim();
+      if (!firm_name) { showErr(errEl, 'Enter the shop / firm name.'); return; }
+      if (!region) { showErr(errEl, 'Pick a region.'); return; }
+      owner_name = (fd.get('u_owner') || '').toString().trim() || null;
+      owner_mobile = (fd.get('u_mobile') || '').toString().trim() || null;
+      state = (fd.get('u_state') || '').toString().trim() || null;
+    }
+
     btn.disabled = true; btn.textContent = 'Saving…';
 
     // Upload selfie first (non-blocking on failure).
@@ -185,9 +246,14 @@ export default async function crmVisitForm(container) {
     const visitedAtRaw = (fd.get('visited_at') || '').toString();
     const payload = {
       org_id: org.id,
-      account_id: partner.id,
-      site_id: partner.site_id || null,
-      firm_name: partner.partner_name || null,
+      account_id,
+      partner_type: mode,
+      site_id,
+      firm_name,
+      region,
+      state,
+      owner_name,
+      owner_mobile,
       visited_by: user.id,
       visited_by_name: userName,
       visited_at: visitedAtRaw ? new Date(visitedAtRaw).toISOString() : new Date().toISOString(),
@@ -206,13 +272,14 @@ export default async function crmVisitForm(container) {
     const { data, error } = await sb.from('crm_visits').insert(payload).select().single();
     if (error) {
       btn.disabled = false; btn.textContent = 'Save visit';
-      errEl.textContent = error.message; errEl.classList.remove('hidden');
-      return;
+      showErr(errEl, error.message); return;
     }
-    publishEvent('crm.visit.logged', { account_id: partner.id, visit_id: data.id });
+    publishEvent('crm.visit.logged', { account_id, visit_id: data.id, partner_type: mode });
     toast('Visit logged');
-    navigate('crm/partner?id=' + partner.id);
+    navigate(account_id ? 'crm/partner?id=' + account_id : 'crm/field-sales');
   }
+
+  function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
 
   render();
 }
