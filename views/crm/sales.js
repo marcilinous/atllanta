@@ -137,7 +137,7 @@ export default async function crmSales(container) {
 
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-    const [byDim, series, pTrend, pTotal, vSeries, visitOut, visitSplit, callOut, leadStat, leads, events, partners] = await Promise.all([
+    const [byDim, series, pTrend, pTotal, vSeries, visitOut, visitSplit, tierSum, callOut, leadStat, leads, events, partners] = await Promise.all([
       sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
       sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
@@ -145,6 +145,7 @@ export default async function crmSales(container) {
       sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_visit_outcomes', { p_from: from, p_to: to }),
       sb.rpc('crm_visit_split', { p_from: from, p_to: to }),
+      sb.rpc('crm_sales_tier_summary', { p_from: from, p_to: to }),
       sb.rpc('crm_call_outcomes', { p_from: from, p_to: to }),
       tallyBy('crm_leads', 'status', 'created_at'),
       countIn('crm_leads', 'created_at'),
@@ -170,11 +171,11 @@ export default async function crmSales(container) {
     const callsTotal = callRows.reduce((a, r) => a + r.n, 0);
     const vSplit = { registered: 0, unregistered: 0 };
     (visitSplit.data || []).forEach(r => { if (r.partner_type in vSplit) vSplit[r.partner_type] = Number(r.cnt) || 0; });
-    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, vSplit, callRows, leadStat,
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, vSplit, (tierSum.data || []), callRows, leadStat,
       { leads, visits: visitsTotal, calls: callsTotal, events, partners });
   }
 
-  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, visitSplit, callRows, leadStat, activity) {
+  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, visitSplit, tierSum, callRows, leadStat, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
     const uapBy = {}, txBy = {}, visitBy = {};
     partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
@@ -257,6 +258,30 @@ export default async function crmSales(container) {
     const growthChip = lastGrowth == null ? '—'
       : `<span style="color:${lastGrowth >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">${lastGrowth >= 0 ? '▲' : '▼'} ${Math.abs(lastGrowth)}%</span>`;
 
+    // Sales summary by partner tier (Star AP, AP, NA).
+    const TIER_ORDER = { 'Star AP': 0, 'AP': 1 };
+    const tierRows = (tierSum || []).map(t => ({
+      tier: t.tier, revenue: Number(t.revenue) || 0, tp_units: Number(t.tp_units) || 0,
+      tss_units: Number(t.tss_units) || 0, units: Number(t.units) || 0,
+      transacting: Number(t.transacting) || 0, uap: Number(t.uap) || 0,
+    })).sort((a, b) => (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9) || b.revenue - a.revenue);
+    const tierCard = !tierRows.length ? '' : `
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header" style="font-weight:var(--font-weight-semibold)">By tier · AP vs Star AP</div>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Tier</th><th style="text-align:right">Revenue</th><th style="text-align:right">TP</th><th style="text-align:right">TSS</th><th style="text-align:right">Units</th><th style="text-align:right">Transacting</th><th style="text-align:right">UAP</th></tr></thead>
+          <tbody>${tierRows.map(t => `<tr>
+            <td style="font-weight:var(--font-weight-medium)">${esc(t.tier)}</td>
+            <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(t.revenue)}</td>
+            <td style="text-align:right">${num(t.tp_units)}</td>
+            <td style="text-align:right">${num(t.tss_units)}</td>
+            <td style="text-align:right">${num(t.units)}</td>
+            <td style="text-align:right">${num(t.transacting)}</td>
+            <td style="text-align:right">${num(t.uap)}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+
     // Activity input metrics → each links to its area.
     const metric = (label, value, route) => `
       <div class="card" style="cursor:pointer" data-route="${route}">
@@ -274,6 +299,8 @@ export default async function crmSales(container) {
         ${kpi('UAP', num(partnerTotal.uap), 'newly activated (first TP)')}
         ${kpi('Transacting partners', num(partnerTotal.transacting), 'any transaction')}
       </div>
+
+      ${tierCard}
 
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
         <div class="card">
