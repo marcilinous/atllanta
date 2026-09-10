@@ -135,11 +135,12 @@ export default async function crmSales(container) {
 
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
-    const [byDim, series, pTrend, pTotal, visitStat, leadStat, leads, visits, calls, events, partners] = await Promise.all([
+    const [byDim, series, pTrend, pTotal, vSeries, visitStat, leadStat, leads, visits, calls, events, partners] = await Promise.all([
       sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
       sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
       sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: 'all' }),
+      sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
       tallyBy('crm_visits', 'visit_status', 'visited_at'),
       tallyBy('crm_leads', 'status', 'created_at'),
       countIn('crm_leads', 'created_at'),
@@ -159,14 +160,18 @@ export default async function crmSales(container) {
     if (pErr) toast('Partner trend: ' + pErr.message);
     const pt = pErr ? { uap: null, transacting: null }
       : (pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 });
-    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, visitStat, leadStat, { leads, visits, calls, events, partners });
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, leadStat, { leads, visits, calls, events, partners });
   }
 
-  async function paint(rows, series, partnerTrend, partnerTotal, visitStat, leadStat, activity) {
+  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, leadStat, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
-    const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
-    const uapBy = {}, txBy = {};
+    const uapBy = {}, txBy = {}, visitBy = {};
     partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
+    visitSeries.forEach(r => { visitBy[r.period] = Number(r.visits) || 0; });
+    // Periods for the UAP-only chart: partner activation buckets.
+    const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
+    // Periods for the visits-vs-transacting chart: union of both series.
+    const tvPeriods = [...new Set([...partnerTrend.map(r => r.period), ...visitSeries.map(r => r.period)])].sort();
 
     let totRev = 0, totUnits = 0;
     const byCat = {}, buckets = {};
@@ -268,8 +273,12 @@ export default async function crmSales(container) {
         <div class="card-body"><div style="height:${Math.max(220, bucketRows.length * 26)}px"><canvas id="sx-dim"></canvas></div></div>
       </div>
 
-      <div class="card" style="margin-bottom:var(--space-4)"><div class="card-header" style="font-weight:var(--font-weight-semibold)">Active partners</div>
-        <div class="card-body"><div style="height:260px"><canvas id="sx-partners"></canvas></div></div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card"><div class="card-header" style="font-weight:var(--font-weight-semibold)">Transacting partners vs BDE visits</div>
+          <div class="card-body"><div style="height:260px"><canvas id="sx-partners"></canvas></div></div></div>
+        <div class="card"><div class="card-header" style="font-weight:var(--font-weight-semibold)">New partner activations (UAP)</div>
+          <div class="card-body"><div style="height:260px"><canvas id="sx-uap"></canvas></div></div></div>
+      </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)">
         <div class="card">
@@ -328,14 +337,27 @@ export default async function crmSales(container) {
           tooltip: { callbacks: { label: (c) => `${c.label}: ${inr(c.parsed)} (${pct(c.parsed, totRev)}%)` } } } },
     });
 
+    // Transacting partners vs BDE visits — comparable magnitudes, so one chart.
     charts.partners = new ChartJs(body.querySelector('#sx-partners'), {
       type: 'line',
-      data: { labels: pPeriods, datasets: [
-        { label: 'Transacting', data: pPeriods.map(p => txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
-        { label: 'UAP (new)', data: pPeriods.map(p => uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+      data: { labels: tvPeriods, datasets: [
+        { label: 'Transacting partners', data: tvPeriods.map(p => txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'BDE visits', data: tvPeriods.map(p => visitBy[p] || 0), borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
       ] },
       options: { responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
+    });
+
+    // UAP on its own — first-TP counts are small and get lost against the above.
+    charts.uap = new ChartJs(body.querySelector('#sx-uap'), {
+      type: 'line',
+      data: { labels: pPeriods, datasets: [
+        { label: 'UAP (new)', data: pPeriods.map(p => uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.12)', fill: true, tension: 0.3, pointRadius: 2 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
         scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
                   y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
     });
