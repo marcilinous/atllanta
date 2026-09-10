@@ -47,11 +47,16 @@ const METRICS = [
   { key: 'tss', label: 'TSS renewals', a: 'a_tss', b: 'b_tss', fmt: num },
   { key: 'value', label: 'Value', a: 'a_value', b: 'b_value', fmt: inr },
 ];
-const CONDS = [
-  { key: 'any', label: 'any', test: () => true },
-  { key: 'gt0', label: '> 0', test: (v) => v > 0 },
-  { key: 'eq0', label: '= 0', test: (v) => v === 0 },
+// Comparison operators for the playground. `num:false` ignores the threshold.
+const OPS = [
+  { key: 'any', label: 'any', num: false, test: () => true },
+  { key: 'gt', label: '>', num: true, test: (v, n) => v > n },
+  { key: 'gte', label: '≥', num: true, test: (v, n) => v >= n },
+  { key: 'eq', label: '=', num: true, test: (v, n) => v === n },
+  { key: 'lte', label: '≤', num: true, test: (v, n) => v <= n },
+  { key: 'lt', label: '<', num: true, test: (v, n) => v < n },
 ];
+const opLabel = (o, n) => o.num ? `${o.label} ${num(n)}` : 'any';
 
 export default async function crmOpportunities(container) {
   const org = getOrg();
@@ -61,7 +66,8 @@ export default async function crmOpportunities(container) {
   let aFrom = P.find(p => p.key === 'lfy').from, aTo = P.find(p => p.key === 'lfy').to;
   let bFrom = P.find(p => p.key === 'cfy').from, bTo = P.find(p => p.key === 'cfy').to;
   let tab = 'uap';                 // 'uap' | 'transacting' | 'playground'
-  let pMetric = 'tp', pCondA = 'gt0', pCondB = 'eq0';   // playground defaults
+  // Playground defaults: TP > 0 in A and TP = 0 in B (the LFY-TP>0 & CFY-TP=0 case).
+  let pMetric = 'tp', pOpA = 'gt', pNumA = 0, pOpB = 'eq', pNumB = 0;
   let rows = [];                   // last loaded compare set
   const nameOf = {};
 
@@ -89,21 +95,21 @@ export default async function crmOpportunities(container) {
     const from = side === 'a' ? aFrom : bFrom, to = side === 'a' ? aTo : bTo;
     const custom = key === 'custom';
     return `
-      <div>
-        <div class="u-sm-muted" style="margin-bottom:var(--space-1)">${side === 'a' ? 'Period A (was)' : 'Period B (now)'}</div>
-        <select class="form-input" data-period="${side}" style="max-width:180px">
+      <div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-3)">
+        <div class="control-label" style="margin-bottom:var(--space-2)">${side === 'a' ? 'Period A · was' : 'Period B · now'}</div>
+        <select class="form-input" data-period="${side}" style="width:100%">
           ${P.map(p => `<option value="${p.key}" ${p.key === key ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
         </select>
-        <div ${custom ? '' : 'hidden'} data-custom="${side}" style="display:flex;gap:var(--space-1);margin-top:var(--space-1)">
-          <input class="form-input" type="date" data-cf="${side}" value="${esc(from)}" style="max-width:150px">
-          <input class="form-input" type="date" data-ct="${side}" value="${esc(to)}" style="max-width:150px">
+        <div ${custom ? '' : 'hidden'} data-custom="${side}" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-2)">
+          <input class="form-input" type="date" data-cf="${side}" value="${esc(from)}">
+          <input class="form-input" type="date" data-ct="${side}" value="${esc(to)}">
         </div>
       </div>`;
   }
 
   function paintControls() {
     controls.innerHTML = `
-      <div class="control-bar">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-3);margin-bottom:var(--space-3)">
         ${periodPicker('a')}${periodPicker('b')}
       </div>
       <div class="seg" style="margin-bottom:var(--space-4)">
@@ -125,7 +131,7 @@ export default async function crmOpportunities(container) {
       if (side === 'a') { aFrom = cf; aTo = ct; } else { bFrom = cf; bTo = ct; }
       if (cf && ct) load();
     }));
-    controls.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
+    controls.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; paintControls(); render(); }));
   }
 
   async function load() {
@@ -149,83 +155,98 @@ export default async function crmOpportunities(container) {
   function currentSet() {
     if (tab === 'uap') return { list: rows.filter(r => r.b_tp === 0), sort: (a, b) => b.b_value - a.b_value };
     if (tab === 'transacting') return { list: rows.filter(r => r.a_value > 0 && r.b_value === 0), sort: (a, b) => b.a_value - a.a_value };
-    // playground
+    // playground: metric OP num on each period, AND'd.
     const m = METRICS.find(x => x.key === pMetric);
-    const cA = CONDS.find(x => x.key === pCondA), cB = CONDS.find(x => x.key === pCondB);
-    return { list: rows.filter(r => cA.test(r[m.a]) && cB.test(r[m.b])), sort: (a, b) => b[m.b] - a[m.b] || b[m.a] - a[m.a] };
+    const oA = OPS.find(x => x.key === pOpA), oB = OPS.find(x => x.key === pOpB);
+    return { list: rows.filter(r => oA.test(r[m.a], pNumA) && oB.test(r[m.b], pNumB)), sort: (a, b) => b[m.b] - a[m.b] || b[m.a] - a[m.a] };
   }
 
+  // Build the shell (columns depend on the tab / metric); table body fills separately
+  // so typing in the search or number fields never rebuilds — and never steals — focus.
   function render() {
     const m = METRICS.find(x => x.key === pMetric);
-    const { list, sort } = currentSet();
-    const q = searchVal.toLowerCase();
-    let shown = list.slice().sort(sort);
-    if (q) shown = shown.filter(r =>
-      (r.partner_name || '').toLowerCase().includes(q) ||
-      (r.region || '').toLowerCase().includes(q) ||
-      (r.hub || '').toLowerCase().includes(q) ||
-      (nameOf[r.owner_id] || '').toLowerCase().includes(q));
-
+    const oA = OPS.find(o => o.key === pOpA), oB = OPS.find(o => o.key === pOpB);
     const caption = tab === 'uap'
       ? `Partners with no TP in Period B — win them into UAP`
       : tab === 'transacting'
         ? `Transacted in Period A, silent in Period B — win-back`
-        : `Partners where ${esc(m.label)} is ${esc(CONDS.find(c => c.key === pCondA).label)} in A and ${esc(CONDS.find(c => c.key === pCondB).label)} in B`;
+        : `${esc(m.label)}: ${esc(opLabel(oA, pNumA))} in A · ${esc(opLabel(oB, pNumB))} in B`;
 
-    // Per-tab columns.
-    let head, cell;
-    if (tab === 'transacting') {
-      head = `<th>Partner</th><th>Region</th><th>Owner</th><th style="text-align:right">Value A</th><th style="text-align:right">Value B</th><th style="text-align:right">Last buy</th>`;
-      cell = (r) => `<td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.a_value)}</td><td style="text-align:right">${inr(r.b_value)}</td><td class="u-sm-muted" style="text-align:right">${r.last_activity ? esc(r.last_activity) : '—'}</td>`;
-    } else if (tab === 'playground') {
-      head = `<th>Partner</th><th>Region</th><th>Owner</th><th style="text-align:right">${esc(m.label)} A</th><th style="text-align:right">${esc(m.label)} B</th><th style="text-align:right">Last buy</th>`;
-      cell = (r) => `<td style="text-align:right;font-weight:var(--font-weight-semibold)">${m.fmt(r[m.a])}</td><td style="text-align:right">${m.fmt(r[m.b])}</td><td class="u-sm-muted" style="text-align:right">${r.last_activity ? esc(r.last_activity) : '—'}</td>`;
-    } else { // uap
-      head = `<th>Partner</th><th>Region</th><th>Owner</th><th style="text-align:right">TP (A)</th><th style="text-align:right">Value B</th><th style="text-align:right">Last buy</th>`;
-      cell = (r) => `<td style="text-align:right">${num(r.a_tp)}</td><td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.b_value)}</td><td class="u-sm-muted" style="text-align:right">${r.last_activity ? esc(r.last_activity) : '—'}</td>`;
-    }
+    let head;
+    if (tab === 'transacting') head = `<th>Partner</th><th>Region</th><th>Owner</th><th style="text-align:right">Value A</th><th style="text-align:right">Value B</th><th style="text-align:right">Last buy</th>`;
+    else if (tab === 'playground') head = `<th>Partner</th><th>Region</th><th>Owner</th><th style="text-align:right">${esc(m.label)} A</th><th style="text-align:right">${esc(m.label)} B</th><th style="text-align:right">Last buy</th>`;
+    else head = `<th>Partner</th><th>Region</th><th>Owner</th><th style="text-align:right">TP (A)</th><th style="text-align:right">Value B</th><th style="text-align:right">Last buy</th>`;
 
+    const cell = (r) => {
+      if (tab === 'transacting') return `<td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.a_value)}</td><td style="text-align:right">${inr(r.b_value)}</td><td class="u-sm-muted" style="text-align:right">${r.last_activity ? esc(r.last_activity) : '—'}</td>`;
+      if (tab === 'playground') return `<td style="text-align:right;font-weight:var(--font-weight-semibold)">${m.fmt(r[m.a])}</td><td style="text-align:right">${m.fmt(r[m.b])}</td><td class="u-sm-muted" style="text-align:right">${r.last_activity ? esc(r.last_activity) : '—'}</td>`;
+      return `<td style="text-align:right">${num(r.a_tp)}</td><td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(r.b_value)}</td><td class="u-sm-muted" style="text-align:right">${r.last_activity ? esc(r.last_activity) : '—'}</td>`;
+    };
+
+    const opSel = (id, cur) => `<select class="form-input" id="${id}" style="max-width:74px;height:34px">${OPS.map(o => `<option value="${o.key}" ${o.key === cur ? 'selected' : ''}>${o.label}</option>`).join('')}</select>`;
     const playgroundBar = tab !== 'playground' ? '' : `
       <div class="control-bar">
         <div class="control-group"><span class="control-label">Metric</span>
-          <select class="form-input" id="op-metric" style="max-width:180px;height:34px">${METRICS.map(x => `<option value="${x.key}" ${x.key === pMetric ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></div>
-        <div class="control-group"><span class="control-label">A is</span>
-          <select class="form-input" id="op-condA" style="max-width:90px;height:34px">${CONDS.map(c => `<option value="${c.key}" ${c.key === pCondA ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div>
-        <div class="control-group"><span class="control-label">and B is</span>
-          <select class="form-input" id="op-condB" style="max-width:90px;height:34px">${CONDS.map(c => `<option value="${c.key}" ${c.key === pCondB ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div>
+          <select class="form-input" id="op-metric" style="max-width:170px;height:34px">${METRICS.map(x => `<option value="${x.key}" ${x.key === pMetric ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></div>
+        <div class="control-group"><span class="control-label">Period A</span>
+          ${opSel('op-opA', pOpA)}
+          <input class="form-input" type="number" id="op-numA" value="${pNumA}" ${oA.num ? '' : 'disabled'} style="max-width:100px;height:34px"></div>
+        <div class="control-group"><span class="control-label">Period B</span>
+          ${opSel('op-opB', pOpB)}
+          <input class="form-input" type="number" id="op-numB" value="${pNumB}" ${oB.num ? '' : 'disabled'} style="max-width:100px;height:34px"></div>
       </div>`;
 
     body.innerHTML = `
       ${playgroundBar}
       <div class="card">
         <div class="card-header" style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
-          <span style="font-weight:var(--font-weight-semibold)">${esc(String(list.length).toLocaleString?.() || list.length)} partners</span>
+          <span style="font-weight:var(--font-weight-semibold)" id="op-total"></span>
           <span class="u-sm-muted">${caption}</span>
           <input type="text" class="form-input" id="op-search" placeholder="Search partner, region, owner…" value="${esc(searchVal)}" style="flex:1;min-width:180px;height:34px">
           <span class="u-meta" id="op-count"></span>
         </div>
         <div class="table-wrap"><table class="table">
           <thead><tr>${head}</tr></thead>
-          <tbody>${shown.length ? shown.slice(0, LIMIT).map(r => `<tr class="op-row" data-id="${esc(r.id)}" style="cursor:pointer">
-            <td><div style="font-weight:var(--font-weight-medium)">${esc(r.partner_name || '—')}</div>${r.tier ? `<div class="u-meta">${esc(r.tier)}</div>` : ''}</td>
-            <td class="u-sm-muted">${esc([r.hub, r.region].filter(Boolean).join(' · ') || '—')}</td>
-            <td class="u-sm-muted">${esc(nameOf[r.owner_id] || '—')}</td>
-            ${cell(r)}
-          </tr>`).join('') : `<tr><td colspan="6" class="u-sm-muted" style="padding:var(--space-4)">No partners match.</td></tr>`}</tbody>
+          <tbody id="op-tbody"></tbody>
         </table></div>
       </div>`;
 
-    document.getElementById('op-count').textContent = `${shown.length.toLocaleString('en-IN')}${shown.length > LIMIT ? ` · top ${LIMIT}` : ''}`;
-    const s = document.getElementById('op-search');
-    s.addEventListener('input', () => { searchVal = s.value; render(); });
-    body.querySelectorAll('.op-row').forEach(row => {
-      if (row.dataset.id) row.addEventListener('click', () => navigate('crm/partner?id=' + row.dataset.id));
-    });
-    if (tab === 'playground') {
-      document.getElementById('op-metric').addEventListener('change', (e) => { pMetric = e.target.value; render(); });
-      document.getElementById('op-condA').addEventListener('change', (e) => { pCondA = e.target.value; render(); });
-      document.getElementById('op-condB').addEventListener('change', (e) => { pCondB = e.target.value; render(); });
+    // paintTable fills only the tbody + counts — safe to call on every keystroke.
+    function paintTable() {
+      const { list, sort } = currentSet();
+      const q = searchVal.toLowerCase();
+      let shown = list.slice().sort(sort);
+      if (q) shown = shown.filter(r =>
+        (r.partner_name || '').toLowerCase().includes(q) ||
+        (r.region || '').toLowerCase().includes(q) ||
+        (r.hub || '').toLowerCase().includes(q) ||
+        (nameOf[r.owner_id] || '').toLowerCase().includes(q));
+      document.getElementById('op-total').textContent = `${list.length.toLocaleString('en-IN')} partners`;
+      document.getElementById('op-count').textContent = `${shown.length.toLocaleString('en-IN')}${shown.length > LIMIT ? ` · top ${LIMIT}` : ''}`;
+      const tb = document.getElementById('op-tbody');
+      tb.innerHTML = shown.length ? shown.slice(0, LIMIT).map(r => `<tr class="op-row" data-id="${esc(r.id)}" style="cursor:pointer">
+        <td><div style="font-weight:var(--font-weight-medium)">${esc(r.partner_name || '—')}</div>${r.tier ? `<div class="u-meta">${esc(r.tier)}</div>` : ''}</td>
+        <td class="u-sm-muted">${esc([r.hub, r.region].filter(Boolean).join(' · ') || '—')}</td>
+        <td class="u-sm-muted">${esc(nameOf[r.owner_id] || '—')}</td>
+        ${cell(r)}
+      </tr>`).join('') : `<tr><td colspan="6" class="u-sm-muted" style="padding:var(--space-4)">No partners match.</td></tr>`;
+      tb.querySelectorAll('.op-row').forEach(row => {
+        if (row.dataset.id) row.addEventListener('click', () => navigate('crm/partner?id=' + row.dataset.id));
+      });
     }
+
+    document.getElementById('op-search').addEventListener('input', (e) => { searchVal = e.target.value; paintTable(); });
+    if (tab === 'playground') {
+      document.getElementById('op-metric').addEventListener('change', (e) => { pMetric = e.target.value; render(); }); // columns change → rebuild
+      const wireOp = (selId, numId, set) => {
+        const sel = document.getElementById(selId), n = document.getElementById(numId);
+        sel.addEventListener('change', (e) => { const o = OPS.find(x => x.key === e.target.value); set.op(e.target.value); n.disabled = !o.num; paintTable(); });
+        n.addEventListener('input', (e) => { set.num(Number(e.target.value) || 0); paintTable(); });
+      };
+      wireOp('op-opA', 'op-numA', { op: v => pOpA = v, num: v => pNumA = v });
+      wireOp('op-opB', 'op-numB', { op: v => pOpB = v, num: v => pNumB = v });
+    }
+    paintTable();
   }
 
   paintControls();
