@@ -200,7 +200,7 @@ export default async function crmDistribution(container) {
     </table></div>`;
 
     wrap.querySelectorAll('.fs-row').forEach(row => {
-      if (row.dataset.id && row.dataset.id !== 'null') row.addEventListener('click', () => { window.location.hash = `#/crm/account?id=${row.dataset.id}`; });
+      if (row.dataset.id && row.dataset.id !== 'null') row.addEventListener('click', () => { window.location.hash = `#/crm/partner?id=${row.dataset.id}`; });
     });
   }
 

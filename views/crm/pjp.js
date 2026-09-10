@@ -211,7 +211,7 @@ export default async function crmPjp(container) {
         <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(a.value_12m)}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
-    beatEl.querySelectorAll('.pjp-beat-row').forEach(r => r.addEventListener('click', () => { window.location.hash = `#/crm/account?id=${r.dataset.id}`; }));
+    beatEl.querySelectorAll('.pjp-beat-row').forEach(r => r.addEventListener('click', () => { window.location.hash = `#/crm/partner?id=${r.dataset.id}`; }));
   }
 
   await loadMonth();

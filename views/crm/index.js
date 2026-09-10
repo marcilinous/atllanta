@@ -7,18 +7,6 @@ import { navigate } from '../../js/router.js';
 export default async function crmHub(container) {
   const live = [
     {
-      title: 'Accounts',
-      desc: 'Companies and partners you sell to',
-      icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01',
-      route: 'crm/accounts',
-    },
-    {
-      title: 'Contacts',
-      desc: 'People at your accounts',
-      icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
-      route: 'crm/contacts',
-    },
-    {
       title: 'Leads',
       desc: 'Prospects your partners report from the field',
       icon: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3',
@@ -35,12 +23,6 @@ export default async function crmHub(container) {
       desc: 'Partner master: onboard, update, and manage details',
       icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01',
       route: 'crm/partners',
-    },
-    {
-      title: 'Pipeline',
-      desc: 'Opportunities across your sales stages',
-      icon: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
-      route: 'crm/pipeline',
     },
     {
       title: 'Events',
@@ -91,7 +73,7 @@ export default async function crmHub(container) {
   container.innerHTML = `
     <div style="margin-bottom:var(--space-6)">
       <h1 class="page-title">CRM</h1>
-      <p class="page-subtitle">Accounts, contacts, leads, and your sales pipeline</p>
+      <p class="page-subtitle">Distribution sales: partners, field activity, opportunities & reports</p>
     </div>
     <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
       ${live.map(s => `
