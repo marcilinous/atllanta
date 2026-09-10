@@ -211,6 +211,7 @@ import crmPartnerDetail from '/views/crm/partner-detail.js';
 import crmVisitForm from '/views/crm/visit-form.js';
 import crmEvents from '/views/crm/events.js';
 import crmProspects from '/views/crm/prospects.js';
+import crmOpportunities from '/views/crm/opportunities.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -479,6 +480,7 @@ registerRoute('crm/partner', crmPartnerDetail);
 registerRoute('crm/log-visit', crmVisitForm);
 registerRoute('crm/events', crmEvents);
 registerRoute('crm/prospects', crmProspects);
+registerRoute('crm/opportunities', crmOpportunities);
 
 initRouter(document.getElementById('main-content'));
 

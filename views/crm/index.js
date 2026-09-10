@@ -72,6 +72,12 @@ export default async function crmHub(container) {
       icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6',
       route: 'crm/prospects',
     },
+    {
+      title: 'Opportunities',
+      desc: 'UAP & transacting win-back, and a two-period comparison playground',
+      icon: 'M13 2L3 14h7l-1 8 10-12h-7l1-8z',
+      route: 'crm/opportunities',
+    },
   ];
 
   const soon = [];
