@@ -102,13 +102,15 @@ export default async function crmReports(container) {
         <p class="page-subtitle">Drop any partner report here — renewals, sales, licenses, payments. Rows are stored raw and keyed on <strong>Site ID</strong>, ready to wire into accounts later.</p>
       </div>
       <div style="display:flex;gap:var(--space-2)">
-        ${canManageData() ? `<button class="btn btn-primary" id="import-report">+ Import report</button>` : ''}
+        ${canManageData() ? `<button class="btn btn-secondary" id="export-report">Export</button>
+        <button class="btn btn-primary" id="import-report">+ Import report</button>` : ''}
       </div>
     </div>
     <div class="card"><div id="reports-list">${loadingSkeleton()}</div></div>
   `;
   container.querySelector('#back').addEventListener('click', () => navigate('crm'));
   container.querySelector('#import-report')?.addEventListener('click', openImport);
+  container.querySelector('#export-report')?.addEventListener('click', openExport);
 
   async function load() {
     const { data, error } = await sb.from('crm_report_imports').select('*').order('created_at', { ascending: false });
@@ -142,15 +144,13 @@ export default async function crmReports(container) {
           <td style="font-size:var(--text-sm);color:var(--color-text-secondary)">${formatDate(r.created_at)}</td>
           <td style="text-align:right;white-space:nowrap">
             <button class="btn btn-ghost btn-sm" data-preview="${r.id}">Preview</button>
-            ${canManageData() ? `<button class="btn btn-ghost btn-sm" data-export="${r.id}">Export</button>
-            <button class="btn btn-ghost btn-sm" data-delete="${r.id}" style="color:var(--color-error)">Delete</button>` : ''}
+            ${canManageData() ? `<button class="btn btn-ghost btn-sm" data-delete="${r.id}" style="color:var(--color-error)">Delete</button>` : ''}
           </td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
 
     el.querySelectorAll('[data-preview]').forEach(b => b.addEventListener('click', () => previewReport(imports.find(r => r.id === b.dataset.preview))));
-    el.querySelectorAll('[data-export]').forEach(b => b.addEventListener('click', () => exportReport(imports.find(r => r.id === b.dataset.export))));
     el.querySelectorAll('[data-delete]').forEach(b => b.addEventListener('click', () => deleteReport(imports.find(r => r.id === b.dataset.delete))));
   }
 
@@ -312,28 +312,54 @@ export default async function crmReports(container) {
         };
       });
 
-      let done = 0, failed = 0, matched = 0;
-      const CHUNK = 500;
-      for (let i = 0; i < payload.length; i += CHUNK) {
-        go.textContent = `Importing… ${done.toLocaleString('en-IN')}/${payload.length.toLocaleString('en-IN')}`;
-        const slice = payload.slice(i, i + CHUNK);
-        const { error } = await sb.from('crm_report_rows').insert(slice);
-        if (error) { failed += slice.length; }
-        else { done += slice.length; matched += slice.filter(r => r.account_id || r.person_user_id).length; }
-      }
-      await sb.from('crm_report_imports').update({ row_count: done, matched_count: matched }).eq('id', imp.id);
-      await logAction('crm', 'report_import', imp.id, 'imported', null, { name, rows: done, matched });
-
-      // Daily snapshot: replace the previous import with the same name AND
-      // the same fiscal year (rows cascade). Scoping by period keeps every
-      // year's data — next year's daily upload starts a new period instead of
+      // Daily snapshot: replace the previous import with the same name AND the
+      // same fiscal year (rows cascade). Scoping by period keeps every year's
+      // data — next year's daily upload starts a new period instead of
       // overwriting this year — and never touches a historical (e.g. LFY) load.
+      // Done BEFORE inserting so the rows being replaced don't count as
+      // "already imported" duplicates and block the fresh copy.
       if (snapshotEl.checked && name) {
         let del = sb.from('crm_report_imports').delete().eq('org_id', org.id).eq('name', name).neq('id', imp.id);
         del = period ? del.eq('period_label', period) : del.is('period_label', null);
         await del;
       }
-      toast(`Imported ${done.toLocaleString('en-IN')} rows${failed ? ` · ${failed} failed` : ''} · ${matched.toLocaleString('en-IN')} matched`);
+
+      // Insert via the dedup RPC: rows whose whole-row content already exists
+      // for this org are skipped, so re-importing an existing file adds nothing.
+      let inserted = 0, skipped = 0, failed = 0;
+      const CHUNK = 500;
+      for (let i = 0; i < payload.length; i += CHUNK) {
+        go.textContent = `Importing… ${(inserted + skipped).toLocaleString('en-IN')}/${payload.length.toLocaleString('en-IN')}`;
+        const slice = payload.slice(i, i + CHUNK);
+        const { data: res, error } = await sb.rpc('crm_insert_report_rows', { p_import_id: imp.id, p_rows: slice });
+        if (error) { failed += slice.length; }
+        else { inserted += res?.[0]?.inserted || 0; skipped += res?.[0]?.skipped || 0; }
+      }
+
+      if (inserted === 0) {
+        // Nothing new landed — drop the empty import record we just created.
+        await sb.from('crm_report_imports').delete().eq('id', imp.id);
+        toast(failed
+          ? `Import failed — ${failed.toLocaleString('en-IN')} rows could not be saved`
+          : `Already imported — ${skipped.toLocaleString('en-IN')} duplicate rows skipped`);
+        go.disabled = false;
+        closeModal();
+        load();
+        return;
+      }
+
+      // Count how many of the rows that actually landed are linked to a partner
+      // or staff member.
+      const { count: matched } = await sb.from('crm_report_rows')
+        .select('id', { count: 'exact', head: true })
+        .eq('import_id', imp.id)
+        .or('account_id.not.is.null,person_user_id.not.is.null');
+      await sb.from('crm_report_imports').update({ row_count: inserted, matched_count: matched || 0 }).eq('id', imp.id);
+      await logAction('crm', 'report_import', imp.id, 'imported', null, { name, rows: inserted, skipped, matched: matched || 0 });
+
+      toast(`Imported ${inserted.toLocaleString('en-IN')} rows`
+        + (skipped ? ` · ${skipped.toLocaleString('en-IN')} duplicates skipped` : '')
+        + (failed ? ` · ${failed.toLocaleString('en-IN')} failed` : ''));
       closeModal();
       load();
     });
@@ -358,20 +384,93 @@ export default async function crmReports(container) {
     </table></div>`;
   }
 
-  async function exportReport(rep) {
+  // Distinct report types across all imports, for the export type picker.
+  function distinctTypes() {
+    return [...new Set(imports.map(i => i.report_type).filter(Boolean))].sort();
+  }
+  // The column that carries the row date for a set of imports (first /date/ column).
+  function dateKeyFor(imps) {
+    for (const im of imps) {
+      const c = (im.columns || []).find(k => /date/i.test(k));
+      if (c) return c;
+    }
+    return null;
+  }
+
+  // Simplified export: pick a report type and (optionally) a date range, then
+  // export the matching rows across every import of that type as one CSV.
+  function openExport() {
+    if (!imports.length) return toast('No reports to export');
+    const types = distinctTypes();
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div style="display:grid;gap:var(--space-3)">
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary)">Export report rows as a single CSV. Choose a report type and, optionally, a date range.</div>
+        <div>
+          <label class="form-label">Report type</label>
+          <select class="form-input" id="exp-type">
+            <option value="">All types</option>
+            ${types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="crm-cols-2">
+          <div><label class="form-label">From date</label><input type="date" class="form-input" id="exp-from"></div>
+          <div><label class="form-label">To date</label><input type="date" class="form-input" id="exp-to"></div>
+        </div>
+        <div id="exp-note" style="font-size:var(--text-xs);color:var(--color-text-tertiary)"></div>
+        <div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
+          <button type="button" class="btn btn-secondary" id="exp-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="exp-go">Export CSV</button>
+        </div>
+      </div>`;
+    const typeEl = wrap.querySelector('#exp-type');
+    const noteEl = wrap.querySelector('#exp-note');
+    const updateNote = () => {
+      const imps = imports.filter(i => !typeEl.value || i.report_type === typeEl.value);
+      const dk = dateKeyFor(imps);
+      noteEl.textContent = dk
+        ? `Date range filters on the "${dk}" column.`
+        : 'No date column detected for this selection — the date range will be ignored.';
+    };
+    typeEl.addEventListener('change', updateNote);
+    updateNote();
+    wrap.querySelector('#exp-cancel').addEventListener('click', closeModal);
+    wrap.querySelector('#exp-go').addEventListener('click', () =>
+      runExport(typeEl.value, wrap.querySelector('#exp-from').value, wrap.querySelector('#exp-to').value));
+    openModal('Export reports', wrap);
+  }
+
+  async function runExport(type, from, to) {
+    const imps = imports.filter(i => !type || i.report_type === type);
+    if (!imps.length) return toast('No matching reports');
+    const ids = imps.map(i => i.id);
+    const dateKey = dateKeyFor(imps);
     toast('Preparing export…');
     const out = [];
     const pageSize = 1000;
-    let from = 0;
+    let offset = 0;
     for (;;) {
-      const { data, error } = await sb.from('crm_report_rows').select('data').eq('import_id', rep.id).range(from, from + pageSize - 1);
+      const { data, error } = await sb.from('crm_report_rows')
+        .select('data').in('import_id', ids).range(offset, offset + pageSize - 1);
       if (error || !data || !data.length) break;
-      data.forEach(r => out.push(r.data || {}));
+      for (const r of data) {
+        const d = r.data || {};
+        if ((from || to) && dateKey) {
+          const v = String(d[dateKey] ?? '').slice(0, 10);
+          if (!v) continue;                 // no date → excluded while filtering
+          if (from && v < from) continue;
+          if (to && v > to) continue;
+        }
+        out.push(d);
+      }
       if (data.length < pageSize) break;
-      from += pageSize;
+      offset += pageSize;
     }
-    if (!out.length) return toast('Nothing to export');
-    downloadCsv(`${rep.name.replace(/[^\w.-]+/g, '_')}.csv`, out);
+    if (!out.length) return toast('Nothing to export for that selection');
+    const label = (type || 'all-types').replace(/[^\w.-]+/g, '_');
+    const range = (from || to) ? `_${from || 'start'}_to_${to || 'end'}` : '';
+    downloadCsv(`crm_${label}${range}.csv`, out);
+    closeModal();
   }
 
   async function deleteReport(rep) {
