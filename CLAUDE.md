@@ -16,7 +16,7 @@ Well past Phase 0. Substantially built out beyond the original recruitment-only 
 
 - **`api/`** — 13 Vercel serverless functions (kept ≤12-function limit by consolidation): matching, resume/JD parsing, ai-query, bulk-import, create-org, google-auth, schedule, reports, send-notification, event-processor, extract-candidate, screen-job.
 - **`supabase/migrations/`** — 14 migrations = the real schema (foundation multi-tenant, interview scheduling + per-candidate slots, Google OAuth/invitations, business-OS platform, expense tracking, helpdesk, asset tracking, announcements).
-- **`views/`** — recruitment, employees, attendance, leave, **plus** finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports.
+- **`views/`** — recruitment, employees, attendance, leave, **plus** finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **crm** (accounts, contacts, leads, opportunities, visits, PJP, report import/export).
 - **Infra** — Vercel + Supabase wired; PWA (`manifest.json`, `sw.js`); Playwright tests in `tests/`.
 
 ## 3. Source-of-Truth Files (read these, don't duplicate them here)
@@ -53,4 +53,6 @@ Well past Phase 0. Substantially built out beyond the original recruitment-only 
 
 ## 7. Do NOT Build (until named trigger)
 
-Payroll, visual workflow builder, custom-permissions UI (four fixed roles: owner/admin/manager/member), native mobile app (PWA first), CRM module, microservices, Elasticsearch, React/Next migration. Rationale in `docs/HANDOVER.md §15`.
+Payroll, visual workflow builder, custom-permissions UI (four fixed roles: owner/admin/manager/member), native mobile app (PWA first), microservices, Elasticsearch, React/Next migration. Rationale in `docs/HANDOVER.md §15`.
+
+> **Note:** CRM is no longer on this list — it is now an active module (`crm_*` tables, `views/crm/`, report import/export). This branch continues that work.
