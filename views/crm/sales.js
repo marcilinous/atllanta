@@ -94,7 +94,7 @@ export default async function crmSales(container) {
         <div class="control-group">
           <span class="control-label">Range</span>
           <div class="seg">
-            ${P.map(p => `<button class="seg-btn ${preset === p.key ? 'is-active' : ''}" data-preset="${p.key}">${esc(p.label)}</button>`).join('')}
+            ${P.map(p => `<button type="button" class="seg-btn ${preset === p.key ? 'is-active' : ''}" data-preset="${p.key}">${esc(p.label)}</button>`).join('')}
           </div>
         </div>
         <div class="control-group">
@@ -135,6 +135,154 @@ export default async function crmSales(container) {
     return counts;
   }
 
+  // ---- pure shape helpers (so filters can recompute just their slice) ----
+  function seriesShape(series) {
+    const periods = [...new Set(series.map(s => s.period))].sort();
+    const periodTotal = {}; periods.forEach(p => periodTotal[p] = 0);
+    for (const s of series) periodTotal[s.period] += Number(s.revenue) || 0;
+    const growth = periods.map((p, i) => {
+      if (i === 0) return null;
+      const prev = periodTotal[periods[i - 1]];
+      return prev ? Math.round(((periodTotal[p] - prev) / prev) * 100) : null;
+    });
+    return { periods, periodTotal, growth };
+  }
+  function trendShape(partnerTrend, visitSeries) {
+    const uapBy = {}, txBy = {}, visitBy = {};
+    partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
+    visitSeries.forEach(r => { visitBy[r.period] = Number(r.visits) || 0; });
+    const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
+    const tvPeriods = [...new Set([...partnerTrend.map(r => r.period), ...visitSeries.map(r => r.period)])].sort();
+    return { uapBy, txBy, visitBy, pPeriods, tvPeriods };
+  }
+  const dimShape = (rows) => {
+    const buckets = {};
+    for (const r of rows) buckets[r.bucket] = (buckets[r.bucket] || 0) + (Number(r.revenue) || 0);
+    return Object.entries(buckets).map(([name, rev]) => ({ name, rev })).sort((a, b) => b.rev - a.rev).slice(0, 12);
+  };
+  const growthChipHtml = (growth) => {
+    const g = growth.length ? growth[growth.length - 1] : null;
+    return g == null ? '—' : `<span style="color:${g >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">${g >= 0 ? '▲' : '▼'} ${Math.abs(g)}%</span>`;
+  };
+  const growthCard = (growth) => `
+    <div class="u-sm-muted" style="margin-bottom:var(--space-1)">Latest ${esc(grain)} growth</div>
+    <div style="font-size:var(--text-2xl);font-weight:var(--font-weight-bold)">${growthChipHtml(growth)}</div>
+    <div class="u-meta" style="margin-top:var(--space-1)">${growth.length ? 'vs previous ' + esc(grain) : '—'}</div>`;
+
+  // ---- chart theme (read design tokens once) ----
+  let theme = null;
+  async function chartCtx() {
+    const C = await ensureChart();
+    if (!theme) {
+      const cs = getComputedStyle(document.documentElement);
+      theme = { grid: (cs.getPropertyValue('--color-border') || '#e2e8f0').trim(),
+                textc: (cs.getPropertyValue('--color-text-secondary') || '#475569').trim() };
+    }
+    return { C, ...theme };
+  }
+  const moneyTick = (v) => inr(v);
+
+  // ---- one-chart builders (destroy + recreate a single chart in place) ----
+  async function drawTrend(shape) {
+    const { C, grid, textc } = await chartCtx();
+    const el = body.querySelector('#sx-trend'); if (!el) return;
+    try { charts.trend?.destroy(); } catch (e) {}
+    charts.trend = new C(el, {
+      type: 'line',
+      data: { labels: shape.periods, datasets: [{ label: 'Revenue', data: shape.periods.map(p => shape.periodTotal[p]),
+        borderColor: '#1E3A8A', backgroundColor: 'rgba(30,58,138,0.12)', fill: true, tension: 0.3, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => {
+          const g = shape.growth[c.dataIndex];
+          return inr(c.parsed.y) + (g == null ? '' : `  (${g >= 0 ? '▲' : '▼'}${Math.abs(g)}% vs prev)`);
+        } } } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, callback: moneyTick }, grid: { color: grid } } } },
+    });
+  }
+  async function drawDonut(byCat, totRev) {
+    const { C, textc } = await chartCtx();
+    const el = body.querySelector('#sx-donut'); if (!el) return;
+    const cats = CAT_ORDER.filter(c => byCat[c]);
+    try { charts.donut?.destroy(); } catch (e) {}
+    charts.donut = new C(el, {
+      type: 'doughnut',
+      data: { labels: cats, datasets: [{ data: cats.map(c => byCat[c]), backgroundColor: cats.map(c => CAT_COLOR[c]), borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } },
+          tooltip: { callbacks: { label: (c) => `${c.label}: ${inr(c.parsed)} (${pct(c.parsed, totRev)}%)` } } } },
+    });
+  }
+  async function drawPartners(t) {
+    const { C, grid, textc } = await chartCtx();
+    const el = body.querySelector('#sx-partners'); if (!el) return;
+    try { charts.partners?.destroy(); } catch (e) {}
+    charts.partners = new C(el, {
+      type: 'line',
+      data: { labels: t.tvPeriods, datasets: [
+        { label: 'Transacting partners', data: t.tvPeriods.map(p => t.txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'BDE visits', data: t.tvPeriods.map(p => t.visitBy[p] || 0), borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
+    });
+  }
+  async function drawUap(t) {
+    const { C, grid, textc } = await chartCtx();
+    const el = body.querySelector('#sx-uap'); if (!el) return;
+    try { charts.uap?.destroy(); } catch (e) {}
+    charts.uap = new C(el, {
+      type: 'line',
+      data: { labels: t.pPeriods, datasets: [
+        { label: 'UAP (new)', data: t.pPeriods.map(p => t.uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.12)', fill: true, tension: 0.3, pointRadius: 2 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
+    });
+  }
+  async function drawDim(bucketRows) {
+    const { C, grid, textc } = await chartCtx();
+    const wrap = body.querySelector('#sx-dim-wrap'); if (wrap) wrap.style.height = Math.max(220, bucketRows.length * 26) + 'px';
+    const el = body.querySelector('#sx-dim'); if (!el) return;
+    try { charts.dim?.destroy(); } catch (e) {}
+    charts.dim = new C(el, {
+      type: 'bar',
+      data: { labels: bucketRows.map(b => b.name), datasets: [{ label: 'Revenue', data: bucketRows.map(b => b.rev), backgroundColor: '#1E3A8A', borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => inr(c.parsed.x) } } },
+        scales: { x: { ticks: { color: textc, callback: moneyTick }, grid: { color: grid } },
+                  y: { ticks: { color: textc }, grid: { display: false } } } },
+    });
+  }
+
+  // ---- independent filter updaters: refetch + redraw ONLY the affected charts ----
+  function segActive(attr, key) {
+    body.querySelectorAll(`[data-${attr}]`).forEach(b => b.classList.toggle('is-active', b.dataset[attr] === key));
+  }
+  async function reloadSeries() {
+    segActive('grain', grain);
+    const [series, pTrend, vSeries] = await Promise.all([
+      sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
+    ]);
+    if (series.error) { toast('Trend: ' + series.error.message); return; }
+    const sShape = seriesShape(series.data || []);
+    const tShape = trendShape(pTrend.data || [], vSeries.data || []);
+    await drawTrend(sShape); await drawPartners(tShape); await drawUap(tShape);
+    const gc = body.querySelector('#sx-growth-card .card-body'); if (gc) gc.innerHTML = growthCard(sShape.growth);
+  }
+  async function reloadDim() {
+    segActive('dim', dim);
+    const byDim = await sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to });
+    if (byDim.error) { toast('By dimension: ' + byDim.error.message); return; }
+    await drawDim(dimShape(byDim.data || []));
+  }
+
   async function load() {
     body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
     const [byDim, series, pTrend, pTotal, vSeries, visitOut, visitSplit, tierSum, callOut, leadStat, leads, events, partners] = await Promise.all([
@@ -157,13 +305,10 @@ export default async function crmSales(container) {
       body.innerHTML = `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">Couldn't load sales</div><div class="empty-state-desc">${esc(msg)}</div></div>`;
       toast('Sales: ' + msg); return;
     }
-    // Partner trend is non-fatal, but don't let a failed call read as a real 0:
-    // surface it and show '—' instead.
     const pErr = pTotal.error || pTrend.error;
     if (pErr) toast('Partner trend: ' + pErr.message);
     const pt = pErr ? { uap: null, transacting: null }
       : (pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 });
-    // Field activity (BDE visits + calls) comes from the Support field log.
     const visitStat = {}; (visitOut.data || []).forEach(r => { if (r.stage) visitStat[r.stage] = Number(r.cnt) || 0; });
     const callRows = (callOut.data || []).map(r => ({ outcome: r.outcome, n: Number(r.cnt) || 0 }))
       .filter(r => r.outcome).sort((a, b) => b.n - a.n);
@@ -177,34 +322,27 @@ export default async function crmSales(container) {
 
   async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, visitSplit, tierSum, callRows, leadStat, activity) {
     Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
-    const uapBy = {}, txBy = {}, visitBy = {};
-    partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
-    visitSeries.forEach(r => { visitBy[r.period] = Number(r.visits) || 0; });
-    // Periods for the UAP-only chart: partner activation buckets.
-    const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
-    // Periods for the visits-vs-transacting chart: union of both series.
-    const tvPeriods = [...new Set([...partnerTrend.map(r => r.period), ...visitSeries.map(r => r.period)])].sort();
 
+    // KPI/category totals are dimension-invariant, so the dim toggle never touches them.
     let totRev = 0, totUnits = 0;
-    const byCat = {}, buckets = {};
+    const byCat = {};
     for (const r of rows) {
       const rev = Number(r.revenue) || 0, units = Number(r.sales_count) || 0;
       totRev += rev; totUnits += units;
       byCat[r.category] = (byCat[r.category] || 0) + rev;
-      buckets[r.bucket] = (buckets[r.bucket] || 0) + rev;
     }
     const tss = byCat['TSS'] || 0, tp = byCat['TP'] || 0;
-    const bucketRows = Object.entries(buckets).map(([name, rev]) => ({ name, rev })).sort((a, b) => b.rev - a.rev).slice(0, 12);
+    const bucketRows = dimShape(rows);
+    const sShape = seriesShape(series);
+    const tShape = trendShape(partnerTrend, visitSeries);
 
-    // Outcome pyramid: stages best → worst, centered bars scaled to the largest
-    // stage. % is of the stage total in the window.
     const pyramid = (stages, counts, emptyMsg) => {
-      const rows = stages.map(s => ({ label: s.label || s.key, color: s.color, n: (counts && counts[s.key]) || 0 }));
-      const total = rows.reduce((a, s) => a + s.n, 0);
-      const max = Math.max(1, ...rows.map(s => s.n));
+      const prows = stages.map(s => ({ label: s.label || s.key, color: s.color, n: (counts && counts[s.key]) || 0 }));
+      const total = prows.reduce((a, s) => a + s.n, 0);
+      const max = Math.max(1, ...prows.map(s => s.n));
       const html = total === 0
         ? `<div class="u-sm-muted" style="padding:var(--space-3) 0">${esc(emptyMsg)}</div>`
-        : rows.map(s => {
+        : prows.map(s => {
             const w = s.n ? Math.max(Math.round((s.n / max) * 100), 8) : 0;
             return `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
               <div style="flex:0 0 132px;text-align:right;font-size:var(--text-sm)">${esc(s.label)}</div>
@@ -219,7 +357,6 @@ export default async function crmSales(container) {
     const visitPyr = pyramid(VISIT_STAGES, visitStat, 'No visits logged in this window.');
     const leadPyr = pyramid(LEAD_STAGES, leadStat, 'No leads collected in this window.');
 
-    // Call / follow-up outcomes: horizontal bars scaled to the top outcome.
     const callTotal = callRows.reduce((a, r) => a + r.n, 0);
     const callMax = Math.max(1, ...callRows.map(r => r.n));
     const callBody = callTotal === 0
@@ -233,16 +370,6 @@ export default async function crmSales(container) {
           </div>`;
         }).join('');
 
-    const periods = [...new Set(series.map(s => s.period))].sort();
-    const periodTotal = {}; periods.forEach(p => periodTotal[p] = 0);
-    for (const s of series) periodTotal[s.period] += Number(s.revenue) || 0;
-    // Period-over-period growth % (DoD/WoW/MoM), aligned to periods[].
-    const growth = periods.map((p, i) => {
-      if (i === 0) return null;
-      const prev = periodTotal[periods[i - 1]];
-      return prev ? Math.round(((periodTotal[p] - prev) / prev) * 100) : null;
-    });
-
     if (!rows.length && !series.length) {
       body.innerHTML = `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">No sales in this window</div><div class="empty-state-desc">Try a wider date range.</div></div>`;
       return;
@@ -254,11 +381,7 @@ export default async function crmSales(container) {
         <div style="font-size:var(--text-2xl);font-weight:var(--font-weight-bold)">${value}</div>
         ${sub ? `<div class="u-meta" style="margin-top:var(--space-1)">${sub}</div>` : ''}
       </div></div>`;
-    const lastGrowth = growth.length ? growth[growth.length - 1] : null;
-    const growthChip = lastGrowth == null ? '—'
-      : `<span style="color:${lastGrowth >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">${lastGrowth >= 0 ? '▲' : '▼'} ${Math.abs(lastGrowth)}%</span>`;
 
-    // Sales summary by partner tier (Star AP, AP, NA).
     const TIER_ORDER = { 'Star AP': 0, 'AP': 1 };
     const tierRows = (tierSum || []).map(t => ({
       tier: t.tier, revenue: Number(t.revenue) || 0, tp_units: Number(t.tp_units) || 0,
@@ -282,7 +405,6 @@ export default async function crmSales(container) {
         </table></div>
       </div>`;
 
-    // Activity input metrics → each links to its area.
     const metric = (label, value, route) => `
       <div class="card" style="cursor:pointer" data-route="${route}">
         <div class="card-body">
@@ -295,7 +417,7 @@ export default async function crmSales(container) {
         ${kpi('Revenue', inr(totRev), num(totUnits) + ' activations')}
         ${kpi('TSS renewals', inr(tss), pct(tss, totRev) + '% of revenue')}
         ${kpi('New licenses (TP)', inr(tp), pct(tp, totRev) + '% of revenue')}
-        ${kpi('Latest ' + grain + ' growth', growthChip, periods.length ? 'vs previous ' + grain : '—')}
+        <div class="card" id="sx-growth-card"><div class="card-body">${growthCard(sShape.growth)}</div></div>
         ${kpi('UAP', num(partnerTotal.uap), 'newly activated (first TP)')}
         ${kpi('Transacting partners', num(partnerTotal.transacting), 'any transaction')}
       </div>
@@ -307,7 +429,7 @@ export default async function crmSales(container) {
           <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
             <span style="font-weight:var(--font-weight-semibold)">Revenue trend</span>
             <div class="seg">
-              ${GRAINS.map(g => `<button class="seg-btn ${grain === g.key ? 'is-active' : ''}" data-grain="${g.key}">${esc(g.label)}</button>`).join('')}
+              ${GRAINS.map(g => `<button type="button" class="seg-btn ${grain === g.key ? 'is-active' : ''}" data-grain="${g.key}">${esc(g.label)}</button>`).join('')}
             </div>
           </div>
           <div class="card-body"><div style="height:280px"><canvas id="sx-trend"></canvas></div></div></div>
@@ -319,10 +441,10 @@ export default async function crmSales(container) {
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
           <span style="font-weight:var(--font-weight-semibold)">By dimension</span>
           <div class="seg">
-            ${DIMS.map(d => `<button class="seg-btn ${dim === d.key ? 'is-active' : ''}" data-dim="${d.key}">${esc(d.label)}</button>`).join('')}
+            ${DIMS.map(d => `<button type="button" class="seg-btn ${dim === d.key ? 'is-active' : ''}" data-dim="${d.key}">${esc(d.label)}</button>`).join('')}
           </div>
         </div>
-        <div class="card-body"><div style="height:${Math.max(220, bucketRows.length * 26)}px"><canvas id="sx-dim"></canvas></div></div>
+        <div class="card-body"><div id="sx-dim-wrap" style="height:${Math.max(220, bucketRows.length * 26)}px"><canvas id="sx-dim"></canvas></div></div>
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)">
@@ -369,71 +491,16 @@ export default async function crmSales(container) {
       </div>
     `;
 
-    body.querySelectorAll('[data-dim]').forEach(b => b.addEventListener('click', () => { dim = b.dataset.dim; load(); }));
-    body.querySelectorAll('[data-grain]').forEach(b => b.addEventListener('click', () => { grain = b.dataset.grain; load(); }));
+    // Filters update only their own charts — no full-page reload.
+    body.querySelectorAll('[data-dim]').forEach(b => b.addEventListener('click', () => { if (b.dataset.dim === dim) return; dim = b.dataset.dim; reloadDim(); }));
+    body.querySelectorAll('[data-grain]').forEach(b => b.addEventListener('click', () => { if (b.dataset.grain === grain) return; grain = b.dataset.grain; reloadSeries(); }));
     body.querySelectorAll('[data-route]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.route)));
 
-    const cs = getComputedStyle(document.documentElement);
-    const grid = (cs.getPropertyValue('--color-border') || '#e2e8f0').trim();
-    const textc = (cs.getPropertyValue('--color-text-secondary') || '#475569').trim();
-    const ChartJs = await ensureChart();
-    const moneyTick = (v) => inr(v);
-
-    charts.trend = new ChartJs(body.querySelector('#sx-trend'), {
-      type: 'line',
-      data: { labels: periods, datasets: [{ label: 'Revenue', data: periods.map(p => periodTotal[p]),
-        borderColor: '#1E3A8A', backgroundColor: 'rgba(30,58,138,0.12)', fill: true, tension: 0.3, pointRadius: 2 }] },
-      options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => {
-          const g = growth[c.dataIndex];
-          return inr(c.parsed.y) + (g == null ? '' : `  (${g >= 0 ? '▲' : '▼'}${Math.abs(g)}% vs prev)`);
-        } } } },
-        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
-                  y: { ticks: { color: textc, callback: moneyTick }, grid: { color: grid } } } },
-    });
-
-    const cats = CAT_ORDER.filter(c => byCat[c]);
-    charts.donut = new ChartJs(body.querySelector('#sx-donut'), {
-      type: 'doughnut',
-      data: { labels: cats, datasets: [{ data: cats.map(c => byCat[c]), backgroundColor: cats.map(c => CAT_COLOR[c]), borderWidth: 0 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
-        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } },
-          tooltip: { callbacks: { label: (c) => `${c.label}: ${inr(c.parsed)} (${pct(c.parsed, totRev)}%)` } } } },
-    });
-
-    // Transacting partners vs BDE visits — comparable magnitudes, so one chart.
-    charts.partners = new ChartJs(body.querySelector('#sx-partners'), {
-      type: 'line',
-      data: { labels: tvPeriods, datasets: [
-        { label: 'Transacting partners', data: tvPeriods.map(p => txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
-        { label: 'BDE visits', data: tvPeriods.map(p => visitBy[p] || 0), borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
-      ] },
-      options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } } },
-        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
-                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
-    });
-
-    // UAP on its own — first-TP counts are small and get lost against the above.
-    charts.uap = new ChartJs(body.querySelector('#sx-uap'), {
-      type: 'line',
-      data: { labels: pPeriods, datasets: [
-        { label: 'UAP (new)', data: pPeriods.map(p => uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.12)', fill: true, tension: 0.3, pointRadius: 2 },
-      ] },
-      options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
-                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
-    });
-
-    charts.dim = new ChartJs(body.querySelector('#sx-dim'), {
-      type: 'bar',
-      data: { labels: bucketRows.map(b => b.name), datasets: [{ label: 'Revenue', data: bucketRows.map(b => b.rev), backgroundColor: '#1E3A8A', borderRadius: 4 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => inr(c.parsed.x) } } },
-        scales: { x: { ticks: { color: textc, callback: moneyTick }, grid: { color: grid } },
-                  y: { ticks: { color: textc }, grid: { display: false } } } },
-    });
+    await drawTrend(sShape);
+    await drawDonut(byCat, totRev);
+    await drawPartners(tShape);
+    await drawUap(tShape);
+    await drawDim(bucketRows);
   }
 
   paintControls();
