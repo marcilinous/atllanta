@@ -287,6 +287,9 @@ views/  dashboard.js  me/  inbox.js  approvals.js  onboarding.js
         employees/  attendance/  leave/  people/  documents/  finance/
         helpdesk/  announcements/  audit/            (HRMS/People)
         recruitment/                                 (Recruitment & Interviews)
+        crm/                                         (CRM — partners, sales, leads,
+                                                      opportunities, field-sales, pjp,
+                                                      prospects, events, exports, reports)
         reports/                                     (→ folds into Analytics)
         ai/  settings/  admin/
 api/    parse-resume.js  match.js  screen-job.js  extract-candidate.js
@@ -337,17 +340,51 @@ This file is the target. The code is being brought onto it in phases (full detai
 in the approved plan `enchanted-sleeping-lemon.md`):
 
 - **Phase 0 (this file)** — canonical definition + requirements. ✅
-- **Phase 1** — unify tenancy: migrate recruitment tables `client_id → org_id`;
-  fold `memberships` into `users`; drop `clients`; replace
-  `auth_accessible_client_ids()` + `auth_user_org_ids()` with one `auth_org_id()`;
-  delete the `roleMap` shim (`js/auth.js:29`); standardize `organization_id → org_id`.
-- **Phase 2** — enforce module boundaries; add password-reset flow.
-- **Phase 3** — design-system cleanup (inline-style removal, SVG icons, dedupe
-  `index.html` helpers against `js/ui.js`).
-- **Phase 4** — build CRM. **Phase 5** — build Analytics as a real module.
+- **Phase 1** — unify tenancy: recruitment tables migrated `client_id → org_id`;
+  `memberships` folded into `users`; `clients` dropped;
+  `auth_accessible_client_ids()` removed; the `roleMap` shim deleted;
+  `invitations` canonicalized to `org_id`. ✅ Credits/`credit_ledger` kept
+  (org-scoped). Org resolution consolidated: `auth_org_id()` is the single
+  source of truth and `auth_user_org_ids()` now delegates to it. ✅
+- **Phase 2** — password-reset flow added (`login.html` + `PASSWORD_RECOVERY`
+  in `js/auth.js`). ✅ Module-boundary enforcement is folded into Phases 4/5
+  (the two remaining direct cross-module reads — the AI assistant's RLS-scoped
+  queries per §11, and `views/reports/*` — resolve as Analytics is built).
+- **Phase 3** — design-system cleanup: reference palette + per-module accents,
+  SVG icons (no emoji), festival banner revised, inline-style unwind. ✅
+- **Phase 4** — CRM: **built, front + back.** 🟡 The canonical CRM line lives on
+  branch `claude/gstack-skill-install-chnb41` (the RTcompu distribution model),
+  now the source of truth; an earlier parallel line (`rtcompu-crm-work`, PR #95)
+  was retired into it. The live DB carries
+  `crm_accounts/contacts/leads/opportunities/pipeline_stages/activities`, a
+  field-sales layer (`crm_visits/calls`, `crm_pjp_*` journey plans,
+  `crm_report_imports/rows`) and `crm_*` RPCs incl. materialized views
+  (`crm_sales_facts`, `crm_field_facts`). `views/crm/` is built:
+  `index` (hub), `leads`, `sales`, `partners`/`partner-detail`, `events`,
+  `field-sales` (Distribution), `pjp`, `visit-form`, `prospects`,
+  `opportunities`, `exports`, and `reports` (report import). Notes:
+  - **Report import** (`views/crm/reports.js`): upload Tally activation/sales
+    CSV/XLSX → `crm_report_rows`, matched to partners by Site ID. Rows are
+    de-duplicated by whole-row content — a stored `content_hash`
+    (`md5(data::text)`) + the `crm_insert_report_rows` (security-invoker) RPC
+    skip rows already present, so re-uploading a file adds nothing. Export is a
+    single dialog: pick report type + optional date range.
+  - **Sales tab** (`views/crm/sales.js`): in-card filters update independently —
+    the grain toggle redraws only the time-series charts, the dimension toggle
+    only the ranking chart; the Range presets are the one global refilter.
+  - **Migration gap** (pre-existing): this branch's migrations *read*
+    `crm_report_imports`/`crm_report_rows` (and materialize from them) but never
+    *create* them — they exist only in the shared DB. Add a create-table
+    migration early in the history when reconciling.
+  - **Post-import refresh**: `crm_sales_facts` needs `crm_refresh_sales_facts()`
+    (service-role) to reflect newly imported rows in Sales analytics; not called
+    from the anon UI. Follow-up: an admin/edge refresh trigger.
+  - Schema diverges from §6.4's proposal (opportunities vs deals; PJP/visits/
+    report-imports not in the doc). Reconcile §6.4 with the real schema.
+- **Phase 5** — build Analytics as a real module (retire `views/reports/*`).
 
-Until Phase 1 lands, recruitment code still queries `client_id`/`memberships`.
-Do not extend that model; new work targets `org_id`.
+Tenancy is unified: `org_id` is the only tenant key. Do not reintroduce
+`client_id`/`memberships`; new work targets `org_id`.
 
 ---
 

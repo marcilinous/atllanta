@@ -422,7 +422,9 @@
   .content {
     flex: 1;
     padding: var(--space-3);
-    padding-bottom: calc(52px + var(--space-3));
+    /* Clear the fixed bottom nav (its height + the device safe-area inset it
+       also reserves) so page content always ends above it. */
+    padding-bottom: calc(52px + var(--space-3) + env(safe-area-inset-bottom, 0px));
     overflow-x: hidden;
     overflow-y: auto;
     width: 100%;

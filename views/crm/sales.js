@@ -1,0 +1,508 @@
+import sb from '../../js/supabase.js';
+import { getOrg } from '../../js/auth.js';
+import { esc, toast, backButton } from '../../js/ui.js';
+import { navigate } from '../../js/router.js';
+
+// CRM › Sales. Analytics-only snapshot of the business for a from/to window:
+// KPIs, a revenue trend (DoD/WoW/MoM toggle with growth %), category mix, a
+// by-dimension ranking, and a summary of the team's input activity (leads,
+// visits, calls, events, partners) that links into each area. Reads
+// crm_sales_by + crm_sales_series (anon+RLS, empty-string-safe) and count
+// queries on the activity tables. Charts via Chart.js (DESIGN.md §8a).
+
+function inr(n) {
+  n = Number(n) || 0;
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(n >= 1e8 ? 0 : 1) + 'Cr';
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(n >= 1e6 ? 0 : 1) + 'L';
+  if (n >= 1e3) return '₹' + Math.round(n / 1e3) + 'K';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+const num = (n) => n == null ? '—' : Math.round(Number(n)).toLocaleString('en-IN');
+const pct = (a, b) => !b ? 0 : Math.round((a / b) * 100);
+const nextDay = (d) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); };
+
+const DIMS = [
+  { key: 'region', label: 'Region' }, { key: 'role', label: 'Tier' },
+  { key: 'district', label: 'District' }, { key: 'hub', label: 'Hub' },
+];
+const GRAINS = [{ key: 'day', label: 'DoD' }, { key: 'week', label: 'WoW' }, { key: 'month', label: 'MoM' }];
+const CAT_COLOR = { TSS: '#1E3A8A', TP: '#10B981', TPCA: '#F59E0B', WABA: '#8b5cf6', Other: '#94a3b8' };
+const CAT_ORDER = ['TSS', 'TP', 'TPCA', 'WABA', 'Other'];
+// Visit outcomes, best → worst, for the pyramid. Order is the funnel order.
+const VISIT_STAGES = [
+  { key: 'Met owner', color: '#10B981' },
+  { key: 'Met resource', color: '#22a3c4' },
+  { key: 'Not able to meet', color: '#F59E0B' },
+  { key: 'Shop closed', color: '#ef7c3a' },
+  { key: 'Business closed', color: '#94a3b8' },
+];
+// Lead pipeline outcomes, hottest → dropped, for the pyramid.
+const LEAD_STAGES = [
+  { key: 'hot', label: 'Hot', color: '#ef4444' },
+  { key: 'warm', label: 'Warm', color: '#F59E0B' },
+  { key: 'cold', label: 'Cold', color: '#3b82f6' },
+  { key: 'dropped', label: 'Dropped', color: '#94a3b8' },
+];
+
+const fyStart = (y) => `${y}-04-01`;
+const fyEnd = (y) => `${y + 1}-03-31`;
+function presets() {
+  const now = new Date();
+  const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return [
+    { key: 'fy', label: 'This FY', from: fyStart(fy), to: fyEnd(fy) },
+    { key: 'pfy', label: 'Last FY', from: fyStart(fy - 1), to: fyEnd(fy - 1) },
+    { key: 'mtd', label: 'This month', from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) },
+    { key: 'd90', label: 'Last 90 days', from: iso(new Date(now.getTime() - 90 * 864e5)), to: iso(now) },
+    { key: 'all', label: 'All', from: '', to: '' },
+  ];
+}
+
+let Chart;
+async function ensureChart() {
+  if (!Chart) { const m = await import('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/auto/+esm'); Chart = m.default; }
+  return Chart;
+}
+
+export default async function crmSales(container) {
+  const org = getOrg();
+  const P = presets();
+  let dim = 'region', grain = 'month';
+  let from = P[0].from, to = P[0].to, preset = 'fy';
+  const charts = {};
+
+  container.innerHTML = `
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:var(--space-3)">
+      <div>
+        <h1 class="page-title" style="margin:0">Sales</h1>
+        <p class="page-subtitle" style="margin:0">${esc(org?.name || 'Region')} · business snapshot for a date range</p>
+      </div>
+      ${backButton('crm')}
+    </div>
+    <div id="sales-controls"></div>
+    <div id="sales-body"><div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>
+  `;
+  if (!org) { document.getElementById('sales-body').innerHTML = `<div class="empty-state"><div class="empty-state-title">No organization</div></div>`; return; }
+
+  const controls = document.getElementById('sales-controls');
+  const body = document.getElementById('sales-body');
+
+  function paintControls() {
+    controls.innerHTML = `
+      <div class="control-bar" style="justify-content:space-between">
+        <div class="control-group">
+          <span class="control-label">Range</span>
+          <div class="seg">
+            ${P.map(p => `<button type="button" class="seg-btn ${preset === p.key ? 'is-active' : ''}" data-preset="${p.key}">${esc(p.label)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="control-group">
+          <input class="form-input" type="date" id="sx-from" value="${esc(from)}" style="max-width:150px;height:34px">
+          <span class="u-sm-muted">to</span>
+          <input class="form-input" type="date" id="sx-to" value="${esc(to)}" style="max-width:150px;height:34px">
+        </div>
+      </div>`;
+    controls.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+      const p = P.find(x => x.key === b.dataset.preset);
+      preset = p.key; from = p.from; to = p.to; paintControls(); load();
+    }));
+    const fEl = controls.querySelector('#sx-from'), tEl = controls.querySelector('#sx-to');
+    const custom = () => { from = fEl.value || ''; to = tEl.value || ''; preset = null; paintControls(); load(); };
+    fEl.addEventListener('change', custom); tEl.addEventListener('change', custom);
+  }
+
+  // Count rows on a table within the date window (via a date column). '' = no bound.
+  async function countIn(table, dateCol) {
+    let q = sb.from(table).select('*', { count: 'exact', head: true });
+    if (from && dateCol) q = q.gte(dateCol, from);
+    if (to && dateCol) q = q.lt(dateCol, nextDay(to));
+    const { count, error } = await q;
+    return error ? 0 : (count || 0);
+  }
+
+  // Tally rows on a table by a status column within the window (RLS-scoped).
+  async function tallyBy(table, statusCol, dateCol) {
+    let q = sb.from(table).select(statusCol);
+    if (from && dateCol) q = q.gte(dateCol, from);
+    if (to && dateCol) q = q.lt(dateCol, nextDay(to));
+    const { data, error } = await q.limit(10000);
+    const counts = {};
+    if (!error) for (const r of (data || [])) {
+      const s = (r[statusCol] || '').trim();
+      if (s) counts[s] = (counts[s] || 0) + 1;
+    }
+    return counts;
+  }
+
+  // ---- pure shape helpers (so filters can recompute just their slice) ----
+  function seriesShape(series) {
+    const periods = [...new Set(series.map(s => s.period))].sort();
+    const periodTotal = {}; periods.forEach(p => periodTotal[p] = 0);
+    for (const s of series) periodTotal[s.period] += Number(s.revenue) || 0;
+    const growth = periods.map((p, i) => {
+      if (i === 0) return null;
+      const prev = periodTotal[periods[i - 1]];
+      return prev ? Math.round(((periodTotal[p] - prev) / prev) * 100) : null;
+    });
+    return { periods, periodTotal, growth };
+  }
+  function trendShape(partnerTrend, visitSeries) {
+    const uapBy = {}, txBy = {}, visitBy = {};
+    partnerTrend.forEach(r => { uapBy[r.period] = Number(r.uap) || 0; txBy[r.period] = Number(r.transacting) || 0; });
+    visitSeries.forEach(r => { visitBy[r.period] = Number(r.visits) || 0; });
+    const pPeriods = [...new Set(partnerTrend.map(r => r.period))].sort();
+    const tvPeriods = [...new Set([...partnerTrend.map(r => r.period), ...visitSeries.map(r => r.period)])].sort();
+    return { uapBy, txBy, visitBy, pPeriods, tvPeriods };
+  }
+  const dimShape = (rows) => {
+    const buckets = {};
+    for (const r of rows) buckets[r.bucket] = (buckets[r.bucket] || 0) + (Number(r.revenue) || 0);
+    return Object.entries(buckets).map(([name, rev]) => ({ name, rev })).sort((a, b) => b.rev - a.rev).slice(0, 12);
+  };
+  const growthChipHtml = (growth) => {
+    const g = growth.length ? growth[growth.length - 1] : null;
+    return g == null ? '—' : `<span style="color:${g >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">${g >= 0 ? '▲' : '▼'} ${Math.abs(g)}%</span>`;
+  };
+  const growthCard = (growth) => `
+    <div class="u-sm-muted" style="margin-bottom:var(--space-1)">Latest ${esc(grain)} growth</div>
+    <div style="font-size:var(--text-2xl);font-weight:var(--font-weight-bold)">${growthChipHtml(growth)}</div>
+    <div class="u-meta" style="margin-top:var(--space-1)">${growth.length ? 'vs previous ' + esc(grain) : '—'}</div>`;
+
+  // ---- chart theme (read design tokens once) ----
+  let theme = null;
+  async function chartCtx() {
+    const C = await ensureChart();
+    if (!theme) {
+      const cs = getComputedStyle(document.documentElement);
+      theme = { grid: (cs.getPropertyValue('--color-border') || '#e2e8f0').trim(),
+                textc: (cs.getPropertyValue('--color-text-secondary') || '#475569').trim() };
+    }
+    return { C, ...theme };
+  }
+  const moneyTick = (v) => inr(v);
+
+  // ---- one-chart builders (destroy + recreate a single chart in place) ----
+  async function drawTrend(shape) {
+    const { C, grid, textc } = await chartCtx();
+    const el = body.querySelector('#sx-trend'); if (!el) return;
+    try { charts.trend?.destroy(); } catch (e) {}
+    charts.trend = new C(el, {
+      type: 'line',
+      data: { labels: shape.periods, datasets: [{ label: 'Revenue', data: shape.periods.map(p => shape.periodTotal[p]),
+        borderColor: '#1E3A8A', backgroundColor: 'rgba(30,58,138,0.12)', fill: true, tension: 0.3, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => {
+          const g = shape.growth[c.dataIndex];
+          return inr(c.parsed.y) + (g == null ? '' : `  (${g >= 0 ? '▲' : '▼'}${Math.abs(g)}% vs prev)`);
+        } } } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, callback: moneyTick }, grid: { color: grid } } } },
+    });
+  }
+  async function drawDonut(byCat, totRev) {
+    const { C, textc } = await chartCtx();
+    const el = body.querySelector('#sx-donut'); if (!el) return;
+    const cats = CAT_ORDER.filter(c => byCat[c]);
+    try { charts.donut?.destroy(); } catch (e) {}
+    charts.donut = new C(el, {
+      type: 'doughnut',
+      data: { labels: cats, datasets: [{ data: cats.map(c => byCat[c]), backgroundColor: cats.map(c => CAT_COLOR[c]), borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } },
+          tooltip: { callbacks: { label: (c) => `${c.label}: ${inr(c.parsed)} (${pct(c.parsed, totRev)}%)` } } } },
+    });
+  }
+  async function drawPartners(t) {
+    const { C, grid, textc } = await chartCtx();
+    const el = body.querySelector('#sx-partners'); if (!el) return;
+    try { charts.partners?.destroy(); } catch (e) {}
+    charts.partners = new C(el, {
+      type: 'line',
+      data: { labels: t.tvPeriods, datasets: [
+        { label: 'Transacting partners', data: t.tvPeriods.map(p => t.txBy[p] || 0), borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'BDE visits', data: t.tvPeriods.map(p => t.visitBy[p] || 0), borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.10)', fill: true, tension: 0.3, pointRadius: 2 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: textc, boxWidth: 12 } } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
+    });
+  }
+  async function drawUap(t) {
+    const { C, grid, textc } = await chartCtx();
+    const el = body.querySelector('#sx-uap'); if (!el) return;
+    try { charts.uap?.destroy(); } catch (e) {}
+    charts.uap = new C(el, {
+      type: 'line',
+      data: { labels: t.pPeriods, datasets: [
+        { label: 'UAP (new)', data: t.pPeriods.map(p => t.uapBy[p] || 0), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.12)', fill: true, tension: 0.3, pointRadius: 2 },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: textc, maxRotation: 0, autoSkip: true }, grid: { color: grid } },
+                  y: { ticks: { color: textc, precision: 0 }, grid: { color: grid }, beginAtZero: true } } },
+    });
+  }
+  async function drawDim(bucketRows) {
+    const { C, grid, textc } = await chartCtx();
+    const wrap = body.querySelector('#sx-dim-wrap'); if (wrap) wrap.style.height = Math.max(220, bucketRows.length * 26) + 'px';
+    const el = body.querySelector('#sx-dim'); if (!el) return;
+    try { charts.dim?.destroy(); } catch (e) {}
+    charts.dim = new C(el, {
+      type: 'bar',
+      data: { labels: bucketRows.map(b => b.name), datasets: [{ label: 'Revenue', data: bucketRows.map(b => b.rev), backgroundColor: '#1E3A8A', borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => inr(c.parsed.x) } } },
+        scales: { x: { ticks: { color: textc, callback: moneyTick }, grid: { color: grid } },
+                  y: { ticks: { color: textc }, grid: { display: false } } } },
+    });
+  }
+
+  // ---- independent filter updaters: refetch + redraw ONLY the affected charts ----
+  function segActive(attr, key) {
+    body.querySelectorAll(`[data-${attr}]`).forEach(b => b.classList.toggle('is-active', b.dataset[attr] === key));
+  }
+  async function reloadSeries() {
+    segActive('grain', grain);
+    const [series, pTrend, vSeries] = await Promise.all([
+      sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
+    ]);
+    if (series.error) { toast('Trend: ' + series.error.message); return; }
+    const sShape = seriesShape(series.data || []);
+    const tShape = trendShape(pTrend.data || [], vSeries.data || []);
+    await drawTrend(sShape); await drawPartners(tShape); await drawUap(tShape);
+    const gc = body.querySelector('#sx-growth-card .card-body'); if (gc) gc.innerHTML = growthCard(sShape.growth);
+  }
+  async function reloadDim() {
+    segActive('dim', dim);
+    const byDim = await sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to });
+    if (byDim.error) { toast('By dimension: ' + byDim.error.message); return; }
+    await drawDim(dimShape(byDim.data || []));
+  }
+
+  async function load() {
+    body.innerHTML = `<div style="padding:var(--space-4)"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div>`;
+    const [byDim, series, pTrend, pTotal, vSeries, visitOut, visitSplit, tierSum, callOut, leadStat, leads, events, partners] = await Promise.all([
+      sb.rpc('crm_sales_by', { p_dim: dim, p_from: from, p_to: to }),
+      sb.rpc('crm_sales_series', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_partner_trend', { p_from: from, p_to: to, p_grain: 'all' }),
+      sb.rpc('crm_visit_series', { p_from: from, p_to: to, p_grain: grain }),
+      sb.rpc('crm_visit_outcomes', { p_from: from, p_to: to }),
+      sb.rpc('crm_visit_split', { p_from: from, p_to: to }),
+      sb.rpc('crm_sales_tier_summary', { p_from: from, p_to: to }),
+      sb.rpc('crm_call_outcomes', { p_from: from, p_to: to }),
+      tallyBy('crm_leads', 'status', 'created_at'),
+      countIn('crm_leads', 'created_at'),
+      countIn('crm_events', 'event_date'),
+      countIn('crm_partner_details', null),
+    ]);
+    if (byDim.error || series.error) {
+      const msg = (byDim.error || series.error).message;
+      body.innerHTML = `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">Couldn't load sales</div><div class="empty-state-desc">${esc(msg)}</div></div>`;
+      toast('Sales: ' + msg); return;
+    }
+    const pErr = pTotal.error || pTrend.error;
+    if (pErr) toast('Partner trend: ' + pErr.message);
+    const pt = pErr ? { uap: null, transacting: null }
+      : (pTotal.data && pTotal.data[0] ? pTotal.data[0] : { uap: 0, transacting: 0 });
+    const visitStat = {}; (visitOut.data || []).forEach(r => { if (r.stage) visitStat[r.stage] = Number(r.cnt) || 0; });
+    const callRows = (callOut.data || []).map(r => ({ outcome: r.outcome, n: Number(r.cnt) || 0 }))
+      .filter(r => r.outcome).sort((a, b) => b.n - a.n);
+    const visitsTotal = Object.values(visitStat).reduce((a, n) => a + n, 0);
+    const callsTotal = callRows.reduce((a, r) => a + r.n, 0);
+    const vSplit = { registered: 0, unregistered: 0 };
+    (visitSplit.data || []).forEach(r => { if (r.partner_type in vSplit) vSplit[r.partner_type] = Number(r.cnt) || 0; });
+    await paint(byDim.data || [], series.data || [], pTrend.data || [], pt, vSeries.data || [], visitStat, vSplit, (tierSum.data || []), callRows, leadStat,
+      { leads, visits: visitsTotal, calls: callsTotal, events, partners });
+  }
+
+  async function paint(rows, series, partnerTrend, partnerTotal, visitSeries, visitStat, visitSplit, tierSum, callRows, leadStat, activity) {
+    Object.values(charts).forEach(c => { try { c.destroy(); } catch (e) {} });
+
+    // KPI/category totals are dimension-invariant, so the dim toggle never touches them.
+    let totRev = 0, totUnits = 0;
+    const byCat = {};
+    for (const r of rows) {
+      const rev = Number(r.revenue) || 0, units = Number(r.sales_count) || 0;
+      totRev += rev; totUnits += units;
+      byCat[r.category] = (byCat[r.category] || 0) + rev;
+    }
+    const tss = byCat['TSS'] || 0, tp = byCat['TP'] || 0;
+    const bucketRows = dimShape(rows);
+    const sShape = seriesShape(series);
+    const tShape = trendShape(partnerTrend, visitSeries);
+
+    const pyramid = (stages, counts, emptyMsg) => {
+      const prows = stages.map(s => ({ label: s.label || s.key, color: s.color, n: (counts && counts[s.key]) || 0 }));
+      const total = prows.reduce((a, s) => a + s.n, 0);
+      const max = Math.max(1, ...prows.map(s => s.n));
+      const html = total === 0
+        ? `<div class="u-sm-muted" style="padding:var(--space-3) 0">${esc(emptyMsg)}</div>`
+        : prows.map(s => {
+            const w = s.n ? Math.max(Math.round((s.n / max) * 100), 8) : 0;
+            return `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+              <div style="flex:0 0 132px;text-align:right;font-size:var(--text-sm)">${esc(s.label)}</div>
+              <div style="flex:1;display:flex;justify-content:center;min-width:0">
+                ${s.n ? `<div style="width:${w}%;background:${s.color};color:#fff;border-radius:var(--radius-sm);padding:6px var(--space-2);text-align:center;font-weight:var(--font-weight-semibold);font-size:var(--text-sm);white-space:nowrap">${num(s.n)}</div>` : ''}
+              </div>
+              <div style="flex:0 0 44px;text-align:right;font-size:var(--text-sm)" class="u-sm-muted">${pct(s.n, total)}%</div>
+            </div>`;
+          }).join('');
+      return { total, html };
+    };
+    const visitPyr = pyramid(VISIT_STAGES, visitStat, 'No visits logged in this window.');
+    const leadPyr = pyramid(LEAD_STAGES, leadStat, 'No leads collected in this window.');
+
+    const callTotal = callRows.reduce((a, r) => a + r.n, 0);
+    const callMax = Math.max(1, ...callRows.map(r => r.n));
+    const callBody = callTotal === 0
+      ? `<div class="u-sm-muted" style="padding:var(--space-3) 0">No calls or follow-ups in this window.</div>`
+      : callRows.map(r => {
+          const w = Math.max(Math.round((r.n / callMax) * 100), 3);
+          return `<div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+            <div style="flex:0 0 150px;font-size:var(--text-sm)">${esc(r.outcome)}</div>
+            <div style="flex:1;min-width:0"><div style="width:${w}%;background:#2563EB;height:14px;border-radius:var(--radius-sm)"></div></div>
+            <div style="flex:0 0 88px;text-align:right;font-size:var(--text-sm)">${num(r.n)} <span class="u-sm-muted">${pct(r.n, callTotal)}%</span></div>
+          </div>`;
+        }).join('');
+
+    if (!rows.length && !series.length) {
+      body.innerHTML = `<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">No sales in this window</div><div class="empty-state-desc">Try a wider date range.</div></div>`;
+      return;
+    }
+
+    const kpi = (label, value, sub) => `
+      <div class="card"><div class="card-body">
+        <div class="u-sm-muted" style="margin-bottom:var(--space-1)">${esc(label)}</div>
+        <div style="font-size:var(--text-2xl);font-weight:var(--font-weight-bold)">${value}</div>
+        ${sub ? `<div class="u-meta" style="margin-top:var(--space-1)">${sub}</div>` : ''}
+      </div></div>`;
+
+    const TIER_ORDER = { 'Star AP': 0, 'AP': 1 };
+    const tierRows = (tierSum || []).map(t => ({
+      tier: t.tier, revenue: Number(t.revenue) || 0, tp_units: Number(t.tp_units) || 0,
+      tss_units: Number(t.tss_units) || 0, units: Number(t.units) || 0,
+      transacting: Number(t.transacting) || 0, uap: Number(t.uap) || 0,
+    })).sort((a, b) => (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9) || b.revenue - a.revenue);
+    const tierCard = !tierRows.length ? '' : `
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header" style="font-weight:var(--font-weight-semibold)">By tier · AP vs Star AP</div>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Tier</th><th style="text-align:right">Revenue</th><th style="text-align:right">TP</th><th style="text-align:right">TSS</th><th style="text-align:right">Units</th><th style="text-align:right">Transacting</th><th style="text-align:right">UAP</th></tr></thead>
+          <tbody>${tierRows.map(t => `<tr>
+            <td style="font-weight:var(--font-weight-medium)">${esc(t.tier)}</td>
+            <td style="text-align:right;font-weight:var(--font-weight-semibold)">${inr(t.revenue)}</td>
+            <td style="text-align:right">${num(t.tp_units)}</td>
+            <td style="text-align:right">${num(t.tss_units)}</td>
+            <td style="text-align:right">${num(t.units)}</td>
+            <td style="text-align:right">${num(t.transacting)}</td>
+            <td style="text-align:right">${num(t.uap)}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+
+    const metric = (label, value, route) => `
+      <div class="card" style="cursor:pointer" data-route="${route}">
+        <div class="card-body">
+          <div class="u-sm-muted" style="margin-bottom:var(--space-1)">${esc(label)}</div>
+          <div style="font-size:var(--text-xl);font-weight:var(--font-weight-bold)">${num(value)}</div>
+        </div></div>`;
+
+    body.innerHTML = `
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:var(--space-4)">
+        ${kpi('Revenue', inr(totRev), num(totUnits) + ' activations')}
+        ${kpi('TSS renewals', inr(tss), pct(tss, totRev) + '% of revenue')}
+        ${kpi('New licenses (TP)', inr(tp), pct(tp, totRev) + '% of revenue')}
+        <div class="card" id="sx-growth-card"><div class="card-body">${growthCard(sShape.growth)}</div></div>
+        ${kpi('UAP', num(partnerTotal.uap), 'newly activated (first TP)')}
+        ${kpi('Transacting partners', num(partnerTotal.transacting), 'any transaction')}
+      </div>
+
+      ${tierCard}
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
+            <span style="font-weight:var(--font-weight-semibold)">Revenue trend</span>
+            <div class="seg">
+              ${GRAINS.map(g => `<button type="button" class="seg-btn ${grain === g.key ? 'is-active' : ''}" data-grain="${g.key}">${esc(g.label)}</button>`).join('')}
+            </div>
+          </div>
+          <div class="card-body"><div style="height:280px"><canvas id="sx-trend"></canvas></div></div></div>
+        <div class="card"><div class="card-header" style="font-weight:var(--font-weight-semibold)">Category mix</div>
+          <div class="card-body"><div style="height:280px"><canvas id="sx-donut"></canvas></div></div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-2)">
+          <span style="font-weight:var(--font-weight-semibold)">By dimension</span>
+          <div class="seg">
+            ${DIMS.map(d => `<button type="button" class="seg-btn ${dim === d.key ? 'is-active' : ''}" data-dim="${d.key}">${esc(d.label)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="card-body"><div id="sx-dim-wrap" style="height:${Math.max(220, bucketRows.length * 26)}px"><canvas id="sx-dim"></canvas></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card"><div class="card-header" style="font-weight:var(--font-weight-semibold)">Transacting partners vs BDE visits</div>
+          <div class="card-body"><div style="height:260px"><canvas id="sx-partners"></canvas></div></div></div>
+        <div class="card"><div class="card-header" style="font-weight:var(--font-weight-semibold)">New partner activations (UAP)</div>
+          <div class="card-body"><div style="height:260px"><canvas id="sx-uap"></canvas></div></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-4);margin-bottom:var(--space-4)">
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:var(--font-weight-semibold)">Visit outcomes</span>
+            <span class="u-sm-muted">${num(visitPyr.total)} visits</span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:var(--space-4);margin-bottom:var(--space-3);flex-wrap:wrap">
+              <div><span class="u-sm-muted">Registered</span> <strong>${num(visitSplit.registered)}</strong> <span class="u-sm-muted">${pct(visitSplit.registered, visitSplit.registered + visitSplit.unregistered)}%</span></div>
+              <div><span class="u-sm-muted">Unregistered</span> <strong>${num(visitSplit.unregistered)}</strong> <span class="u-sm-muted">${pct(visitSplit.unregistered, visitSplit.registered + visitSplit.unregistered)}%</span></div>
+            </div>
+            ${visitPyr.html}</div></div>
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:var(--font-weight-semibold)">Lead outcomes</span>
+            <span class="u-sm-muted">${num(leadPyr.total)} leads</span>
+          </div>
+          <div class="card-body">${leadPyr.html}</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:var(--font-weight-semibold)">Call &amp; follow-up outcomes</span>
+          <span class="u-sm-muted">${num(callTotal)} calls</span>
+        </div>
+        <div class="card-body">${callBody}</div></div>
+
+      <div style="margin-bottom:var(--space-2);font-weight:var(--font-weight-semibold)">Business activity ${from || to ? `<span class="u-sm-muted" style="font-weight:normal">· ${esc(from || '…')} → ${esc(to || 'now')}</span>` : ''}</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+        ${metric('Leads collected', activity.leads, 'crm/leads')}
+        ${metric('Visits logged', activity.visits, 'crm/field-sales')}
+        ${metric('Calls logged', activity.calls, 'crm/field-sales')}
+        ${metric('Events', activity.events, 'crm/events')}
+        ${metric('Partners', activity.partners, 'crm/partners')}
+      </div>
+    `;
+
+    // Filters update only their own charts — no full-page reload.
+    body.querySelectorAll('[data-dim]').forEach(b => b.addEventListener('click', () => { if (b.dataset.dim === dim) return; dim = b.dataset.dim; reloadDim(); }));
+    body.querySelectorAll('[data-grain]').forEach(b => b.addEventListener('click', () => { if (b.dataset.grain === grain) return; grain = b.dataset.grain; reloadSeries(); }));
+    body.querySelectorAll('[data-route]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.route)));
+
+    await drawTrend(sShape);
+    await drawDonut(byCat, totRev);
+    await drawPartners(tShape);
+    await drawUap(tShape);
+    await drawDim(bucketRows);
+  }
+
+  paintControls();
+  await load();
+}
