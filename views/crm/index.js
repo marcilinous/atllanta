@@ -66,6 +66,12 @@ export default async function crmHub(container) {
       icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
       route: 'crm/exports',
     },
+    {
+      title: 'Report import',
+      desc: 'Upload Tally activation/sales CSVs — de-duplicated, with type & date export',
+      icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 15V3',
+      route: 'crm/reports',
+    },
   ];
 
   const soon = [];
