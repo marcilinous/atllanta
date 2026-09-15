@@ -414,7 +414,10 @@ SQL of everything it applied) and are now the repo's history, verified
 byte-for-byte against `md5(statements)` computed in the database.
 
 **The rule this establishes: `supabase/migrations/` must stay byte-identical to
-what the database recorded.** Practically:
+what the database recorded, plus clearly-marked reconstruction migrations for
+objects that were created outside the migration system.** Every reconstruction
+file says so in a header comment; there is currently exactly one
+(`20260803090049_crm_telecaller_names.sql`). Practically:
 
 - Apply DDL with the Supabase `apply_migration` tool, then save the file under
   the exact version it recorded — check `schema_migrations` rather than guessing
@@ -432,9 +435,33 @@ Fixed in `20260915163455_restore_posts_rls_policies.sql`. `audit_logs` and
 `events` still have no INSERT policy; that is deliberate — both are written by
 service-role and `SECURITY DEFINER` paths that bypass RLS.
 
-Still unverified: replaying the exported history onto a fresh database and
-diffing it against production. Until that is done, "replayable" is an argument,
-not evidence.
+**Verified by replay.** The history was replayed onto an empty database (a
+throwaway local Supabase stack, since branching needs the Pro plan) and the
+resulting schema compared against production's catalogue.
+
+The raw export did **not** replay. It failed at `20260811153118_security_hardening`
+with `function public.crm_telecaller_names() does not exist` — that function was
+created in production outside the migration system, so nothing in the recorded
+history creates it. This is why the reconstruction-migration exception above
+exists. With `20260803090049_crm_telecaller_names.sql` in place, all 107
+migrations apply cleanly to an empty database.
+
+The structural diff against production then showed **0 objects that production
+has and the replay does not build**. It builds two that production no longer
+has, both created by migrations and dropped by none, so production removed them
+by hand:
+
+- `zzz_crm_accounts_backup` — the safety copy taken during the accounts merge;
+  deliberate cleanup.
+- `analytics_run_as` — created by `20260905134934_analytics_alerts`. **Worth a
+  look**: production is missing a function its own migration creates, and the
+  name suggests it may have been removed on purpose for security. Decide whether
+  the migration should still create it.
+
+Scope of that check: it compares objects by name — tables, columns, indexes,
+policies, functions, views, matviews. A function whose *body* drifted from its
+migration would pass it, and grants/privileges are not compared. A clean diff is
+strong evidence, not proof of identical behaviour.
 
 ---
 
