@@ -1,0 +1,1 @@
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'hiring_manager_id') THEN ALTER TABLE jobs ADD COLUMN hiring_manager_id UUID; END IF; END $$; CREATE INDEX IF NOT EXISTS idx_jobs_hiring_manager ON jobs(hiring_manager_id);

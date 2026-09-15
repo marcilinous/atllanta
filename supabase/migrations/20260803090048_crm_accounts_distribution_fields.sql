@@ -1,0 +1,10 @@
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS external_id TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS tier TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS partner_status TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS region TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS district TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS hub TEXT;
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS telecaller TEXT;
+CREATE INDEX IF NOT EXISTS idx_crm_accounts_state ON crm_accounts(org_id, state);
+CREATE INDEX IF NOT EXISTS idx_crm_accounts_region ON crm_accounts(org_id, region);
