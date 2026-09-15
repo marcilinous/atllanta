@@ -336,8 +336,10 @@ input, table, modal, toast, card, badge, empty-state, skeleton). Accent
 
 ## 13. Alignment Status (code vs. this document)
 
-This file is the target. The code is being brought onto it in phases (full detail
-in the approved plan `enchanted-sleeping-lemon.md`):
+This file is the target. The code is being brought onto it in phases. (An
+earlier version pointed at an approved plan `enchanted-sleeping-lemon.md` for
+full detail; that file is not in the repo or anywhere on the working machine, so
+this section is the status record.)
 
 - **Phase 0 (this file)** — canonical definition + requirements. ✅
 - **Phase 1** — unify tenancy: recruitment tables migrated `client_id → org_id`;
@@ -356,7 +358,9 @@ in the approved plan `enchanted-sleeping-lemon.md`):
   branch `claude/gstack-skill-install-chnb41` (the RTcompu distribution model),
   now the source of truth; an earlier parallel line (`rtcompu-crm-work`, PR #95)
   was retired into it. The live DB carries
-  `crm_accounts/contacts/leads/opportunities/pipeline_stages/activities`, a
+  `crm_contacts/leads/opportunities/pipeline_stages/activities` plus
+  `crm_partner_details` (`crm_accounts` is now a backward-compatibility **view**
+  over it, not a table — the accounts→partner-details merge landed), a
   field-sales layer (`crm_visits/calls`, `crm_pjp_*` journey plans,
   `crm_report_imports/rows`) and `crm_*` RPCs incl. materialized views
   (`crm_sales_facts`, `crm_field_facts`). `views/crm/` is built:
@@ -372,16 +376,67 @@ in the approved plan `enchanted-sleeping-lemon.md`):
   - **Sales tab** (`views/crm/sales.js`): in-card filters update independently —
     the grain toggle redraws only the time-series charts, the dimension toggle
     only the ranking chart; the Range presets are the one global refilter.
-  - **Migration gap** (pre-existing): this branch's migrations *read*
-    `crm_report_imports`/`crm_report_rows` (and materialize from them) but never
-    *create* them — they exist only in the shared DB. Add a create-table
-    migration early in the history when reconciling.
+  - **Migration gap — resolved, and the original diagnosis was wrong.** This
+    previously read: the branch's migrations reference
+    `crm_report_imports`/`crm_report_rows` but never create them, so add a
+    create-table migration early in the history. Do **not** do that — it would
+    add a duplicate definition. Nothing was missing from the real history;
+    both tables are created in applied migration `20260803114500`. The actual
+    problem was that the repo's migrations were not the migrations that built
+    the database. See "Migration history" below.
   - **Post-import refresh**: `crm_sales_facts` needs `crm_refresh_sales_facts()`
     (service-role) to reflect newly imported rows in Sales analytics; not called
     from the anon UI. Follow-up: an admin/edge refresh trigger.
   - Schema diverges from §6.4's proposal (opportunities vs deals; PJP/visits/
     report-imports not in the doc). Reconcile §6.4 with the real schema.
 - **Phase 5** — build Analytics as a real module (retire `views/reports/*`).
+  Not started in the UI, but the backend is partly there already: the live DB
+  has `analytics_dashboards`, `analytics_questions` and `analytics_alerts`
+  (applied migrations `20260905072504` and `20260905134934`). Check what those
+  tables already support before designing the module.
+
+### Migration history
+
+`supabase/migrations/` and the live database used to hold two unrelated
+lineages. The repo carried 41 hand-authored files stamped with synthetic round
+timestamps (`20260723000000`); the database recorded 105 applied migrations
+stamped with real clock times (`20260730193855`). Exactly one version appeared
+in both. The repo's history therefore could not rebuild the database — 23 of 55
+live tables had no create-table statement anywhere in it, including the whole
+CRM core. The likely cause (inferred from the timestamp shapes, not proven) is
+that migrations were applied through the Supabase `apply_migration` tool, which
+stamps its own timestamps, while `.sql` files were written into the repo
+separately and never reconciled.
+
+Resolved on branch `claude/migrations-from-db`: all applied migrations were
+exported from `supabase_migrations.schema_migrations` (where Supabase stores the
+SQL of everything it applied) and are now the repo's history, verified
+byte-for-byte against `md5(statements)` computed in the database.
+
+**The rule this establishes: `supabase/migrations/` must stay byte-identical to
+what the database recorded.** Practically:
+
+- Apply DDL with the Supabase `apply_migration` tool, then save the file under
+  the exact version it recorded — check `schema_migrations` rather than guessing
+  a timestamp, because the tool picks its own.
+- Keep the applied SQL and the file identical. Either apply the SQL with its
+  comments included, or keep files comment-free and put the rationale in the
+  commit message. A commented file applied in uncommented form is drift.
+- Never hand-author a migration file with an invented timestamp. That is exactly
+  what produced the split lineage.
+
+Triage of the 41 superseded files against the live schema found 38 already
+landed. The one genuine gap was the noticeboard: `posts` had RLS enabled with
+only a `DELETE` policy, so `views/dashboard.js` could neither read nor write it.
+Fixed in `20260915163455_restore_posts_rls_policies.sql`. `audit_logs` and
+`events` still have no INSERT policy; that is deliberate — both are written by
+service-role and `SECURITY DEFINER` paths that bypass RLS.
+
+Still unverified: replaying the exported history onto a fresh database and
+diffing it against production. Until that is done, "replayable" is an argument,
+not evidence.
+
+---
 
 Tenancy is unified: `org_id` is the only tenant key. Do not reintroduce
 `client_id`/`memberships`; new work targets `org_id`.
