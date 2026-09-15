@@ -325,3 +325,55 @@ Feature keys for the gen-2 routes (`partners`, `field-sales`, `prospects`,
 `events`, `exports`, `log-visit`) must be added to `CRM_SUB`, `PARTNER_FEATURES`
 and `FEATURES`, or the screens will not appear in the sidebar or pass the route
 gate. After that: push, preview, and the two-pass verification in §6.
+
+---
+
+## 10. Decisions 1 and 3 resolved — keep main's leads and opportunities
+
+Owner: *"keep main's leads and opportunities, they're generic"*. No file change
+was needed; those were never replaced. Recording the consequences so they are
+not rediscovered as bugs.
+
+**The gen-2 opportunity engine is not ported.** The CRM line's
+`opportunities.js` is built on the `crm_partner_opportunity` RPC (UAP,
+transacting win-back, and a two-period comparison playground). RTcompu keeps the
+gen-1 opportunities screen instead — `crm/opps`, backed by
+`opportunities-coverage.js` — which is what it uses in production today.
+
+The supporting database objects **are** present, because the migration port
+brought the whole verified history: `crm_partner_opportunity`,
+`crm_opportunity_features_mv` and the opportunity-engine RPCs all exist but have
+no UI on this branch. They are inert, not broken. If the RTcompu opportunity
+workspace is wanted later it can be added at its own route — `crm/opportunities`
+stays generic and `crm/opps` is taken by the coverage screen, so it needs a new
+one, e.g. `crm/partner-opportunities`.
+
+**One known degradation.** `views/crm/partner-detail.js` has a "Collect lead"
+button linking to `#/crm/leads?partner=<id>`. `main`'s generic `leads.js` does
+not read a `partner` query parameter (the CRM line's did, via a partner lookup
+in the lead form). The button still navigates and the leads screen still works;
+the partner is simply not pre-filled. Fixable later with a small addition to
+`leads.js` if it matters.
+
+## 11. Status
+
+Integration is functionally complete for the CRM itself:
+
+| Decision | Outcome |
+|---|---|
+| Vercel function limit | Resolved — `extract-candidate` dropped, already folded into `parse-resume` on main |
+| Migrations | Verified 107 ported, replacing main's 57 |
+| Gen-2 partner screens | 11 added, plus `js/csv.js`; 7 routes registered; feature keys gated |
+| `pjp.js` | Gen-2 taken (month locks + adherence); `to-visit.js` retired with it |
+| `sales.js`, `reports.js` | Gen-2 taken (partner-gated) |
+| `visits.js` | Kept — generic `account-detail.js` and the coverage screen link to it |
+| `telecalling*`, `coverage`, `targets` | Kept, per owner |
+| CRM hub | Merged; RTcompu sees 12 partner cards, non-partner orgs unchanged |
+| `leads.js`, `opportunities.js` | Kept as main's (generic) |
+
+**Still open:** which `CLAUDE.md` is canonical (§8 q2).
+
+**Not yet done:** the two-pass manual verification on the Vercel preview (§6),
+which is the gate before opening a PR into `main`. The non-partner pass matters
+most — every change here was made with RTcompu in mind, so a regression to the
+generic CRM is the likeliest thing to have slipped through.
