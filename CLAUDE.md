@@ -1,23 +1,524 @@
-# CLAUDE.md — Atllanta (Lean Session Memory)
+# CLAUDE.md — Atllanta Foundation & Requirements
 
-> Kept deliberately short so it costs few tokens per session. The exhaustive blueprint (full schema, design tokens, event recipes, phase-by-phase plan) lives in **`docs/HANDOVER.md`** — read it only when you need that depth. **When docs and repo disagree, the repo wins.**
+> **What this file is:** The single source of truth for what Atllanta is, how it
+> is structured, and what it must do. Read it completely before writing any code.
+> Every architectural decision, tenancy rule, module boundary, naming convention,
+> and requirement is here. When in doubt, this file wins.
+>
+> **Status:** This document describes the **canonical target**. Part of the code
+> still runs on an older agency/`client_id` model and is being migrated onto this
+> base (see §13, Alignment Status). Where code and this file disagree, this file
+> is the direction; the code is the debt.
 
 ---
 
-## 1. What Atllanta Is
+## 1. What Is Atllanta
 
-A **Business Operating System** — one platform connecting people, customers, work, and operations under shared identity, AI, search, workflows, and design. It began as a CV-to-JD matching + interview scheduling tool (Groq LLM) and is expanding into a full Business OS, with recruitment as the core differentiator under the **People** app.
+Atllanta is a **single-tenant-per-company Business Operating System** — one product
+that connects people, customers, work, and operations under one identity, one
+permission model, one design system, and one AI assistant.
 
-Pitch: *Companies come for the AI hiring tool, stay for the employee management platform.*
+**One company = one `organization`.** Every user belongs to exactly one org and
+holds exactly one role. Every business-data table carries `org_id` and is isolated
+by a single Postgres row-level-security pattern.
 
-## 2. Current State (update this section as work lands)
+Atllanta is composed of **four business modules** on **one shared Platform layer**:
 
-Well past Phase 0. Substantially built out beyond the original recruitment-only scope:
+1. **HRMS / People** — employee lifecycle: directory, attendance, leave, assets,
+   expenses, helpdesk, announcements, documents.
+2. **Recruitment & Interview Automation** — CV↔JD matching (Groq), candidate
+   pipeline, and automated interview scheduling (Google Meet).
+3. **CRM** — customers, contacts, leads, and a configurable sales pipeline.
+4. **Analytics** — cross-module dashboards and reporting.
 
-- **`api/`** — 12 Vercel serverless functions (kept ≤12-function limit by consolidation): matching, resume/JD parsing, ai-query, bulk-import, create-org, google-auth, schedule, reports, send-notification, event-processor, extract-candidate, screen-job.
-- **`supabase/migrations/`** — ~49 migrations = the real schema (foundation multi-tenant, interview scheduling, Google OAuth/invitations, business-OS platform, expense tracking, helpdesk, asset tracking, announcements, **+ the whole CRM/partner-sales vertical**).
-- **`views/`** — recruitment, employees, attendance, leave, finance, helpdesk, announcements, documents, people (assets/letters/lifecycle), audit, ai, admin, settings, onboarding, reports, **`views/analytics/` (Metabase-style self-serve BI)**, **plus `views/crm/` (24 files)**.
-- **Infra** — Vercel + Supabase wired (project `nburswxjpukntgdwuyme` = `atllanta`); PWA (`manifest.json`, `sw.js`); Playwright tests in `tests/`. Live-app changes verified against the real Supabase project, additive migrations applied there directly.
+**One-line pitch:** Companies come for the AI hiring tool, stay for the operating
+system that runs the rest of the company.
+
+**Build history to know:** Atllanta began as an agency recruitment SaaS
+(`organizations → clients → jobs`) and later grew an HR/People layer scoped by
+`org_id`. That left two tenancy models fused together. The canonical model below
+(single `org_id`, no agency tier) is the resolution. Do not add new code on the
+old `client_id`/`memberships` model.
+
+---
+
+## 2. Stack
+
+| Layer | Tool | Non-negotiable |
+|-------|------|----------------|
+| Database | **Supabase (PostgreSQL 15+)** | ✅ |
+| Auth | **Supabase Auth** | ✅ |
+| Storage | **Supabase Storage** | ✅ |
+| Hosting | **Vercel** | ✅ |
+| Frontend | **Vanilla JS + HTML + CSS** (no framework) | ✅ |
+| AI / LLM | **Groq (LLaMA)** — already integrated | ✅ |
+| Email | **Resend** | ✅ |
+| Vector search | pgvector (Supabase) | Later |
+| WhatsApp / Maps | BSP / Google Maps | Later |
+
+**Hard rules:**
+- Zero monthly cost during build/pilot — free tiers only.
+- No React, Next.js, TypeScript, or Tailwind unless the owner explicitly asks.
+- No npm packages for what vanilla JS covers.
+- Supabase client (`@supabase/supabase-js`) via CDN, not npm.
+- **`anon` key + RLS only. Never `service_role` in frontend or AI paths.** If the
+  user can't see it in the UI, the AI can't see it either.
+
+---
+
+## 3. Architecture — Modular Monolith
+
+One Supabase project. One Vercel deployment. Modules are separated by folder and
+schema boundaries, not services or repos.
+
+```
+Atllanta (single deployment)
+│
+├── Platform Layer (shared — every module uses these, no business logic)
+│     ├── Identity (auth, org, roles, permissions)
+│     ├── Tenancy + RLS (single org_id isolation)
+│     ├── Event bus (events table + processor)
+│     ├── Notifications (in-app, email via Resend)
+│     ├── Audit (append-only action log)
+│     ├── Files (Supabase Storage)
+│     ├── Global search
+│     └── AI Assistant (Groq, permission-aware)
+│
+├── Application Layer (four modules — each OWNS its data)
+│     ├── HRMS / People
+│     ├── Recruitment & Interview Automation
+│     ├── CRM
+│     └── Analytics (owns no business tables — reads via APIs/views)
+│
+└── Infrastructure: Supabase (Postgres + Auth + Storage + Edge Functions), Vercel
+```
+
+### Core rules (enforced, not aspirational)
+1. **Modules own their data.** A module never reads another module's tables
+   directly — it calls that module's API or reacts to its events.
+2. **No shared business logic.** Only shared *platform* services (auth, files,
+   notifications, audit, events, search, AI).
+3. **Every mutation publishes an event.** Format `module.entity.action`, e.g.
+   `people.employee.created`, `recruitment.candidate.shortlisted`,
+   `crm.deal.won`, `leave.request.approved`.
+4. **All data access goes through RLS.** No `service_role` key in frontend code.
+5. **Every endpoint checks permission** through the same layer as the UI. The AI
+   assistant is not an exception.
+
+---
+
+## 4. Multi-Tenancy (the base)
+
+**Model:** shared database, one org per company, row-level security per org.
+
+Every business table has `org_id uuid not null references organizations(id)`.
+A single security-definer helper resolves the caller's org, and every table gets
+the same four policies:
+
+```sql
+-- One helper, used by every policy
+create or replace function auth_org_id() returns uuid
+  language sql security definer stable
+  as $$ select org_id from users where id = auth.uid() $$;
+
+-- Standard policy set on EVERY org-scoped table
+alter table <t> enable row level security;
+create policy "org_select" on <t> for select using (org_id = auth_org_id());
+create policy "org_insert" on <t> for insert with check (org_id = auth_org_id());
+create policy "org_update" on <t> for update using (org_id = auth_org_id());
+create policy "org_delete" on <t> for delete using (org_id = auth_org_id());
+```
+
+**Canonical tenant key is `org_id`.** Not `organization_id`, not `client_id`.
+The agency tier (`clients`, `memberships`, `auth_accessible_client_ids()`,
+`org_type`) is being removed — see §13.
+
+**Critical test (must pass at all times):** create two orgs, insert data in both,
+and verify user A cannot read user B's data under *any* query path, on every table,
+under the `anon` key.
+
+---
+
+## 5. Roles & Permissions
+
+Four fixed roles on `users.role`:
+
+| Role | Scope |
+|------|-------|
+| `owner` | Full control of the org, billing, deletion. |
+| `admin` | Manage users, settings, all module data. |
+| `manager` | Approve/act within their team/department. |
+| `member` | Self-service: own attendance, leave, profile, assigned work. |
+
+No custom-permission UI. Role checks live in one place (`js/auth.js` + RLS), and
+the UI hides what a role cannot do (`data-role` on nav in `app.html`).
+
+---
+
+## 6. Canonical Data Model
+
+`org_id` on every business table. Names below are the target; where the live
+schema still differs (recruitment tables on `client_id`), §13 tracks the gap.
+
+### 6.1 Platform & Identity
+```
+organizations(id, name, slug, logo_url, timezone, currency, plan_tier,
+              payment_status, created_at, updated_at)
+users(id → auth.users, org_id, full_name, email, phone, avatar_url,
+      role owner|admin|manager|member, designation, department_id, team_id,
+      reporting_manager_id, status, date_of_joining)
+departments(id, org_id, name, head_id)
+teams(id, org_id, department_id, name, lead_id)
+invitations(id, org_id, email, role, token, status, expires_at)
+audit_logs(id, org_id, user_id, module, entity_type, entity_id, action,
+           old_values jsonb, new_values jsonb, created_at)   -- append only
+events(id, org_id, event_type, actor_id, payload jsonb, status, attempts,
+       created_at, processed_at)
+notifications(id, org_id, user_id, title, body, module, entity_type, entity_id,
+              channel, status, sent_at)
+files(id, org_id, uploaded_by, file_name, file_path, file_size, mime_type,
+      entity_type, entity_id, created_at)
+```
+
+### 6.2 HRMS / People
+```
+attendance, attendance_regularizations, work_schedules, holidays,
+leave_types, leave_balances, leave_requests,
+assets, asset_assignments, expenses, expense_categories,
+helpdesk_categories, helpdesk_category_handlers, helpdesk_tickets,
+announcements, posts
+```
+
+### 6.3 Recruitment & Interview Automation
+```
+jobs, candidates, applications (match_score, match_summary, stage),
+interviews, interview_slots
+```
+(These tables exist; they migrate `client_id → org_id` in Phase 1.)
+
+### 6.4 CRM (to build)
+```
+crm_accounts(id, org_id, name, industry, website, owner_id, created_at)
+crm_contacts(id, org_id, account_id, full_name, email, phone, title)
+crm_leads(id, org_id, full_name, company, email, phone, source, status, owner_id)
+crm_pipelines(id, org_id, name, stages jsonb)     -- configurable stages
+crm_deals(id, org_id, account_id, pipeline_id, title, value, currency, stage,
+          owner_id, expected_close, status open|won|lost, created_at)
+crm_activities(id, org_id, entity_type, entity_id, type note|call|task|email,
+               body, due_at, done, actor_id, created_at)
+```
+
+### 6.5 Analytics
+Owns no business tables. Reads through each module's API or dedicated SQL views
+(`analytics_*` views / materialized views), never by selecting another module's
+tables directly.
+
+### 6.6 Indexes & FTS
+Every `org_id` gets an index. Keep the existing FTS columns on `users`,
+`candidates`, `jobs` (generated `tsvector` + GIN). Add module-local indexes on
+hot filter columns (status, dates, owner).
+
+---
+
+## 7. Module Boundaries & Event Contracts
+
+Cross-module needs are met by **events** or a **module API**, never a foreign
+table read.
+
+| Event | → Reactions |
+|-------|-------------|
+| `people.employee.created` | Create leave balances for the year → notify manager + HR |
+| `leave.request.created` | Notify manager; if > 3 days also HR |
+| `leave.request.approved` | Update balance + attendance → notify employee |
+| `recruitment.candidate.shortlisted` | Notify hiring manager → create interview task |
+| `attendance.checkin.completed` | If late, mark late → notify manager on 3rd late/month |
+| `crm.lead.converted` | Create account + deal → notify owner |
+| `crm.deal.won` | Notify owner + manager → (optional) analytics refresh |
+
+The processor is `js/event-processor.js` (client trigger) / `api/event-processor.js`
+(serverless drain). Publish with `js/events.js` `publishEvent(type, payload)`.
+
+---
+
+## 8. Requirements
+
+### 8.1 Non-functional (platform — apply to every module)
+- **Tenant isolation:** the two-org test (§4) passes on every table, always.
+- **Auth:** email/password + Google OAuth (both wired in `login.html`). **Add the
+  missing password-reset flow** — `resetPasswordForEmail` on `login.html` and a
+  `PASSWORD_RECOVERY` handler in `js/auth.js` (currently only `SIGNED_OUT` is
+  handled at `js/auth.js:55`).
+- **Security:** `anon` + RLS only; no `service_role` client-side or in AI paths;
+  every user-rendered string passes `esc()` (`js/ui.js`).
+- **Events:** every mutation publishes `module.entity.action`.
+- **Design system:** views compose `css/tokens.css` + `css/components.css`
+  classes. Do not add token-laced inline `style=""` strings (there are ~1,700 to
+  unwind). One icon system: inline SVG. No emoji as UI icons.
+- **Reuse ladder:** before new code, reuse a `js/ui.js` helper, then stdlib, then
+  a platform service. `js/ui.js` already exports `esc, toast, openModal, closeModal,
+  formatDate, timeAgo, initials, avColor, scoreBar, stagePill, showError,
+  loadingSkeleton, getAuthToken`.
+
+### 8.2 Functional — per module
+- **HRMS / People:** directory + profile + org chart; attendance check-in/out +
+  regularization; leave apply/approve + balances + calendar + holidays; assets;
+  expenses; helpdesk tickets; announcements; document store; lifecycle & letters.
+- **Recruitment & Interview Automation:** create job/JD → Groq skill parse; upload
+  resumes (single + bulk) → parse; match → ranked scores + breakdown; shortlist/
+  reject pipeline; schedule interviews with slots + Google Meet; candidate profile
+  with scores + interview history.
+- **CRM:** accounts; contacts; leads with source/status; deals on a configurable
+  pipeline; activity/note/task timeline; convert lead → account+deal; owner
+  assignment. All `org_id`-scoped + RLS + events.
+- **Analytics:** per-module KPI dashboards; date-range + department filters;
+  export; reads via module APIs / `analytics_*` views only. Replaces the ad-hoc
+  `views/reports/*` screens.
+
+---
+
+## 9. File Structure (actual)
+
+```
+app.html              the signed-in SPA shell (routes registered here)
+index.html            marketing landing      login.html  reset-password.html
+404.html  schedule.html  privacy.html  terms.html
+css/    tokens.css  base.css  layout.css  components.css
+js/     supabase.js auth.js  router.js  events.js  event-processor.js
+        notifications.js  search.js  audit.js  ai.js  ui.js  config.js
+        features.js   per-org + per-role gating (READ §16 before CRM work)
+        csv.js        CSV helpers for the partner-CRM exports
+        outbox.js  outbox-handlers.js   offline write queue
+        image.js
+        analytics/    models.js compiler.js engine.js nl.js charts.js duck.js
+views/  dashboard.js  me/  inbox.js  approvals.js  onboarding.js
+        employees/  attendance/  leave/  people/  documents/  finance/
+        helpdesk/  announcements/  audit/  hr/       (HRMS/People)
+        recruitment/                                 (Recruitment & Interviews)
+        crm/                                         (BOTH CRMs — see §16)
+        analytics/                                   (self-serve BI, §15)
+        reports/                                     (→ folds into Analytics)
+        sales/  ai/  settings/  admin/
+api/    12 functions — at the Vercel Hobby cap, do not add a 13th
+        parse-resume.js  match.js  screen-job.js  ai-query.js
+        schedule.js  google-auth.js  bulk-import.js  reports.js
+        create-org.js  send-notification.js  event-processor.js  lead.js
+        (candidate extraction is parse-resume.js?action=extract-candidate)
+lib/    supabaseServer.js  googleMeet.js  email.js  ratelimit.js
+        provisionMember.js  langfuse.js
+mobile/                                     supabase/functions/api-gateway/
+supabase/migrations/*.sql   supabase/seed.sql
+docs/   HANDOVER.md  architecture.html  analytics-setup.md  superpowers/specs/
+```
+
+New modules add a `views/<module>/` folder, a migration, and (if needed) `api/`
+endpoints — never a new tenancy model.
+
+---
+
+## 10. Design System
+
+Tokens in `css/tokens.css` (colors, spacing 4px base, typography, radius, shadow,
+dark mode via `[data-theme="dark"]`). Components in `css/components.css` (button,
+input, table, modal, toast, card, badge, empty-state, skeleton). Accent
+`--color-accent: #2563EB`. **Compose classes; don't inline token strings.**
+
+---
+
+## 11. AI Integration (Groq)
+
+- **CV↔JD matching** (built): resume/JD → Groq structured parse → score +
+  breakdown stored on `applications`. Keep prompts that work; restructure only
+  surrounding code.
+- **AI Assistant** (permission-aware): natural-language query → Groq intent JSON
+  → executed through the **same `anon`+RLS Supabase client** as the UI. Mutations
+  require a confirmation dialog. Never `service_role`.
+
+---
+
+## 12. Conventions
+
+- Tables/columns `snake_case`; JS files `kebab-case`; JS functions `camelCase`;
+  CSS classes `kebab-case`; events `module.entity.action`.
+- `const` by default, `let` when reassigned, never `var`; `async/await`; early
+  returns; every Supabase call checks `error`.
+- Git: branch `feature/…`|`fix/…`|`chore/…`; commits imperative and short.
+
+---
+
+## 13. Alignment Status (code vs. this document)
+
+This file is the target. The code is being brought onto it in phases. (An
+earlier version pointed at an approved plan `enchanted-sleeping-lemon.md` for
+full detail; that file is not in the repo or anywhere on the working machine, so
+this section is the status record.)
+
+- **Phase 0 (this file)** — canonical definition + requirements. ✅
+- **Phase 1** — unify tenancy: recruitment tables migrated `client_id → org_id`;
+  `memberships` folded into `users`; `clients` dropped;
+  `auth_accessible_client_ids()` removed; the `roleMap` shim deleted;
+  `invitations` canonicalized to `org_id`. ✅ Credits/`credit_ledger` kept
+  (org-scoped). Org resolution consolidated: `auth_org_id()` is the single
+  source of truth and `auth_user_org_ids()` now delegates to it. ✅
+- **Phase 2** — password-reset flow added (`login.html` + `PASSWORD_RECOVERY`
+  in `js/auth.js`). ✅ Module-boundary enforcement is folded into Phases 4/5
+  (the two remaining direct cross-module reads — the AI assistant's RLS-scoped
+  queries per §11, and `views/reports/*` — resolve as Analytics is built).
+- **Phase 3** — design-system cleanup: reference palette + per-module accents,
+  SVG icons (no emoji), festival banner revised, inline-style unwind. ✅
+- **Phase 4** — CRM: **built, front + back.** 🟡 The canonical CRM line lives on
+  branch `claude/gstack-skill-install-chnb41` (the RTcompu distribution model),
+  now the source of truth; an earlier parallel line (`rtcompu-crm-work`, PR #95)
+  was retired into it. The live DB carries
+  `crm_contacts/leads/opportunities/pipeline_stages/activities` plus
+  `crm_partner_details` (`crm_accounts` is now a backward-compatibility **view**
+  over it, not a table — the accounts→partner-details merge landed), a
+  field-sales layer (`crm_visits/calls`, `crm_pjp_*` journey plans,
+  `crm_report_imports/rows`) and `crm_*` RPCs incl. materialized views
+  (`crm_sales_facts`, `crm_field_facts`). `views/crm/` is built:
+  `index` (hub), `leads`, `sales`, `partners`/`partner-detail`, `events`,
+  `field-sales` (Distribution), `pjp`, `visit-form`, `prospects`,
+  `opportunities`, `exports`, and `reports` (report import). Notes:
+  - **Report import** (`views/crm/reports.js`): upload Tally activation/sales
+    CSV/XLSX → `crm_report_rows`, matched to partners by Site ID. Rows are
+    de-duplicated by whole-row content — a stored `content_hash`
+    (`md5(data::text)`) + the `crm_insert_report_rows` (security-invoker) RPC
+    skip rows already present, so re-uploading a file adds nothing. Export is a
+    single dialog: pick report type + optional date range.
+  - **Sales tab** (`views/crm/sales.js`): in-card filters update independently —
+    the grain toggle redraws only the time-series charts, the dimension toggle
+    only the ranking chart; the Range presets are the one global refilter.
+  - **Migration gap — resolved, and the original diagnosis was wrong.** This
+    previously read: the branch's migrations reference
+    `crm_report_imports`/`crm_report_rows` but never create them, so add a
+    create-table migration early in the history. Do **not** do that — it would
+    add a duplicate definition. Nothing was missing from the real history;
+    both tables are created in applied migration `20260803114500`. The actual
+    problem was that the repo's migrations were not the migrations that built
+    the database. See "Migration history" below.
+  - **Post-import refresh**: `crm_sales_facts` needs `crm_refresh_sales_facts()`
+    (service-role) to reflect newly imported rows in Sales analytics; not called
+    from the anon UI. Follow-up: an admin/edge refresh trigger.
+  - Schema diverges from §6.4's proposal (opportunities vs deals; PJP/visits/
+    report-imports not in the doc). Reconcile §6.4 with the real schema.
+- **Phase 5** — Analytics. **Already built on `main`**, not pending: a
+  Metabase-style self-serve BI module (`js/analytics/`, `views/analytics/`,
+  semantic layer → compiler → RLS-safe `analytics_run_sql`, ECharts, DuckDB-Wasm
+  panel, scheduled reports and alerts). See §15 for the detail. The remaining
+  work is retiring `views/reports/*` in favour of it, not building it.
+
+### Integration status (branch `claude/crm-into-main`)
+
+The RTcompu CRM was built on `claude/gstack-skill-install-chnb41` while `main`
+(production) gained analytics, email, outbox, rate limiting, mobile and the
+landing pages. The two diverged on 2026-07-23 and became different builds of the
+same product. They are being reconciled on `claude/crm-into-main` by porting the
+partner vertical onto `main` rather than merging the branches — most merge
+conflicts were in files `main` owns and the CRM line barely touched.
+
+Done there: the verified migration history replaces `main`'s hand-authored set;
+the gen-2 partner screens are added, routed and gated; PJP moved to the
+locks-and-adherence version; the CRM hub surfaces both CRMs. Not done: the
+two-pass verification on a preview deployment (as RTcompu, and as a non-partner
+org where the generic CRM must be unchanged) before any PR into `main`.
+
+**Read §16 before touching `views/crm/`.**
+
+### Migration history
+
+`supabase/migrations/` and the live database used to hold two unrelated
+lineages. The repo carried 41 hand-authored files stamped with synthetic round
+timestamps (`20260723000000`); the database recorded 105 applied migrations
+stamped with real clock times (`20260730193855`). Exactly one version appeared
+in both. The repo's history therefore could not rebuild the database — 23 of 55
+live tables had no create-table statement anywhere in it, including the whole
+CRM core. The likely cause (inferred from the timestamp shapes, not proven) is
+that migrations were applied through the Supabase `apply_migration` tool, which
+stamps its own timestamps, while `.sql` files were written into the repo
+separately and never reconciled.
+
+Resolved on branch `claude/migrations-from-db`: all applied migrations were
+exported from `supabase_migrations.schema_migrations` (where Supabase stores the
+SQL of everything it applied) and are now the repo's history, verified
+byte-for-byte against `md5(statements)` computed in the database.
+
+**The rule this establishes: `supabase/migrations/` must stay byte-identical to
+what the database recorded, plus clearly-marked reconstruction migrations for
+objects that were created outside the migration system.** Every reconstruction
+file says so in a header comment; there is currently exactly one
+(`20260803090049_crm_telecaller_names.sql`). Practically:
+
+- Apply DDL with the Supabase `apply_migration` tool, then save the file under
+  the exact version it recorded — check `schema_migrations` rather than guessing
+  a timestamp, because the tool picks its own.
+- Keep the applied SQL and the file identical. Either apply the SQL with its
+  comments included, or keep files comment-free and put the rationale in the
+  commit message. A commented file applied in uncommented form is drift.
+- Never hand-author a migration file with an invented timestamp. That is exactly
+  what produced the split lineage.
+
+Triage of the 41 superseded files against the live schema found 38 already
+landed. The one genuine gap was the noticeboard: `posts` had RLS enabled with
+only a `DELETE` policy, so `views/dashboard.js` could neither read nor write it.
+Fixed in `20260915163455_restore_posts_rls_policies.sql`. `audit_logs` and
+`events` still have no INSERT policy; that is deliberate — both are written by
+service-role and `SECURITY DEFINER` paths that bypass RLS.
+
+**Verified by replay.** The history was replayed onto an empty database (a
+throwaway local Supabase stack, since branching needs the Pro plan) and the
+resulting schema compared against production's catalogue.
+
+The raw export did **not** replay. It failed at `20260811153118_security_hardening`
+with `function public.crm_telecaller_names() does not exist` — that function was
+created in production outside the migration system, so nothing in the recorded
+history creates it. This is why the reconstruction-migration exception above
+exists. With `20260803090049_crm_telecaller_names.sql` in place, all 107
+migrations apply cleanly to an empty database.
+
+The structural diff against production then showed **0 objects that production
+has and the replay does not build**. It builds two that production no longer
+has, both created by migrations and dropped by none, so production removed them
+by hand:
+
+- `zzz_crm_accounts_backup` — the safety copy taken during the accounts merge;
+  deliberate cleanup.
+- `analytics_run_as` — created by `20260905134934_analytics_alerts`. **Worth a
+  look**: production is missing a function its own migration creates, and the
+  name suggests it may have been removed on purpose for security. Decide whether
+  the migration should still create it.
+
+Scope of that check: it compares objects by name — tables, columns, indexes,
+policies, functions, views, matviews. A function whose *body* drifted from its
+migration would pass it, and grants/privileges are not compared. A clean diff is
+strong evidence, not proof of identical behaviour.
+
+---
+
+Tenancy is unified: `org_id` is the only tenant key. Do not reintroduce
+`client_id`/`memberships`; new work targets `org_id`.
+
+---
+
+## 14. What NOT to Build
+
+| Item | Reason |
+|------|--------|
+| Agency/reseller multi-client tier | Explicitly collapsed to one-org-per-company. |
+| Payroll | Compliance minefield. Not until paying customers demand it. |
+| Visual workflow builder | Predefined event recipes only. |
+| Custom role-permission UI | Four fixed roles are enough. |
+| Native mobile app | PWA first. |
+| Microservices / Elasticsearch | Monolith + Postgres FTS until a named scaling trigger. |
+| React / Next.js migration | Stay vanilla JS unless the owner asks. |
+
+
+---
+
+## 15. Platform subsystems (detail)
+
+Carried over from the working notes that lived on `main`. These describe
+subsystems the canonical sections above summarise but do not detail, and they
+are the record for anyone touching security, analytics, webhooks or the API
+gateway.
 
 ### Security remediation (external audit — Phase 1)
 
@@ -37,6 +538,12 @@ External tools read/write via a revocable org key. The REST surface is Supabase 
 
 ### CRM / partner-sales vertical (tenant **RTcompu**, org `e8845b88-…`)
 
+> **Partly superseded.** This describes the first-generation partner
+> vertical. The distribution-model screens (partners, field sales,
+> prospects, events, exports) and a PJP with month locks and adherence
+> replaced parts of it; `visits.js`, telecalling and coverage remain. See
+> "Two CRMs, one product" below.
+
 A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from imported partner reports keyed on Site ID (`crm_report_*`), materialised into `crm_opportunity_features_mv` (per-partner facts: base size, billed rupees, last visit/activation, tier). All CRM reads go through `SECURITY DEFINER` RPCs that re-apply level scoping (own / reports / admin via `crm_report_ids()`, `crm_user_is_org_admin()`); MV/helpers revoked from `anon`. Key surfaces:
 
 - **PJP (`views/crm/pjp.js`)** — the one field-visit block ("Who to visit" is a tab/drill-down of it, not a separate menu card). Month calendar (route-map planner, **not** the attendance heatmap look), plan an area per day, **lock the month** (`crm_pjp_month_locks`, DB-enforced on day-plan write policies). Open a planned day → partner list; each row has a **Log visit** button → `crm/visits?account=…` (prefilled).
@@ -44,7 +551,7 @@ A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from i
 - **Visits** (`views/crm/visits.js`) — GPS + selfie + offline outbox; captures **Tally serial** (`tally_serial` / `tally_serial_status` ∈ shared/not_shared/no_licence).
 - **Pending:** partner-wise **pincode CSV** from Sachin → load into `crm_accounts.pincode` to sharpen peer benchmarks from city to pincode level (column exists, nullable).
 
-## 3. Source-of-Truth Files (read these, don't duplicate them here)
+### Source-of-truth files
 
 | Need | Look at |
 |------|---------|
@@ -57,31 +564,68 @@ A telecalling/field-sales CRM gated to enabled orgs (RTcompu). Data comes from i
 
 **Skills:** `archify` (`.claude/skills/archify` → `.agents/skills/archify`) generates interactive HTML diagrams (architecture/workflow/sequence/dataflow/lifecycle) from prose, Mermaid, or repo code — `node bin/archify.mjs validate|deliver <type> <spec.json> <out.html> --quality showcase`.
 
-## 4. Stack
+---
 
-- DB / Auth / Storage: **Supabase (Postgres 15+)**. Hosting: **Vercel**. AI: **Groq (LLaMA)**. Email: **Resend**.
-- **No language/framework lock-in** (Sachin, 2026-09: "no limitation on coding languages — use multiple if required; goal is a world-class Business OS"). React/Next/TypeScript/Tailwind, other backend languages (Python/Go/… as Vercel functions or build tools), npm packages, real charting/UI libs, and a build step are all fair game **where they earn their place**. The app today is vanilla JS + HTML + CSS loading the Supabase client via CDN.
-- **Adopt incrementally, don't rewrite what works.** New modules/features may use the best tool for the job; migrate existing vanilla views only when there's a concrete reason, not wholesale. Keep the app one deployable unit (see §5).
-- Still true: **zero monthly cost** during build/pilot (free tiers), and the **Vercel 12-function limit** (consolidate; prefer client + RPC over new functions).
-- The §5 architecture rules (modular monolith, RLS, multi-tenant, events) are **unchanged and still non-negotiable** — language freedom does not relax them.
+## 16. Two CRMs, one product
 
-## 5. Architecture Rules (non-negotiable)
+There are **two CRMs by design**, gated per organization. This is the single
+most misread thing in the codebase: `views/crm/` holds both, and the file names
+do not tell you which is which.
 
-1. **Modular monolith.** One Supabase project, one Vercel deploy. Modules separated by folders + schema boundaries, not services.
-2. **Modules own their data.** Cross-module access goes through APIs/events, never direct table reads.
-3. **Every mutation publishes an event** — `module.entity.action` (e.g. `recruitment.candidate.shortlisted`).
-4. **All data access goes through RLS.** Never put the `service_role` key in frontend or in the AI path — if the user can't see it in the UI, the AI can't either.
-5. **Multi-tenant:** every org-scoped table has `org_id`, isolated by RLS keyed on the authed user's `org_id`. Cross-tenant isolation must always hold.
-6. **Every Supabase call checks `error`:** `const { data, error } = await supabase...`.
-7. **Four productized modules — autonomous · integrated · integratable** (Sachin, 2026-09). The product is four modules: **HRMS** (people/attendance/leave/finance/helpdesk/docs), **CRM**, **Recruitment** (resume↔JD matching + interview automation), **Analytics**. Each must be: (a) **autonomous** — an org can enable only some (per-org toggles in `js/features.js`); a module must **degrade gracefully** when another is off, never hard-break (e.g. Analytics only offers models for enabled modules); (b) **integrated** when co-present — only via the event bus (`module.entity.action`) + shared identity/RLS, never direct cross-module table reads (rule 2/3); (c) **integratable with any external tool** — external tools read via REST/PostgREST (RLS) + **outbound webhooks** on the event bus and authenticate with **org-scoped API keys**; external systems sync **in** via connectors that map to the **canonical schema**, so internal modules always read one schema (an org can run Atllanta CRM *or* Salesforce and the other modules don't care).
+**The gates.** `organizations` carries two booleans:
 
-## 6. Conventions
+| Flag | Meaning | Live state |
+|---|---|---|
+| `crm_enabled` | the generic CRM | true for every org |
+| `partner_crm_enabled` | the RTcompu partner vertical | true for RTcompu only |
 
-- Tables: `snake_case` plural. Columns: `snake_case`. JS files: `kebab-case`. JS functions: `camelCase`. CSS classes: `kebab-case`. Events: `module.entity.action`.
-- `const` by default, `let` when needed, never `var`. `async/await` over `.then()`. Early returns over nesting.
-- Commits: imperative, short. Branches: `feature/…`, `fix/…`, `chore/…`.
-- **Product copy (Sachin, 2026-09):** don't explain the internal working/architecture to end users in the UI — no "runs in your browser / in-memory / RLS-scoped / compiled to SQL / on the daily job" style notes. Keep UI microcopy functional and outcome-focused; mechanics belong in code comments and docs, not on screen.
+`js/features.js` reads them via `setCrmEnabled()` / `setPartnerPack()` and splits
+the CRM surface into `GENERIC_CRM` and `PARTNER_FEATURES`. These are **platform
+gates: an org's own admins do not bypass them**, unlike per-role feature access.
 
-## 7. Do NOT Build (until named trigger)
+`isVisible()` precedence, in order: a `GENERIC_CRM` key is hidden when
+`crm_enabled` is false; a `PARTNER_FEATURES` key is hidden when
+`partner_crm_enabled` is false; anything else falls through to "unknown keys
+stay open". **That last rule is why a new partner screen must be added to
+`PARTNER_FEATURES`** — a key in neither set is visible to everyone.
 
-Payroll, visual workflow builder, custom-permissions UI (four fixed roles: owner/admin/manager/member), native mobile app (PWA first), microservices, Elasticsearch. Rationale in `docs/HANDOVER.md §15`. *(No longer deferred: framework choice — see §4. Multiple languages are fine **within the modular monolith**; splitting into separate services is still the deferred "microservices" item, a distinct architectural call.)*
+**Generic CRM** (`crm`, `crm_leads`, `crm_pipeline`, `crm_contacts`):
+`index.js`, `leads.js`, `lead-detail.js`, `lead-actions.js`, `opportunities.js`,
+`opportunity-detail.js`, `accounts.js`, `account-detail.js`, `contacts.js`,
+`contact-detail.js`, `activities.js`, `settings.js`, `common.js`.
+`leads.js` and `opportunities.js` are **generic** — the partner vertical does not
+own them, despite a partner-flavoured version existing on the old CRM branch.
+
+**Partner vertical, first generation** (still in use): `telecalling*.js`,
+`coverage.js`, `opportunities-coverage.js` (route `crm/opps`), `targets.js`,
+`visits.js` (route `crm/visits`).
+
+**Partner vertical, second generation** (the distribution model): `partners.js`,
+`partner-detail.js`, `partner-form.js`, `account-form.js`, `field-sales.js`
+(route `crm/field-sales`), `field-log.js`, `prospects.js`, `events.js`,
+`exports.js`, `visit-form.js` (route `crm/log-visit`), `activity-timeline.js`,
+plus the gen-2 `pjp.js`, `sales.js` and `reports.js`.
+
+`js/csv.js` exists for the gen-2 exports and is imported by five of them.
+
+**Things that will look like bugs and are not:**
+
+- **Two visit-logging paths.** The hub sends you to `crm/log-visit` (gen 2), but
+  `account-detail.js` and `opportunities-coverage.js` still link to `crm/visits`
+  (gen 1). Both work. `visits.js` was kept precisely because those two link to
+  it, one of them in the *generic* CRM.
+- **An opportunity engine with no UI.** `crm_partner_opportunity`,
+  `crm_opportunity_features_mv` and the opportunity-engine RPCs exist in the
+  schema but nothing calls them. The gen-2 opportunities screen was deliberately
+  not ported, because `opportunities.js` stays generic. If that workspace is
+  wanted, give it its own route — `crm/opportunities` is generic and `crm/opps`
+  is the coverage screen.
+- **"Collect lead" loses the partner.** `partner-detail.js` links to
+  `crm/leads?partner=<id>`; the generic `leads.js` does not read that parameter.
+  The button works, the partner is not pre-filled.
+- **`to-visit.js` is gone.** Superseded by the gen-2 PJP, which no longer imports
+  `inr` / `REASON_BY_KEY` from it.
+
+**Adding a partner screen:** register the route in `app.html`, map it in
+`CRM_SUB`, add the key to `PARTNER_FEATURES`, and add a card to `partnerCards` in
+`views/crm/index.js`. Skip the `PARTNER_FEATURES` step and every org sees it.
