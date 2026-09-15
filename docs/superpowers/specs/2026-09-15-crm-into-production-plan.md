@@ -10,8 +10,14 @@
 RTcompu CRM was built on `claude/gstack-skill-install-chnb41`. The goal is to get
 that CRM live **without losing what `main` has gained since the two lines split.**
 
-This is not "merge the CRM branch". The two lineages diverged on **2026-07-23**
-and became different builds of the same product:
+This is not "merge the CRM branch", and it is not "choose a CRM". **There are two
+CRMs by design** — a generic one for every org and a custom partner vertical for
+RTcompu — and `main` already gates them per-org (§4A). The CRM line is a newer
+generation of the *partner* vertical. The job is to upgrade that vertical in
+production without disturbing the generic CRM every other org uses.
+
+The two lineages diverged on **2026-07-23** and became different builds of the
+same product:
 
 | | `main` (production) | CRM line |
 |---|---|---|
@@ -76,43 +82,80 @@ consider them:
 
 ## 4. Work breakdown
 
-### A. CRM views — per-file decision, NOT a wholesale replace
+### A. CRM views — upgrading one of two CRMs, not choosing between them
 
-The two `views/crm/` folders are **not** a superset relationship. They overlap in
-only 6 files — exactly the six add/add conflicts. Replacing the folder wholesale
-would delete 18 files that are live in production today.
+**There are deliberately two CRMs, and `main` already implements the gating.**
+`organizations` carries two flags, live today:
 
-**Only in `main` (18):** `accounts.js`, `account-detail.js`, `contacts.js`,
-`contact-detail.js`, `activities.js`, `common.js`, `coverage.js`,
-`opportunities-coverage.js`, `opportunity-detail.js`, `lead-actions.js`,
-`lead-detail.js`, `settings.js`, `targets.js`, `telecalling.js`,
-`telecalling-common.js`, `telecalling-daily.js`, `to-visit.js`, `visits.js`
+| Org | `crm_enabled` | `partner_crm_enabled` |
+|---|---|---|
+| Atllanta Pvt Ltd, BlueHire, Hiretrack, Generic CRM Test Co | yes | no |
+| **RTcompu** | yes | **yes** |
 
-**Only in the CRM line (11):** `partners.js`, `partner-detail.js`,
-`partner-form.js`, `account-form.js`, `field-sales.js`, `field-log.js`,
-`prospects.js`, `events.js`, `exports.js`, `visit-form.js`,
-`activity-timeline.js`
+`js/features.js` on `main` reads them (`setCrmEnabled`, `setPartnerPack`) and
+splits the CRM surface in two:
 
-**In both (6, all add/add conflicts):** `index.js`, `leads.js`,
-`opportunities.js`, `pjp.js`, `reports.js`, `sales.js`
+```js
+const GENERIC_CRM     = new Set(['crm','crm_leads','crm_pipeline','crm_contacts']);
+const PARTNER_FEATURES = new Set(['crm_visits','crm_telecalling','crm_coverage',
+  'crm_sales','crm_targets','crm_opps','crm_reports','crm_to_visit','crm_pjp']);
+```
 
-So three decisions, not one:
+These are platform gates, explicitly **not** bypassed by an org's own admins.
 
-- **Add** the CRM line's 11 new files. Low risk; they are new to `main`.
-- **Resolve** the 6 shared files. `sales.js` (508 vs 183 lines) and `reports.js`
-  (502 vs 387) are CRM-line dominant and should take the RTcompu version;
-  `index.js` is the hub and needs a real merge, since it routes to files from
-  both sets.
-- **Decide, file by file,** what happens to `main`'s 18. Some are the generic-CRM
-  blocks the RTcompu line deliberately retired (`accounts`, `contacts`,
-  `activities`, and their detail views). Others — `telecalling*`, `visits`,
-  `to-visit`, `coverage`, `targets` — look like real features currently live in
-  production, and at least one (`to-visit`) appears superseded by the RTcompu PJP
-  work (there is a `claude/merge-tovisit-into-pjp` branch). **Nothing here gets
-  deleted without the owner confirming it is superseded** (see §8).
+That reframes the whole job. `main`'s "CRM-only" files are not generic leftovers:
+`telecalling*`, `visits`, `to-visit`, `coverage`, `targets` **are the RTcompu
+partner vertical** — an earlier generation of it, already gated. The CRM line is a
+**later generation of the same vertical**, built without gating because that
+branch only ever served RTcompu.
+
+So the work is **upgrading the partner vertical from generation 1 to generation 2,
+leaving the generic CRM and the gating machinery untouched.** Nothing about the
+generic CRM changes, and no org other than RTcompu should see any difference.
+
+Grouping the files accordingly:
+
+- **Generic CRM — do not touch (main, 10):** `accounts.js`, `account-detail.js`,
+  `contacts.js`, `contact-detail.js`, `activities.js`, `lead-actions.js`,
+  `lead-detail.js`, `opportunity-detail.js`, `settings.js`, `common.js`
+- **Partner vertical, gen 1 (main, 8):** `visits.js`, `telecalling.js`,
+  `telecalling-common.js`, `telecalling-daily.js`, `to-visit.js`, `coverage.js`,
+  `opportunities-coverage.js`, `targets.js`
+- **Partner vertical, gen 2 (CRM line, 11 — to add):** `partners.js`,
+  `partner-detail.js`, `partner-form.js`, `account-form.js`, `field-sales.js`,
+  `field-log.js`, `prospects.js`, `events.js`, `exports.js`, `visit-form.js`,
+  `activity-timeline.js`
+- **In both (6, the add/add conflicts):** `index.js`, `leads.js`,
+  `opportunities.js`, `pjp.js`, `reports.js`, `sales.js`
+
+Note the 6 shared files straddle the divide: on `main` `leads.js` and
+`opportunities.js` serve the **generic** CRM (`crm_leads`, `crm_pipeline`), while
+on the CRM line they are RTcompu screens. These cannot be taken wholesale from
+either side — each needs reading. `index.js` is the hub and must route both CRMs.
+
+### A2. Feature keys to add
+
+The gen-2 hub exposes routes `main` has no feature key for: `partners`,
+`field-sales`, `prospects`, `events`, `exports`, `log-visit`. Each needs an entry
+in `CRM_SUB` and membership in `PARTNER_FEATURES`, plus a label in `FEATURES`, or
+it will not appear in the sidebar or pass the route gate. Retired gen-1 keys come
+out of both sets at the same time.
+
+Concretely:
+
+- **Add** the CRM line's 11 gen-2 files. Low risk; they are new to `main`.
+- **Resolve** the 6 shared files individually. `sales.js` (508 vs 183 lines) and
+  `reports.js` (502 vs 387) are CRM-line dominant. `leads.js` and
+  `opportunities.js` serve different CRMs on the two sides and need the most care.
+- **Retire only gen-1 partner files that gen 2 actually replaces** — at most those
+  8, never the 10 generic ones. `to-visit.js` looks superseded by the PJP work
+  (there is a `claude/merge-tovisit-into-pjp` branch), and `visits.js` by
+  `visit-form.js`/`field-log.js`. `telecalling*`, `coverage` and `targets` have no
+  obvious gen-2 counterpart and should be assumed **kept** until the owner says
+  otherwise (see §8).
 
 Before removing any file, grep `main` for importers — `js/router.js`,
-`index.html` and the nav are the likely referrers.
+`index.html`, the nav and `js/features.js` are the likely referrers.
 
 ### B. Shared files — keep main's version
 
@@ -163,10 +206,17 @@ The existing safety net is thin: two Playwright specs (`tests/app-shell.spec.js`
 - **Build**: the preview deployment must succeed — this is what catches the
   function-limit breach.
 - **Playwright**: both specs pass against the preview.
-- **Manual smoke on the preview**, since these paths have no automated cover:
-  CRM hub, leads, sales, partners, field-sales, PJP, visit form, report import;
-  plus the things `main` owns and must not regress — analytics, login/auth,
-  recruitment, employees, settings.
+- **Manual smoke on the preview**, since these paths have no automated cover.
+  Two passes, because there are two CRMs:
+  - **As RTcompu** (`partner_crm_enabled = true`): CRM hub, partners, sales,
+    field-sales, PJP, visit form, prospects, events, exports, report import.
+  - **As a non-partner org** (e.g. "Generic CRM Test Co", which exists for this):
+    the generic CRM must look and behave exactly as it does today, and none of
+    the partner screens may appear in the sidebar or open by direct URL. This is
+    the regression most likely to slip through, since all our attention is on
+    the RTcompu side.
+  - Plus what `main` owns and must not regress: analytics, login/auth,
+    recruitment, employees, settings.
 
 ## 7. Risks and rollback
 
@@ -190,12 +240,12 @@ The existing safety net is thin: two Playwright specs (`tests/app-shell.spec.js`
    line's is a 400-line canonical spec with the §13 migration history. They cannot
    both be the source of truth. Recommendation: keep the CRM line's as the
    canonical document and fold `main`'s current-state notes into it.
-3. **`main`'s 18 CRM-only files** — the biggest open question, because these are
-   live in production. Which are superseded by RTcompu and safe to retire, and
-   which must stay? Specifically: are `telecalling*.js`, `visits.js`,
-   `to-visit.js`, `coverage.js` and `targets.js` still in use, or did the RTcompu
-   field-sales/PJP work replace them? The generic-CRM set (`accounts`,
-   `contacts`, `activities` and their detail views) looks retired, but that should
-   be confirmed rather than assumed.
+3. **Which gen-1 partner screens does gen 2 replace?** Now scoped to 8 files, not
+   18, because the generic CRM is settled and stays. Best guesses to confirm:
+   `to-visit.js` → PJP, `visits.js` → `visit-form.js` + `field-log.js`. No gen-2
+   counterpart is apparent for `telecalling.js`, `telecalling-common.js`,
+   `telecalling-daily.js`, `coverage.js`, `opportunities-coverage.js` or
+   `targets.js` — are those still used by RTcompu, or retired? Default if
+   unanswered: keep them, since they are live and gated correctly already.
 4. **`analytics_run_as`** — production is missing a function its own migration
    creates. Deferred with the rest of analytics; noted so it is not lost.
