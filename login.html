@@ -180,18 +180,28 @@
 
   .login-toggle button:hover { text-decoration: underline; }
 
-  .login-forgot { text-align: right; margin-top: calc(var(--space-2) * -1); }
-  .login-forgot button {
-    background: none; border: none; color: var(--color-accent);
-    font-size: var(--text-sm); font-weight: var(--font-weight-medium); cursor: pointer; padding: 0;
-  }
-  .login-forgot button:hover { text-decoration: underline; }
-
   .login-success {
-    font-size: var(--text-sm); color: var(--color-success);
-    background: var(--color-success-light); padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md); margin-top: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--color-success);
+    background: var(--color-success-light);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-2);
   }
+
+  .login-forgot { text-align: right; margin-top: calc(-1 * var(--space-2)); }
+
+  .login-forgot button {
+    color: var(--color-accent);
+    font-weight: var(--font-weight-medium);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    padding: 0;
+  }
+
+  .login-forgot button:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -210,26 +220,12 @@
         <label for="login-password">Password</label>
         <input type="password" id="login-password" autocomplete="current-password" required placeholder="Enter your password">
       </div>
+      <div class="login-forgot">
+        <button type="button" id="forgot-btn">Forgot password?</button>
+      </div>
       <button type="submit" class="login-btn" id="login-btn">Sign in</button>
       <div id="login-error" class="login-error hidden"></div>
     </form>
-
-    <div class="login-forgot"><button type="button" id="forgot-btn">Forgot password?</button></div>
-
-    <!-- Self-service password reset -->
-    <div id="forgot-section" class="hidden">
-      <p class="login-subtitle" style="margin-top: var(--space-4)">Enter your account email and we'll send you a link to reset your password.</p>
-      <form id="forgot-form" class="login-form">
-        <div>
-          <label for="forgot-email">Email</label>
-          <input type="email" id="forgot-email" autocomplete="email" required placeholder="you@company.com">
-        </div>
-        <button type="submit" class="login-btn" id="forgot-send-btn">Send reset link</button>
-        <div id="forgot-error" class="login-error hidden"></div>
-        <div id="forgot-success" class="login-success hidden"></div>
-      </form>
-      <div class="login-toggle"><button id="forgot-back-btn">← Back to sign in</button></div>
-    </div>
 
     <div class="login-divider" id="login-divider">or</div>
 
@@ -257,7 +253,33 @@
       </form>
     </div>
 
-    <div class="login-toggle" id="main-toggle">
+    <div id="reset-section" class="hidden">
+      <form id="reset-form" class="login-form">
+        <div>
+          <label for="reset-email">Email</label>
+          <input type="email" id="reset-email" autocomplete="email" required placeholder="you@company.com">
+        </div>
+        <button type="submit" class="login-btn" id="reset-btn">Send reset link</button>
+        <div id="reset-error" class="login-error hidden"></div>
+        <div id="reset-success" class="login-success hidden"></div>
+      </form>
+      <div class="login-toggle">
+        <button id="reset-back-btn">Back to sign in</button>
+      </div>
+    </div>
+
+    <div id="recovery-section" class="hidden">
+      <form id="recovery-form" class="login-form">
+        <div>
+          <label for="recovery-password">New password</label>
+          <input type="password" id="recovery-password" autocomplete="new-password" required placeholder="Min 6 characters" minlength="6">
+        </div>
+        <button type="submit" class="login-btn" id="recovery-btn">Update password</button>
+        <div id="recovery-error" class="login-error hidden"></div>
+      </form>
+    </div>
+
+    <div class="login-toggle" id="login-toggle-row">
       <span id="toggle-text">Don't have an account?</span>
       <button id="toggle-btn">Sign up</button>
     </div>
@@ -275,35 +297,64 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const cfg = window.ATLLANTA_CONFIG;
 const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-const { data: { session } } = await sb.auth.getSession();
-if (session) { window.location.href = '/app'; }
-
-let mode = 'login';
 const loginForm = document.getElementById('login-form');
 const signupSection = document.getElementById('signup-section');
 const signupForm = document.getElementById('signup-form');
+const resetSection = document.getElementById('reset-section');
+const resetForm = document.getElementById('reset-form');
+const recoverySection = document.getElementById('recovery-section');
+const recoveryForm = document.getElementById('recovery-form');
+const googleBtn = document.getElementById('google-btn');
+const loginDivider = document.getElementById('login-divider');
+const toggleRow = document.getElementById('login-toggle-row');
 const toggleBtn = document.getElementById('toggle-btn');
 const toggleText = document.getElementById('toggle-text');
+const titleEl = document.querySelector('.login-title');
+const subtitleEl = document.querySelector('.login-subtitle');
 
-// Public self-serve signup is disabled until the signup model is decided.
-// Today a signed-up user gets no org (createWorkspace() no-ops without one),
-// so we hide the entry point rather than dead-end prospects. New orgs are
-// provisioned via api/create-org. Flip this to true to re-enable signup.
-const SIGNUP_ENABLED = false;
-if (!SIGNUP_ENABLED) {
-  document.getElementById('main-toggle').classList.add('hidden');
-  signupSection.classList.add('hidden');
+const VIEWS = {
+  login:    { title: 'Welcome back',        subtitle: 'Sign in to your Atllanta workspace' },
+  signup:   { title: 'Create your account', subtitle: 'Get started with Atllanta' },
+  reset:    { title: 'Reset your password', subtitle: "Enter your email and we'll send a reset link" },
+  recovery: { title: 'Set a new password',  subtitle: 'Choose a new password for your account' },
+};
+
+function setView(view) {
+  const oauthVisible = view === 'login' || view === 'signup';
+  loginForm.classList.toggle('hidden', view !== 'login');
+  signupSection.classList.toggle('hidden', view !== 'signup');
+  resetSection.classList.toggle('hidden', view !== 'reset');
+  recoverySection.classList.toggle('hidden', view !== 'recovery');
+  googleBtn.classList.toggle('hidden', !oauthVisible);
+  loginDivider.classList.toggle('hidden', !oauthVisible);
+  toggleRow.classList.toggle('hidden', !oauthVisible);
+  toggleText.textContent = view === 'signup' ? 'Already have an account?' : "Don't have an account?";
+  toggleBtn.textContent = view === 'signup' ? 'Sign in' : 'Sign up';
+  titleEl.textContent = VIEWS[view].title;
+  subtitleEl.textContent = VIEWS[view].subtitle;
+}
+
+// A password-recovery link lands here with a recovery token in the URL hash and
+// fires PASSWORD_RECOVERY. Detect it before the signed-in redirect so the recovery
+// session isn't bounced to '/' before the user can set a new password.
+let recovering = window.location.hash.includes('type=recovery');
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') { recovering = true; setView('recovery'); }
+});
+
+const { data: { session } } = await sb.auth.getSession();
+if (recovering) {
+  setView('recovery');
+} else if (session) {
+  window.location.href = '/';
 }
 
 toggleBtn.addEventListener('click', () => {
-  mode = mode === 'login' ? 'signup' : 'login';
-  loginForm.classList.toggle('hidden', mode === 'signup');
-  signupSection.classList.toggle('hidden', mode === 'login');
-  document.querySelector('.login-title').textContent = mode === 'login' ? 'Welcome back' : 'Create your account';
-  document.querySelector('.login-subtitle').textContent = mode === 'login' ? 'Sign in to your Atllanta workspace' : 'Get started with Atllanta';
-  toggleText.textContent = mode === 'login' ? "Don't have an account?" : 'Already have an account?';
-  toggleBtn.textContent = mode === 'login' ? 'Sign up' : 'Sign in';
+  setView(signupSection.classList.contains('hidden') ? 'signup' : 'login');
 });
+
+document.getElementById('forgot-btn').addEventListener('click', () => setView('reset'));
+document.getElementById('reset-back-btn').addEventListener('click', () => setView('login'));
 
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -326,7 +377,7 @@ loginForm.addEventListener('submit', async (e) => {
     errEl.classList.remove('hidden');
     return;
   }
-  window.location.href = '/app';
+  window.location.href = '/';
 });
 
 signupForm.addEventListener('submit', async (e) => {
@@ -353,7 +404,7 @@ signupForm.addEventListener('submit', async (e) => {
     errEl.classList.remove('hidden');
     return;
   }
-  window.location.href = '/app';
+  window.location.href = '/';
 });
 
 document.getElementById('google-btn').addEventListener('click', async () => {
@@ -363,51 +414,55 @@ document.getElementById('google-btn').addEventListener('click', async () => {
   });
 });
 
-// --- Self-service password reset ---
-const forgotSection = document.getElementById('forgot-section');
-function showForgot(on) {
-  document.getElementById('login-form').classList.toggle('hidden', on);
-  document.getElementById('login-divider').classList.toggle('hidden', on);
-  document.getElementById('google-btn').classList.toggle('hidden', on);
-  document.getElementById('signup-section').classList.add('hidden');
-  document.getElementById('main-toggle').classList.toggle('hidden', on);
-  document.querySelector('.login-forgot').classList.toggle('hidden', on);
-  forgotSection.classList.toggle('hidden', !on);
-  document.querySelector('.login-title').textContent = on ? 'Reset your password' : 'Welcome back';
-  document.querySelector('.login-subtitle').textContent = on
-    ? "We'll email you a reset link."
-    : 'Sign in to your Atllanta workspace';
-}
-document.getElementById('forgot-btn').addEventListener('click', () => showForgot(true));
-document.getElementById('forgot-back-btn').addEventListener('click', () => showForgot(false));
-
-document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+resetForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const errEl = document.getElementById('forgot-error');
-  const okEl = document.getElementById('forgot-success');
-  errEl.classList.add('hidden'); okEl.classList.add('hidden');
-  const btn = document.getElementById('forgot-send-btn');
-  const email = document.getElementById('forgot-email').value.trim();
-  btn.disabled = true; btn.textContent = 'Sending…';
+  const btn = document.getElementById('reset-btn');
+  const errEl = document.getElementById('reset-error');
+  const okEl = document.getElementById('reset-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
 
-  const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/reset-password',
-  });
+  const { error } = await sb.auth.resetPasswordForEmail(
+    document.getElementById('reset-email').value.trim(),
+    { redirectTo: window.location.origin + '/login' }
+  );
 
-  btn.disabled = false; btn.textContent = 'Send reset link';
-  if (error && !/rate|limit/i.test(error.message)) {
-    // Only surface transport-level problems; never reveal whether an account
-    // exists (email-enumeration guard).
+  btn.disabled = false;
+  btn.textContent = 'Send reset link';
+
+  if (error) {
     errEl.textContent = error.message;
     errEl.classList.remove('hidden');
     return;
   }
-  okEl.textContent = "If an account exists for that email, a reset link is on its way. Check your inbox.";
+  okEl.textContent = 'Check your email for a link to reset your password.';
   okEl.classList.remove('hidden');
 });
+
+recoveryForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('recovery-btn');
+  const errEl = document.getElementById('recovery-error');
+  errEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+
+  const { error } = await sb.auth.updateUser({
+    password: document.getElementById('recovery-password').value,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Update password';
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  window.location.href = '/';
+});
 </script>
-<!-- Vercel Web Analytics (cookieless, first-party). Inert until enabled in the
-     Vercel dashboard; the script 404s harmlessly until then. -->
-<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
