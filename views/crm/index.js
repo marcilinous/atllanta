@@ -37,16 +37,23 @@ export default async function crmHub(container) {
     pipeline: { title: 'Pipeline', feature: 'crm_pipeline', desc: 'Drag deals through your sales stages', route: 'crm/opportunities', color: 'var(--color-accent)', icon: 'M3 3v18h18M18 9l-5 5-3-3-4 4' },
   };
 
-  // Partner vertical cards (RT / partner-pack orgs).
+  // Partner vertical cards (RT / partner-pack orgs). Two generations live side
+  // by side here: the distribution screens (partners, field sales, prospects,
+  // events, exports) and the earlier telecalling/coverage screens that RTcompu
+  // still uses. Every card is gated, so a non-partner org sees none of them.
   const partnerCards = [
-    { title: 'Partners', feature: 'crm', desc: 'Your Tally partner base, by region & role', route: 'crm/accounts', color: 'var(--color-info)', icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01' },
-    { title: 'PJP', feature: 'crm_pjp', desc: 'Plan the month by area, then who to visit each day', route: 'crm/pjp', color: 'var(--color-info)', icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' },
-    { title: 'Log a visit', feature: 'crm_visits', desc: 'Record a partner visit with GPS & selfie', route: 'crm/visits', color: 'var(--color-success)', icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z' },
+    { title: 'Partners', feature: 'crm_partners', desc: 'Partner master: onboard, update and manage details', route: 'crm/partners', color: 'var(--color-info)', icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01' },
+    { title: 'Distribution', feature: 'crm_field_sales', desc: 'Command centre: BDEs, territories, partners to act on', route: 'crm/field-sales', color: 'var(--color-accent)', icon: 'M22 12h-4l-3 9L9 3l-3 9H2' },
+    { title: 'PJP', feature: 'crm_pjp', desc: 'Plan each BDE beat by territory, with month locks & adherence', route: 'crm/pjp', color: 'var(--color-info)', icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' },
+    { title: 'Log a visit', feature: 'crm_visits', desc: 'Field visit capture: outcome, Tally check, GPS, selfie', route: 'crm/log-visit', color: 'var(--color-success)', icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z' },
+    { title: 'Prospects', feature: 'crm_prospects', desc: 'Unregistered partners from the field — register to onboard', route: 'crm/prospects', color: 'var(--color-warning)', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 .001M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
+    { title: 'Events', feature: 'crm_events', desc: 'Digital, physical & partner events — planned and executed', route: 'crm/events', color: 'var(--color-accent)', icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' },
     { title: 'Telecalling', feature: 'crm_telecalling', desc: 'Your call book — TSS renewals to drive', route: 'crm/telecalling', color: 'var(--color-warning)', icon: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z' },
     { title: 'Opportunities', feature: 'crm_opps', desc: 'Where to drive business — mine, or rolled up by team', route: 'crm/opps', color: 'var(--color-accent)', icon: 'M3 3v18h18M18 9l-5 5-3-3-4 4' },
     { title: 'Business by territory', feature: 'crm_coverage', desc: 'Revenue, TP/TSS & coverage: CM → TL → BDE', route: 'crm/coverage', color: 'var(--color-accent)', icon: 'M22 12h-4l-3 9L9 3l-3 9H2' },
     { title: 'Sales', feature: 'crm_sales', desc: 'Activation revenue by product, channel & area', route: 'crm/sales', color: 'var(--color-success)', icon: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' },
-    { title: 'Reports', feature: 'crm_reports', desc: 'Import partner reports keyed on Site ID', route: 'crm/reports', color: 'var(--color-text-secondary)', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
+    { title: 'Report import', feature: 'crm_reports', desc: 'Upload Tally activation/sales CSVs — de-duplicated on re-upload', route: 'crm/reports', color: 'var(--color-text-secondary)', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
+    { title: 'Reports & exports', feature: 'crm_exports', desc: 'Canned CSV downloads for MIS & analysts', route: 'crm/exports', color: 'var(--color-text-secondary)', icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3' },
   ];
 
   const primary = partner ? partnerCards : [generic.accounts, generic.contacts, generic.leads, generic.pipeline];
