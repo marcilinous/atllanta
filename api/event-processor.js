@@ -25,6 +25,7 @@ const recipes = {
       }));
       await sb.from("leave_balances").upsert(balances, {
         onConflict: "user_id,leave_type_id,year",
+        ignoreDuplicates: true,
       });
     }
 
@@ -134,19 +135,17 @@ const recipes = {
       event.payload;
 
     const year = new Date().getFullYear();
-    const { data: balance } = await sb
-      .from("leave_balances")
-      .select("id, used")
-      .eq("user_id", user_id)
-      .eq("leave_type_id", leave_type_id)
-      .eq("year", year)
-      .maybeSingle();
-
-    if (balance) {
-      await sb
-        .from("leave_balances")
-        .update({ used: (parseFloat(balance.used) || 0) + parseFloat(days) })
-        .eq("id", balance.id);
+    // Atomic in-DB increment, applied at most once per event: claim_side_effect
+    // dedupes across retries and across the browser processor, so the used-days
+    // counter can't double-count.
+    const { data: firstTime } = await sb.rpc("claim_side_effect", { p_event_id: event.id, p_effect_key: "leave_used" });
+    if (firstTime) {
+      await sb.rpc("apply_leave_usage", {
+        p_user_id: user_id,
+        p_leave_type_id: leave_type_id,
+        p_year: year,
+        p_days: parseFloat(days) || 0,
+      });
     }
 
     const { data: leaveReq } = await sb
@@ -456,7 +455,12 @@ export default async function handler(req, res) {
       .eq("status", "pending")
       .select("id");
 
-    if (claimError || !claimed?.length) {
+    if (claimError) {
+      console.error("event claim failed:", event.id, claimError.message);
+      skipped++;
+      continue;
+    }
+    if (!claimed?.length) {
       skipped++;
       continue;
     }
@@ -464,14 +468,15 @@ export default async function handler(req, res) {
     const recipe = recipes[event.event_type];
     try {
       if (recipe) await recipe(sb, event);
-      await sb
+      const { error: completeError } = await sb
         .from("events")
         .update({ status: "completed", processed_at: new Date().toISOString(), locked_at: null, last_error: null })
         .eq("id", event.id);
+      if (completeError) console.error("event completion write failed:", event.id, completeError.message);
       processed++;
     } catch (err) {
       const newStatus = event.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
-      await sb
+      const { error: failError } = await sb
         .from("events")
         .update({
           status: newStatus,
@@ -480,6 +485,7 @@ export default async function handler(req, res) {
           ...(newStatus === "failed" ? { failed_at: new Date().toISOString() } : {}),
         })
         .eq("id", event.id);
+      if (failError) console.error("event failure write failed:", event.id, failError.message);
       failed++;
     }
   }

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const S = globalThis.__apiTest = { calls: [], pending: [], claimWins: true };
+const S = globalThis.__apiTest = { calls: [], pending: [], claimWins: true, firstTime: true, failCompletion: false };
 let tmp, handler;
 
 before(async () => {
@@ -33,6 +33,12 @@ before(async () => {
         if (table === 'events' && names[0] === 'update' && names.includes('select')) {
           return resolve({ data: S.claimWins ? [{ id: 'ev-1' }] : [], error: null });
         }
+        if (table === 'events' && names[0] === 'update' && !names.includes('select') && S.failCompletion) {
+          return resolve({ data: null, error: { message: 'write failed' } });
+        }
+        if (table === 'leave_types' && names[0] === 'select') {
+          return resolve({ data: [{ id: 'lt-1', annual_quota: 12 }], error: null });
+        }
         return resolve({ data: null, error: null });
       };
       return c;
@@ -42,7 +48,7 @@ before(async () => {
         from: (t) => chain(t),
         rpc(name, args) {
           S.calls.push({ rpc: name, args });
-          return Promise.resolve({ data: [{ requeued: 0, deadlettered: 0 }], error: null });
+          return Promise.resolve({ data: name === 'claim_side_effect' ? S.firstTime : [{ requeued: 0, deadlettered: 0 }], error: null });
         },
       };
     }
@@ -55,7 +61,7 @@ before(async () => {
 after(() => { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); delete process.env.CRON_SECRET; });
 
 beforeEach(() => {
-  S.calls = []; S.pending = []; S.claimWins = true;
+  S.calls = []; S.pending = []; S.claimWins = true; S.firstTime = true; S.failCompletion = false;
   process.env.CRON_SECRET = 'test-secret';
   delete process.env.RESEND_API_KEY;   // recipes must never reach Resend from a test
 });
@@ -125,5 +131,59 @@ describe('claiming', () => {
     assert.ok(requeueAt !== -1, 'expected requeue_stale_events to be called');
     assert.deepEqual(S.calls[requeueAt].args, { p_lease_seconds: 600, p_max_attempts: 3 });
     assert.ok(requeueAt < selectAt, 'requeue must run before the pending select');
+  });
+});
+
+describe('replay safety', () => {
+  const approvedEvent = { id: 'ev-1', event_type: 'leave.request.approved', attempts: 0,
+    payload: { leave_request_id: 'lr-1', user_id: 'u-2', org_id: 'org-1', days: '2', leave_type_id: 'lt-1' } };
+  const createdEvent = { id: 'ev-1', event_type: 'people.employee.created', attempts: 0,
+    payload: { employee_id: 'u-1', org_id: 'org-1' } };
+
+  test('leave.request.approved claims the side effect and applies usage atomically, once', async () => {
+    S.pending = [approvedEvent];
+    await handler(req('GET', 'Bearer test-secret'), res());
+
+    const claimAt = S.calls.findIndex(c => c.rpc === 'claim_side_effect');
+    const applyAt = S.calls.findIndex(c => c.rpc === 'apply_leave_usage');
+    assert.ok(claimAt !== -1, 'expected claim_side_effect to be called');
+    assert.deepEqual(S.calls[claimAt].args, { p_event_id: 'ev-1', p_effect_key: 'leave_used' });
+    assert.ok(applyAt !== -1, 'expected apply_leave_usage to be called');
+    assert.ok(claimAt < applyAt, 'claim must happen before applying usage');
+    assert.deepEqual(S.calls[applyAt].args, {
+      p_user_id: 'u-2',
+      p_leave_type_id: 'lt-1',
+      p_year: new Date().getFullYear(),
+      p_days: 2,
+    });
+    assert.equal(
+      S.calls.some(c => c.table === 'leave_balances' && c.ops[0][0] === 'update'),
+      false,
+      'must not read-then-update leave_balances directly'
+    );
+  });
+
+  test('leave.request.approved skips apply_leave_usage when the side effect was already claimed', async () => {
+    S.pending = [approvedEvent];
+    S.firstTime = false;
+    await handler(req('GET', 'Bearer test-secret'), res());
+    assert.equal(S.calls.some(c => c.rpc === 'apply_leave_usage'), false, 'apply_leave_usage must not run on replay');
+  });
+
+  test('people.employee.created upserts leave_balances with ignoreDuplicates so replay cannot reset used to 0', async () => {
+    S.pending = [createdEvent];
+    await handler(req('GET', 'Bearer test-secret'), res());
+    const upsert = S.calls.find(c => c.table === 'leave_balances' && c.ops[0][0] === 'upsert');
+    assert.ok(upsert, 'expected a leave_balances upsert');
+    assert.deepEqual(upsert.ops[0][2], { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
+  });
+
+  test('a failed completion write is logged, not swallowed', async (t) => {
+    const errorMock = t.mock.method(console, 'error', () => {});
+    S.pending = [createdEvent];
+    S.failCompletion = true;
+    await handler(req('GET', 'Bearer test-secret'), res());
+    const call = errorMock.mock.calls.find(c => c.arguments[0] === 'event completion write failed:');
+    assert.ok(call, 'expected a "event completion write failed:" console.error call');
   });
 });
