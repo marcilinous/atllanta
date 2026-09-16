@@ -5,12 +5,14 @@
 //
 // js/supabase.js pulls supabase-js from a CDN and needs a live session, so that
 // one module is replaced with a stub carrying a fixture org. Everything else —
-// index.html's bootstrap, features.js, router.js, the whole ESM graph — is the
+// the app shell's bootstrap, features.js, router.js, the whole ESM graph — is the
 // genuine artifact, parsed and executed by a real browser.
 
 import { chromium } from '@playwright/test';
 
-const BASE = 'http://localhost:3000';
+// Override with BASE_URL when port 3000 is taken (e.g. by another checkout's
+// server, which would silently test the wrong tree).
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 let pass = 0, fail = 0;
 const ok = (label, actual, expected) => {
   const good = JSON.stringify(actual) === JSON.stringify(expected);
@@ -21,9 +23,12 @@ const ok = (label, actual, expected) => {
 // A stub supabase client whose organizations row carries the gate flags we want
 // to exercise. Every query resolves to a fixture; nothing touches the network.
 const stub = ({ crmEnabled, partnerPack }) => `
-  // This line folded memberships into users (Phase 1 tenancy unification):
-  // auth.js reads users(id, org_id, role, ...), then organizations.
+  // auth.js on this line reads memberships(user_id, organization_id, role),
+  // then organizations. users is kept for lines that folded memberships into it.
+  // Without the org link the partner routes block for lack of an org, not by
+  // the gate, which would look exactly like a pass.
   const FIXTURES = {
+    memberships: { id: 'm1', user_id: 'u1', organization_id: 'o1', role: 'agency_admin', created_at: '2026-01-01' },
     users: { id: 'u1', org_id: 'o1', role: 'admin', full_name: 'Fixture User', email: 'fixture@example.com' },
     organizations: { id: 'o1', name: 'Fixture Org', crm_enabled: ${crmEnabled}, partner_crm_enabled: ${partnerPack} },
   };
@@ -65,7 +70,7 @@ async function boot(browser, opts) {
   await page.route('**/js/supabase.js', route =>
     route.fulfill({ status: 200, contentType: 'application/javascript', body: stub(opts) })
   );
-  await page.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/${APP_PAGE}`, { waitUntil: 'domcontentloaded' });
   // The shell unhides #app only after the auth bootstrap completes.
   await page.waitForFunction(() => {
     const el = document.getElementById('app');
@@ -90,6 +95,11 @@ try {
   console.error(`\nNo server on ${BASE}. Start one first:\n  npx serve . -p 3000\n`);
   process.exit(1);
 }
+
+// The app shell is app.html where index.html is the marketing landing page
+// (vercel.json rewrites /app to it); on lines without a landing page it is index.html.
+const APP_PAGE = (await fetch(`${BASE}/app.html`)).ok ? 'app.html' : 'index.html';
+console.log(`app shell: ${APP_PAGE}`);
 
 const browser = await chromium.launch({ headless: true });
 

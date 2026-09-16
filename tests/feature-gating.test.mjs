@@ -52,7 +52,8 @@ function asOrg({ crm, pack, admin = false }) {
 const PARTNER_ROUTES = [
   'crm/partners', 'crm/partner', 'crm/field-sales', 'crm/log-visit',
   'crm/prospects', 'crm/events', 'crm/exports', 'crm/pjp',
-  'crm/sales', 'crm/reports',
+  'crm/sales', 'crm/reports', 'crm/visits', 'crm/telecalling',
+  'crm/coverage', 'crm/targets', 'crm/opps',
 ];
 
 describe('platform gates', () => {
@@ -61,6 +62,7 @@ describe('platform gates', () => {
     assert.equal(allowed('crm'), true);
     assert.equal(allowed('crm/leads'), true);
     assert.equal(allowed('crm/opportunities'), true);
+    assert.equal(allowed('crm/contacts'), true);
   });
 
   test('a generic-CRM tenant reaches no partner screen', () => {
