@@ -84,12 +84,6 @@
 
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
-  /* Status tints retained from main's palette: components.css, layout.css and
-     the attendance/telecalling views reference these. */
-  --color-success-light: #F0FDF4;
-  --color-warning-light: #FFFBEB;
-  --color-error-light: #FEF2F2;
-  --color-info-light: #EFF6FF;
 }
 
 /* ===== Dark theme — Deep navy ground; accents lightened so they stay
@@ -125,10 +119,6 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 12px -2px rgba(0,0,0,0.5);
   --shadow-lg: 0 12px 28px -6px rgba(0,0,0,0.6);
-  --color-success-light: #052e16;
-  --color-warning-light: #451a03;
-  --color-error-light: #450a0a;
-  --color-info-light: #1e293b;
 }
 
 /* ===== Per-module accent switch — set by js/router.js on <html data-module>.
@@ -154,26 +144,4 @@
   --color-accent: var(--accent-analytics);
   --color-accent-hover: var(--accent-analytics-hover);
   --color-accent-light: var(--accent-analytics-light);
-}
-
-[data-theme="light"] {
-  --color-bg: #FFFFFF;
-  --color-bg-secondary: #F7F8FA;
-  --color-bg-tertiary: #EDEEF1;
-  --color-surface: #FFFFFF;
-  --color-border: #E2E4E9;
-  --color-border-light: #F0F1F3;
-  --color-text-primary: #1A1D23;
-  --color-text-secondary: #6B7080;
-  --color-text-tertiary: #9CA0AB;
-  --color-accent: #2563EB;
-  --color-accent-hover: #1D4FD8;
-  --color-accent-light: #EFF6FF;
-  --color-success-light: #F0FDF4;
-  --color-warning-light: #FFFBEB;
-  --color-error-light: #FEF2F2;
-  --color-info-light: #EFF6FF;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
 }
