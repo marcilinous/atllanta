@@ -133,6 +133,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
       model: GROQ_MODEL,
       temperature: 0.2,
       max_tokens: 600,
+      reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
   });

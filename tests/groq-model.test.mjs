@@ -34,3 +34,11 @@ test('every Groq caller names the replacement model', () => {
     assert.ok(fs.readFileSync(path.join(ROOT, file), 'utf8').includes(REPLACEMENT), `${file} should use ${REPLACEMENT}`);
   }
 });
+
+test('gpt-oss-120b callers set a low reasoning budget', () => {
+  const files = ['api/extract-candidate.js', 'api/match.js', 'api/screen-job.js'];
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    assert.ok(text.includes('reasoning_effort: "low"'), `${file} should set reasoning_effort: "low"`);
+  }
+});

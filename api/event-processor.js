@@ -138,14 +138,18 @@ const recipes = {
     // Atomic in-DB increment, applied at most once per event: claim_side_effect
     // dedupes across retries and across the browser processor, so the used-days
     // counter can't double-count.
-    const { data: firstTime } = await sb.rpc("claim_side_effect", { p_event_id: event.id, p_effect_key: "leave_used" });
+    const { data: firstTime, error: claimError } = await sb.rpc("claim_side_effect", { p_event_id: event.id, p_effect_key: "leave_used" });
+    // Nothing was recorded, so a retry is safe.
+    if (claimError) throw new Error(`claim_side_effect failed: ${claimError.message}`);
     if (firstTime) {
-      await sb.rpc("apply_leave_usage", {
+      const { error: applyError } = await sb.rpc("apply_leave_usage", {
         p_user_id: user_id,
         p_leave_type_id: leave_type_id,
         p_year: year,
         p_days: parseFloat(days) || 0,
       });
+      // The side effect is already claimed, so a retry would skip it: log loudly.
+      if (applyError) console.error("leave usage apply failed after claim:", event.id, applyError.message);
     }
 
     const { data: leaveReq } = await sb
@@ -453,6 +457,7 @@ export default async function handler(req, res) {
       .update({ status: "processing", attempts: event.attempts + 1, locked_at: new Date().toISOString() })
       .eq("id", event.id)
       .eq("status", "pending")
+      .eq("attempts", event.attempts)
       .select("id");
 
     if (claimError) {
@@ -467,7 +472,9 @@ export default async function handler(req, res) {
 
     const recipe = recipes[event.event_type];
     try {
-      if (recipe) await recipe(sb, event);
+      // Tenant comes from the event row (stamped by publish_event), never from
+      // the caller-supplied payload.
+      if (recipe) await recipe(sb, { ...event, payload: { ...event.payload, org_id: event.org_id } });
       const { error: completeError } = await sb
         .from("events")
         .update({ status: "completed", processed_at: new Date().toISOString(), locked_at: null, last_error: null })

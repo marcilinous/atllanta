@@ -60,6 +60,7 @@ ${resume_text.slice(0, 4000)}`;
       model: GROQ_MODEL,
       temperature: 0.1,
       max_tokens: 300,
+      reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
   });

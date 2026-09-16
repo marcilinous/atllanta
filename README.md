@@ -7,7 +7,7 @@ AI-powered resume-to-JD matching for HR teams and staffing agencies — with int
 - **Frontend:** vanilla HTML/CSS/JS (no build step), Supabase JS via CDN
 - **Backend:** Vercel serverless functions (`/api`)
 - **Database & auth:** Supabase (Postgres + Auth + RLS)
-- **AI matching:** Groq (`llama-3.3-70b-versatile`)
+- **AI matching:** Groq (`openai/gpt-oss-120b`)
 
 ## Architecture
 

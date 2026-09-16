@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const S = globalThis.__apiTest = { calls: [], pending: [], claimWins: true, firstTime: true, failCompletion: false };
+const S = globalThis.__apiTest = { calls: [], pending: [], claimWins: true, firstTime: true, failCompletion: false, rpcErrors: {} };
 let tmp, handler;
 
 before(async () => {
@@ -48,6 +48,7 @@ before(async () => {
         from: (t) => chain(t),
         rpc(name, args) {
           S.calls.push({ rpc: name, args });
+          if (S.rpcErrors[name]) return Promise.resolve({ data: null, error: { message: 'rpc failed' } });
           return Promise.resolve({ data: name === 'claim_side_effect' ? S.firstTime : [{ requeued: 0, deadlettered: 0 }], error: null });
         },
       };
@@ -61,7 +62,7 @@ before(async () => {
 after(() => { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); delete process.env.CRON_SECRET; });
 
 beforeEach(() => {
-  S.calls = []; S.pending = []; S.claimWins = true; S.firstTime = true; S.failCompletion = false;
+  S.calls = []; S.pending = []; S.claimWins = true; S.firstTime = true; S.failCompletion = false; S.rpcErrors = {};
   process.env.CRON_SECRET = 'test-secret';
   delete process.env.RESEND_API_KEY;   // recipes must never reach Resend from a test
 });
@@ -110,7 +111,7 @@ describe('claiming', () => {
     await handler(req('GET', 'Bearer test-secret'), res());
     const claim = S.calls.find(c => c.table === 'events' && c.ops[0][0] === 'update');
     assert.ok(claim, 'expected a claim update');
-    assert.deepEqual(claim.ops.filter(o => o[0] === 'eq'), [['eq', 'id', 'ev-1'], ['eq', 'status', 'pending']]);
+    assert.deepEqual(claim.ops.filter(o => o[0] === 'eq'), [['eq', 'id', 'ev-1'], ['eq', 'status', 'pending'], ['eq', 'attempts', 0]]);
     assert.ok(claim.ops.some(o => o[0] === 'select'));
   });
 
@@ -185,5 +186,45 @@ describe('replay safety', () => {
     await handler(req('GET', 'Bearer test-secret'), res());
     const call = errorMock.mock.calls.find(c => c.arguments[0] === 'event completion write failed:');
     assert.ok(call, 'expected a "event completion write failed:" console.error call');
+  });
+
+  test('a claim_side_effect error is thrown, so the event is retried and apply_leave_usage never runs', async () => {
+    S.pending = [approvedEvent];
+    S.rpcErrors.claim_side_effect = true;
+    const r = res();
+    await handler(req('GET', 'Bearer test-secret'), r);
+    assert.equal(S.calls.some(c => c.rpc === 'apply_leave_usage'), false, 'apply_leave_usage must not run when claim_side_effect errors');
+    assert.deepEqual(r.body, { processed: 0, failed: 1, skipped: 0, total: 1 });
+  });
+
+  test('an apply_leave_usage error after a successful claim is logged loudly, not retried', async (t) => {
+    const errorMock = t.mock.method(console, 'error', () => {});
+    S.pending = [approvedEvent];
+    S.rpcErrors.apply_leave_usage = true;
+    const r = res();
+    await handler(req('GET', 'Bearer test-secret'), r);
+    const call = errorMock.mock.calls.find(c => c.arguments[0] === 'leave usage apply failed after claim:');
+    assert.ok(call, 'expected a "leave usage apply failed after claim:" console.error call');
+    assert.deepEqual(r.body, { processed: 1, failed: 0, skipped: 0, total: 1 });
+  });
+});
+
+describe('tenant', () => {
+  test('recipes use the org_id from the event row, never the caller-supplied payload', async () => {
+    const event = { id: 'ev-1', org_id: 'org-1', event_type: 'people.employee.created', attempts: 0,
+      payload: { employee_id: 'u-1', org_id: 'org-evil' } };
+    S.pending = [event];
+    await handler(req('GET', 'Bearer test-secret'), res());
+
+    const leaveTypesCall = S.calls.find(c => c.table === 'leave_types');
+    assert.ok(leaveTypesCall, 'expected a leave_types call');
+    assert.ok(
+      leaveTypesCall.ops.some(o => o[0] === 'eq' && o[1] === 'org_id' && o[2] === 'org-1'),
+      'expected leave_types to be scoped to the event row org_id'
+    );
+    assert.ok(
+      !leaveTypesCall.ops.some(o => o.includes('org-evil')),
+      'the payload-supplied org_id must never reach a query'
+    );
   });
 });
