@@ -405,15 +405,30 @@ async function sendEmail(to, subject, html) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
+  // Vercel Cron calls with GET and sends CRON_SECRET as a bearer token.
+  if (req.method !== "GET" && req.method !== "POST") {
+    return res.status(405).json({ error: "Use GET or POST" });
+  }
 
-  const authHeader = req.headers.authorization || "";
+  // Fail closed: this endpoint runs service-role recipes for every org, so it
+  // must never be callable without the secret.
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    return res.status(500).json({ error: "Server misconfigured: CRON_SECRET is not set" });
+  }
+  if ((req.headers.authorization || "") !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   const sb = supabaseAdmin();
+
+  // Rescue events stranded in 'processing' by a worker that died or whose
+  // resolve_event call failed, and dead-letter any past their attempts.
+  const { error: requeueError } = await sb.rpc("requeue_stale_events", {
+    p_lease_seconds: 600,
+    p_max_attempts: MAX_ATTEMPTS,
+  });
+  if (requeueError) console.error("requeue_stale_events failed:", requeueError.message);
 
   const { data: events, error } = await sb
     .from("events")
@@ -425,44 +440,49 @@ export default async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
   if (!events?.length)
-    return res.status(200).json({ processed: 0, message: "No pending events" });
+    return res.status(200).json({ processed: 0, failed: 0, skipped: 0, total: 0 });
 
   let processed = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (const event of events) {
-    await sb
+    // Claim only if still pending. The browser processor claims through
+    // claim_events(); whichever claims first runs the recipe, the other skips.
+    const { data: claimed, error: claimError } = await sb
       .from("events")
-      .update({ status: "processing", attempts: event.attempts + 1 })
-      .eq("id", event.id);
+      .update({ status: "processing", attempts: event.attempts + 1, locked_at: new Date().toISOString() })
+      .eq("id", event.id)
+      .eq("status", "pending")
+      .select("id");
 
-    const recipe = recipes[event.event_type];
-    if (!recipe) {
-      await sb
-        .from("events")
-        .update({ status: "completed", processed_at: new Date().toISOString() })
-        .eq("id", event.id);
-      processed++;
+    if (claimError || !claimed?.length) {
+      skipped++;
       continue;
     }
 
+    const recipe = recipes[event.event_type];
     try {
-      await recipe(sb, event);
+      if (recipe) await recipe(sb, event);
       await sb
         .from("events")
-        .update({ status: "completed", processed_at: new Date().toISOString() })
+        .update({ status: "completed", processed_at: new Date().toISOString(), locked_at: null, last_error: null })
         .eq("id", event.id);
       processed++;
     } catch (err) {
-      const newStatus =
-        event.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
+      const newStatus = event.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
       await sb
         .from("events")
-        .update({ status: newStatus })
+        .update({
+          status: newStatus,
+          locked_at: null,
+          last_error: String(err?.message || err).slice(0, 500),
+          ...(newStatus === "failed" ? { failed_at: new Date().toISOString() } : {}),
+        })
         .eq("id", event.id);
       failed++;
     }
   }
 
-  return res.status(200).json({ processed, failed, total: events.length });
+  return res.status(200).json({ processed, failed, skipped, total: events.length });
 }
