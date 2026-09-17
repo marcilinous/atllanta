@@ -254,6 +254,9 @@ declare
   v_until   timestamptz;
   v_name    text;
 begin
+  -- Serialise checks per user, so parallel calls cannot both raise a flag.
+  perform pg_advisory_xact_lock(hashtextextended('ai_bot_check:' || p_user_id::text, 0));
+
   -- Already paused: the quota check blocks; don't raise another flag.
   if exists (select 1 from public.ai_user_flags f where f.user_id = p_user_id and f.paused_until > now()) then
     flagged := false; reason := null; paused_until := null;
