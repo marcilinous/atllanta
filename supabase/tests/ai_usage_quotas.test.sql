@@ -60,4 +60,135 @@ begin
   end if;
 end $$;
 
+
+-- 2. ai_record_usage --------------------------------------------------------
+do $$
+declare
+  a uuid := current_setting('t.org_a')::uuid;
+  m uuid := current_setting('t.member_a')::uuid;
+  v_day date := (now() at time zone 'Asia/Kolkata')::date;
+  v_month date := date_trunc('month', now() at time zone 'Asia/Kolkata')::date;
+  v_row record;
+begin
+  perform ai_record_usage(a, m, 'match', 'openai/gpt-oss-120b', 100, 50, 'ok', null, 'h-ok');
+  select * into v_row from ai_usage where org_id = a order by id desc limit 1;
+  if v_row.total_tokens <> 150 or v_row.prompt_tokens <> 100 or v_row.completion_tokens <> 50
+     or v_row.outcome <> 'ok' or v_row.request_hash <> 'h-ok' or v_row.user_id <> m then
+    raise exception '2a: ledger row wrong: %', row_to_json(v_row);
+  end if;
+  if (select tokens from ai_usage_org_month where org_id = a and month = v_month) <> 150 then raise exception '2b: org month tokens not 150'; end if;
+  if (select calls from ai_usage_org_month where org_id = a and month = v_month) <> 1 then raise exception '2c: org month calls not 1'; end if;
+  if (select tokens from ai_usage_user_day where user_id = m and day = v_day) is distinct from 150::bigint then
+    raise exception '2d: user day tokens not 150 on the org-local date';
+  end if;
+  perform ai_record_usage(a, m, 'match', 'openai/gpt-oss-120b', 999, 999, 'blocked', 'user_day_exhausted', null);
+  if (select tokens from ai_usage_org_month where org_id = a and month = v_month) <> 150 then raise exception '2e: a blocked call added tokens'; end if;
+  if (select blocked_calls from ai_usage_org_month where org_id = a and month = v_month) <> 1 then raise exception '2f: a blocked call was not counted as blocked'; end if;
+  if (select calls from ai_usage_user_day where user_id = m and day = v_day) <> 1 then raise exception '2g: a blocked call was counted as a call'; end if;
+  if (select total_tokens from ai_usage where org_id = a and outcome = 'blocked') <> 0 then raise exception '2h: a blocked ledger row has tokens'; end if;
+end $$;
+
+-- 3. ai_quota_check ---------------------------------------------------------
+do $$
+declare
+  a uuid := current_setting('t.org_a')::uuid;
+  m uuid := current_setting('t.member_a')::uuid;
+  v_day date := (now() at time zone 'Asia/Kolkata')::date;
+  v_month date := date_trunc('month', now() at time zone 'Asia/Kolkata')::date;
+  r record;
+begin
+  select * into r from ai_quota_check(a, m);
+  if not r.allowed or r.reason is not null then raise exception '3a: under quota should be allowed: %', row_to_json(r); end if;
+  if r.user_limit <> 200000 or r.org_quota <> 2000000 or r.user_used <> 150 or r.org_used <> 150 then
+    raise exception '3b: figures wrong: %', row_to_json(r);
+  end if;
+  if r.resets_day <> ((v_day + 1)::timestamp at time zone 'Asia/Kolkata') then raise exception '3c: resets_day is not the next local midnight'; end if;
+  if r.resets_month <> ((v_month + interval '1 month')::timestamp at time zone 'Asia/Kolkata') then raise exception '3d: resets_month is not the next local 1st'; end if;
+
+  update ai_org_quotas set monthly_tokens = 150, overage_mode = 'hard_stop' where org_id = a;
+  select * into r from ai_quota_check(a, m);
+  if r.allowed or r.reason <> 'org_month_exhausted' then raise exception '3e: org at quota should block in hard_stop: %', row_to_json(r); end if;
+
+  update ai_org_quotas set overage_mode = 'soft_limit' where org_id = a;
+  select * into r from ai_quota_check(a, m);
+  if not r.allowed then raise exception '3f: soft_limit should allow over quota: %', row_to_json(r); end if;
+
+  update ai_usage_user_day set tokens = 200000 where user_id = m and day = v_day;
+  select * into r from ai_quota_check(a, m);
+  if r.allowed or r.reason <> 'user_day_exhausted' then raise exception '3g: user at daily limit should block even in soft_limit: %', row_to_json(r); end if;
+
+  insert into ai_user_limits (org_id, user_id, daily_tokens) values (a, m, 500000);
+  select * into r from ai_quota_check(a, m);
+  if not r.allowed or r.user_limit <> 500000 then raise exception '3h: user override should beat the org default: %', row_to_json(r); end if;
+
+  delete from ai_org_quotas where org_id = a;
+  select * into r from ai_quota_check(a, m);
+  if r.allowed or r.reason <> 'org_month_exhausted' or r.org_quota <> 0 or r.overage_mode <> 'hard_stop' then
+    raise exception '3i: a missing quota row should block: %', row_to_json(r);
+  end if;
+
+  -- restore
+  insert into ai_org_quotas (org_id, monthly_tokens, overage_mode) values (a, 2000000, 'hard_stop');
+  delete from ai_user_limits where org_id = a and user_id = m;
+  update ai_usage_user_day set tokens = 150 where user_id = m and day = v_day;
+end $$;
+
+-- 4. ai_bot_check -----------------------------------------------------------
+do $$
+declare
+  a uuid := current_setting('t.org_a')::uuid;
+  m uuid := current_setting('t.member_a')::uuid;
+  r record; v_before int; v_admins int;
+begin
+  -- 59 non-blocked calls in the last minute (section 2 added 1 ok + 1 blocked): top up to 59 ok rows
+  insert into ai_usage (org_id, user_id, feature, model, total_tokens, outcome, request_hash)
+  select a, m, 'assistant', 'openai/gpt-oss-120b', 10, 'ok', 'h' || g from generate_series(1, 58) g;
+  select * into r from ai_bot_check(a, m, 'assistant', 'h-new');
+  if r.flagged then raise exception '4a: 59 recent calls must not flag: %', row_to_json(r); end if;
+
+  insert into ai_usage (org_id, user_id, feature, model, total_tokens, outcome, request_hash)
+  values (a, m, 'assistant', 'openai/gpt-oss-120b', 10, 'ok', 'h60');
+  select count(*) into v_admins from users where org_id = a and role in ('owner','admin') and status = 'active';
+  select count(*) into v_before from notifications where org_id = a and title = 'AI paused: unusual activity';
+  select * into r from ai_bot_check(a, m, 'assistant', 'h-new');
+  if not r.flagged or r.reason <> 'call_rate' then raise exception '4b: the 61st call in a minute must flag call_rate: %', row_to_json(r); end if;
+  if r.paused_until < now() + interval '9 minutes' or r.paused_until > now() + interval '11 minutes' then
+    raise exception '4c: pause is not about 10 minutes: %', r.paused_until;
+  end if;
+  if (select count(*) from notifications where org_id = a and title = 'AI paused: unusual activity') - v_before <> v_admins then
+    raise exception '4d: expected % owner/admin notifications', v_admins;
+  end if;
+  if (select (detail->>'calls_last_minute')::int from ai_user_flags where user_id = m) <> 61 then
+    raise exception '4e: detail.calls_last_minute should be 61';
+  end if;
+
+  select * into r from ai_quota_check(a, m);
+  if r.allowed or r.reason <> 'paused_bot_check' or r.paused_until is null then raise exception '4f: a paused user must be blocked: %', row_to_json(r); end if;
+
+  select * into r from ai_bot_check(a, m, 'assistant', 'h-new');
+  if r.flagged then raise exception '4g: an already-paused user must not be flagged again'; end if;
+  if (select count(*) from ai_user_flags where user_id = m) <> 1 then raise exception '4h: expected exactly one flag'; end if;
+
+  perform set_config('t.flag_m', (select id::text from ai_user_flags where user_id = m), true);
+end $$;
+
+do $$
+declare
+  a uuid := current_setting('t.org_a')::uuid;
+  ad uuid := current_setting('t.admin_a')::uuid;
+  r record;
+begin
+  insert into ai_usage (org_id, user_id, feature, model, total_tokens, outcome, request_hash)
+  select a, ad, 'match', 'openai/gpt-oss-120b', 10, 'ok', 'same' from generate_series(1, 9);
+  select * into r from ai_bot_check(a, ad, 'match', 'different');
+  if r.flagged then raise exception '4i: a different request must not count as a repeat'; end if;
+  select * into r from ai_bot_check(a, ad, 'screen', 'same');
+  if r.flagged then raise exception '4j: the same hash under another feature must not count'; end if;
+  insert into ai_usage (org_id, user_id, feature, model, total_tokens, outcome, request_hash)
+  values (a, ad, 'match', 'openai/gpt-oss-120b', 0, 'blocked', 'same');
+  select * into r from ai_bot_check(a, ad, 'match', 'same');
+  if not r.flagged or r.reason <> 'repeated_request' then raise exception '4k: the 10th identical request must flag: %', row_to_json(r); end if;
+  if (select (detail->>'repeats')::int from ai_user_flags where user_id = ad) <> 10 then raise exception '4l: detail.repeats should be 10 (blocked rows do not count)'; end if;
+end $$;
+
 select 'all ai usage tests passed' as result;
