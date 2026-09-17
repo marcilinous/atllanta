@@ -28,11 +28,12 @@ export default async function handler(req, res) {
   let jobId = job_id;
   let candidateId = candidate_id;
   if (application_id) {
-    const { data } = await db
+    const { data, error } = await db
       .from("job_applications")
       .select("id, job_id, candidate_id")
       .eq("id", application_id)
       .single();
+    if (error) return res.status(503).json({ error: "Could not load data — please try again" });
     app = data;
     if (!app) return res.status(404).json({ error: "Application not found" });
     jobId = app.job_id;
@@ -41,20 +42,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "application_id, or job_id and candidate_id, are required" });
   }
 
-  const { data: job } = await db
+  const { data: job, error: jobError } = await db
     .from("jobs")
     .select("id, title, jd_raw_text, description, org_id")
     .eq("id", jobId)
     .single();
+  if (jobError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!job) return res.status(404).json({ error: "Job or candidate not found" });
   if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
 
-  const { data: candidate } = await db
+  const { data: candidate, error: candidateError } = await db
     .from("candidates")
-    .select("id, full_name, name, resume_text, resume_raw_text")
+    .select("id, full_name, name, resume_text, resume_raw_text, org_id")
     .eq("id", candidateId)
     .single();
+  if (candidateError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!candidate) return res.status(404).json({ error: "Job or candidate not found" });
+  if (candidate.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this candidate" });
 
   if (!app) {
     const { data } = await db
@@ -116,7 +120,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
       updated_at: new Date().toISOString(),
     })
     .eq("id", app.id);
-  if (updateErr) return res.status(500).json({ error: updateErr.message });
+  if (updateErr) return res.status(500).json({ error: "Could not save the match — please try again" });
 
   return res.status(200).json({
     application_id: app.id,

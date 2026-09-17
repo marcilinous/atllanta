@@ -554,10 +554,12 @@ export default async function recruitmentJobs(container) {
 
         barEl.style.width = '100%';
         const scored = (data.results || []).filter(r => r.score != null).length;
-        const failed = (data.results || []).filter(r => r.error).length;
-        statusEl.textContent = `Done: ${scored} scored${failed ? `, ${failed} not scored` : ''}${data.tokens_used ? ` · ${data.tokens_used.toLocaleString('en-IN')} AI tokens used` : ''}${data.remaining ? ` · ${data.remaining} more to screen — run again` : ''}`;
+        const errored = (data.results || []).filter(r => r.error);
+        const failed = errored.length;
+        const message = errored.find(r => r.error !== 'No resume text')?.error || errored[0]?.error;
+        statusEl.textContent = `Done: ${scored} scored${failed ? `, ${failed} not scored` : ''}${data.tokens_used ? ` · ${data.tokens_used.toLocaleString('en-IN')} AI tokens used` : ''}${data.remaining ? ` · ${data.remaining} not screened (50 per run)` : ''}${message ? ` · ${message}` : ''}`;
         btn.textContent = 'Done';
-        toast(`Screening complete: ${scored} scored`);
+        toast(scored === 0 && message ? message : `Screening complete: ${scored} scored`);
         await loadData();
         renderJobs();
       } catch (err) {

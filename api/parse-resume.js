@@ -90,7 +90,8 @@ async function handleParseJD(req, res, caller) {
 
   // Only parse into a job the caller's organisation owns.
   if (job_id) {
-    const { data: job } = await caller.db.from("jobs").select("id, org_id").eq("id", job_id).maybeSingle();
+    const { data: job, error: jobError } = await caller.db.from("jobs").select("id, org_id").eq("id", job_id).maybeSingle();
+    if (jobError) return res.status(503).json({ error: "Could not load data — please try again" });
     if (!job) return res.status(404).json({ error: "Job not found" });
     if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
   }
@@ -129,7 +130,8 @@ ${description.slice(0, 4000)}`;
   }
 
   if (job_id) {
-    await caller.db.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id);
+    const { error: updateErr } = await caller.db.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id);
+    if (updateErr) return res.status(500).json({ error: "Could not save the parsed skills — please try again" });
   }
 
   return res.status(200).json({ parsed_skills: parsed });

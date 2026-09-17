@@ -219,12 +219,13 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "GROQ_API_KEY is not set. Configure it in Vercel → Settings → Environment Variables." });
   }
 
-  const { data: job } = await db
+  const { data: job, error: jobError } = await db
     .from("jobs")
     .select("id, title, jd_raw_text, description, org_id")
     .eq("id", job_id)
     .single();
 
+  if (jobError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!job) return res.status(404).json({ error: "Job not found" });
   if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
 
@@ -236,7 +237,8 @@ export default async function handler(req, res) {
   let appsQuery = db
     .from("job_applications")
     .select("id, candidate_id, match_score")
-    .eq("job_id", job_id);
+    .eq("job_id", job_id)
+    .order("id");
 
   if (Array.isArray(application_ids) && application_ids.length) {
     appsQuery = appsQuery.in("id", application_ids);
@@ -244,28 +246,29 @@ export default async function handler(req, res) {
     appsQuery = appsQuery.is("match_score", null);
   }
 
-  const { data: allApps } = await appsQuery;
+  const { data: allApps, error: appsError } = await appsQuery;
+  if (appsError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!allApps?.length) {
     return res.status(200).json({ results: [], tokens_used: 0, processed: 0, remaining: 0, method: useAI ? "ai" : "python", message: "No candidates to screen" });
   }
 
-  const apps = useAI ? allApps.slice(0, AI_BATCH_LIMIT) : allApps;
-  const remaining = allApps.length - apps.length;
-
-  const candIds = apps.map((a) => a.candidate_id);
-  const { data: candidates } = await db
+  // Load candidates for every fetched application first, so resume-less
+  // candidates can be filtered out before the 50-per-run cap is applied —
+  // they must not use up an AI slot.
+  const candIds = allApps.map((a) => a.candidate_id);
+  const { data: candidates, error: candidatesError } = await db
     .from("candidates")
     .select("id, full_name, name, resume_text, resume_raw_text")
-    .in("id", candIds);
+    .in("id", candIds)
+    .eq("org_id", caller.orgId);
+  if (candidatesError) return res.status(503).json({ error: "Could not load data — please try again" });
 
   const candMap = {};
   (candidates || []).forEach((c) => { candMap[c.id] = c; });
 
   const results = [];
-  let tokensUsed = 0;
-  let stopMessage = null;   // set by the first gateway refusal; later candidates are not sent to AI
-
-  for (const app of apps) {
+  const eligible = [];   // applications whose candidate has resume text
+  for (const app of allApps) {
     const cand = candMap[app.candidate_id];
     const candidateName = cand?.full_name || cand?.name || "Unknown";
     const resumeText = cand?.resume_text || cand?.resume_raw_text;
@@ -273,7 +276,16 @@ export default async function handler(req, res) {
       results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: "No resume text" });
       continue;
     }
+    eligible.push({ app, candidateName, resumeText });
+  }
 
+  const apps = useAI ? eligible.slice(0, AI_BATCH_LIMIT) : eligible;
+  const remaining = eligible.length - apps.length;
+
+  let tokensUsed = 0;
+  let stopMessage = null;   // set by the first gateway refusal; later candidates are not sent to AI
+
+  for (const { app, candidateName, resumeText } of apps) {
     if (useAI) {
       if (stopMessage) {
         results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: stopMessage });
@@ -314,13 +326,17 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
         const parsed = JSON.parse(ai.text.replace(/```json|```/g, "").trim());
         const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
 
-        await db.from("job_applications").update({
+        const { error: updateErr } = await db.from("job_applications").update({
           match_score: score,
           match_summary: parsed.summary || "",
           match_raw_response: parsed,
           status: "screened",
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
+        if (updateErr) {
+          results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: "Could not save the score" });
+          continue;
+        }
 
         results.push({ application_id: app.id, candidate_name: candidateName, score, summary: parsed.summary });
       } catch {
@@ -332,13 +348,17 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
         const result = algorithmicMatch(jd, resumeText);
         const score = result.score;
 
-        await db.from("job_applications").update({
+        const { error: updateErr } = await db.from("job_applications").update({
           match_score: score,
           match_summary: result.summary || "",
           match_raw_response: result,
           status: "screened",
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
+        if (updateErr) {
+          results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: "Could not save the score" });
+          continue;
+        }
 
         results.push({ application_id: app.id, candidate_name: candidateName, score, summary: result.summary });
       } catch {

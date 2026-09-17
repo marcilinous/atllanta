@@ -23,7 +23,7 @@ before(async () => {
     function chain(table) {
       const ops = [];
       const c = {};
-      for (const m of ['select', 'eq', 'in', 'is', 'single', 'maybeSingle', 'update', 'insert', 'upsert']) {
+      for (const m of ['select', 'eq', 'in', 'is', 'order', 'single', 'maybeSingle', 'update', 'insert', 'upsert']) {
         c[m] = (...a) => { ops.push([m, ...a]); return c; };
       }
       c.then = (resolve) => {
@@ -135,7 +135,7 @@ describe('match', () => {
   const tables = () => {
     S.tables.job_applications = (ops) => ops[0][0] === 'update' ? { data: null, error: null } : { data: { id: 'app-1', job_id: 'job-1', candidate_id: 'cand-1' }, error: null };
     S.tables.jobs = { data: { id: 'job-1', title: 'Java Dev', jd_raw_text: 'Java JD', description: null, org_id: 'org-1' }, error: null };
-    S.tables.candidates = { data: { id: 'cand-1', full_name: 'Asha', name: null, resume_text: 'Java resume', resume_raw_text: null }, error: null };
+    S.tables.candidates = { data: { id: 'cand-1', full_name: 'Asha', name: null, resume_text: 'Java resume', resume_raw_text: null, org_id: 'org-1' }, error: null };
   };
 
   test('scores through the gateway as match, reports tokens and never touches credits', async () => {
@@ -157,12 +157,39 @@ describe('match', () => {
     assert.equal(S.db.some(e => e.table === 'job_applications' && e.ops[0][0] === 'upsert'), false);
   });
 
+  test('refuses another organisation\'s candidate before creating an application or calling AI', async () => {
+    tables();
+    S.tables.candidates = { data: { id: 'cand-9', full_name: 'Other', resume_text: 'Other resume', org_id: 'org-2' }, error: null };
+    const r = res(); await handlers.match(post({ job_id: 'job-1', candidate_id: 'cand-9' }), r);
+    assert.deepEqual([r.statusCode, r.body], [403, { error: 'No access to this candidate' }]);
+    assert.equal(S.ai.length, 0);
+    assert.equal(S.db.some(e => e.table === 'job_applications' && e.ops[0][0] === 'upsert'), false);
+  });
+
   test('passes a quota refusal through and saves nothing', async () => {
     tables();
     S.aiResults = [limited];
     const r = res(); await handlers.match(post({ application_id: 'app-1' }), r);
     assert.deepEqual([r.statusCode, r.body], [429, limited.body]);
     assert.equal(S.db.some(e => e.table === 'job_applications' && e.ops[0][0] === 'update'), false);
+  });
+
+  test('a job load error surfaces as 503 rather than a false 404/403', async () => {
+    tables();
+    S.tables.jobs = { data: null, error: { message: 'connection reset' } };
+    const r = res(); await handlers.match(post({ application_id: 'app-1' }), r);
+    assert.deepEqual([r.statusCode, r.body], [503, { error: 'Could not load data — please try again' }]);
+    assert.equal(S.ai.length, 0);
+  });
+
+  test('an update error while saving the match is reported, not leaked', async () => {
+    tables();
+    S.tables.job_applications = (ops) => ops[0][0] === 'update'
+      ? { data: null, error: { message: 'connection reset' } }
+      : { data: { id: 'app-1', job_id: 'job-1', candidate_id: 'cand-1' }, error: null };
+    S.aiResults = [ok('{"score":82,"summary":"Strong","strengths":["Java"],"gaps":[]}', 700)];
+    const r = res(); await handlers.match(post({ application_id: 'app-1' }), r);
+    assert.deepEqual([r.statusCode, r.body], [500, { error: 'Could not save the match — please try again' }]);
   });
 });
 
@@ -184,6 +211,20 @@ describe('screen-job', () => {
     assert.deepEqual(S.ai.map(a => a.feature), ['screen', 'screen']);
     assert.notEqual(JSON.stringify(S.ai[0].messages), JSON.stringify(S.ai[1].messages));
     assert.equal(creditTouched(), false);
+    const candOp = S.db.find(e => e.table === 'candidates');
+    assert.ok(candOp.ops.some(op => op[0] === 'eq' && op[1] === 'org_id' && op[2] === 'org-1'));
+  });
+
+  test('an update error while saving a score is reported per-candidate, and tokens already spent still count', async () => {
+    setup(1);
+    S.tables.job_applications = (ops) => ops[0][0] === 'update'
+      ? { data: null, error: { message: 'connection reset' } }
+      : { data: [{ id: 'app-0', candidate_id: 'cand-0', match_score: null }], error: null };
+    S.aiResults = [ok('{"score":70,"summary":"a"}', 500)];
+    const r = res(); await handlers['screen-job'](post({ job_id: 'job-1', method: 'ai' }), r);
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(r.body.results[0], { application_id: 'app-0', candidate_name: 'Cand 0', score: null, error: 'Could not save the score' });
+    assert.equal(r.body.tokens_used, 500);
   });
 
   test('stops calling AI after the first quota refusal and marks the rest', async () => {
@@ -201,6 +242,26 @@ describe('screen-job', () => {
     const r = res(); await handlers['screen-job'](post({ job_id: 'job-1', method: 'ai' }), r);
     assert.equal(S.ai.length, 50);
     assert.deepEqual([r.body.processed, r.body.remaining], [50, 10]);
+  });
+
+  test('candidates without resume text do not use up the 50-per-run cap', async () => {
+    S.tables.jobs = { data: { id: 'job-1', title: 'Java Dev', jd_raw_text: 'Java JD', description: null, org_id: 'org-1' }, error: null };
+    const noResume = Array.from({ length: 5 }, (_, i) => ({ id: `app-n${i}`, candidate_id: `cand-n${i}`, match_score: null }));
+    const withResume = Array.from({ length: 50 }, (_, i) => ({ id: `app-r${i}`, candidate_id: `cand-r${i}`, match_score: null }));
+    const apps = [...noResume, ...withResume];
+    S.tables.job_applications = (ops) => ops[0][0] === 'update' ? { data: null, error: null } : { data: apps, error: null };
+    S.tables.candidates = {
+      data: [
+        ...noResume.map((a, i) => ({ id: a.candidate_id, full_name: `NoResume ${i}`, resume_text: '' })),
+        ...withResume.map((a, i) => ({ id: a.candidate_id, full_name: `Resume ${i}`, resume_text: `resume ${i}` })),
+      ],
+      error: null,
+    };
+    const r = res(); await handlers['screen-job'](post({ job_id: 'job-1', method: 'ai' }), r);
+    assert.equal(S.ai.length, 50);
+    assert.deepEqual([r.body.processed, r.body.remaining], [50, 0]);
+    assert.equal(r.body.results.filter(x => x.error === 'No resume text').length, 5);
+    assert.equal(r.body.results.filter(x => typeof x.score === 'number').length, 50);
   });
 
   test('keyword screening never calls AI', async () => {
