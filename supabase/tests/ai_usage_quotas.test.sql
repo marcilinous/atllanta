@@ -79,6 +79,43 @@ begin
   end loop;
 end $$;
 
+-- 1c. Client, helper and internal function privileges ------------------------
+do $$
+declare f text; r text;
+begin
+  -- Callable by signed-in users (each re-checks the caller inside).
+  foreach f in array array[
+    'public.platform_set_org_quota(uuid,bigint,text)',
+    'public.ai_set_user_limit(uuid,bigint)',
+    'public.ai_clear_flag(bigint)',
+    'public.ai_my_usage()',
+    'public.ai_org_usage(date)',
+    'public.platform_org_usage(date)',
+    'public.platform_org_detail(uuid,date)',
+    'public.is_platform_admin()',
+    'public.ai_is_org_admin_of(uuid)'] loop
+    if not has_function_privilege('authenticated', f, 'execute') then
+      raise exception '1i: authenticated cannot execute %', f;
+    end if;
+    foreach r in array array['public', 'anon'] loop
+      if has_function_privilege(r, f, 'execute') then
+        raise exception '1j: % can execute %', r, f;
+      end if;
+    end loop;
+  end loop;
+  -- Internal: only reachable from inside SECURITY DEFINER functions.
+  foreach f in array array[
+    'public.ai_usage_report(uuid,date,date)',
+    'public.ai_org_tz(uuid)',
+    'public.ai_seed_new_org()'] loop
+    foreach r in array array['public', 'anon', 'authenticated'] loop
+      if has_function_privilege(r, f, 'execute') then
+        raise exception '1k: % can execute internal function %', r, f;
+      end if;
+    end loop;
+  end loop;
+end $$;
+
 -- 2. ai_record_usage --------------------------------------------------------
 do $$
 declare
@@ -208,5 +245,138 @@ begin
   if r.flagged is not true or r.reason is distinct from 'repeated_request' then raise exception '4k: the 10th identical request must flag: %', row_to_json(r); end if;
   if (select (detail->>'repeats')::int from ai_user_flags where user_id = ad) is distinct from 10 then raise exception '4l: detail.repeats should be 10 (blocked rows do not count)'; end if;
 end $$;
+
+-- 5. As member A --------------------------------------------------------------
+select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.member_a'), 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $$
+declare r record; v_n int;
+begin
+  begin perform ai_clear_flag(current_setting('t.flag_m')::bigint); raise exception '5a: a member cleared a flag'; exception when insufficient_privilege then null; end;
+  begin perform ai_set_user_limit(null, 1); raise exception '5b: a member set the default limit'; exception when insufficient_privilege then null; end;
+  begin perform platform_set_org_quota(current_setting('t.org_a')::uuid, 1, 'hard_stop'); raise exception '5c: a member set an org quota'; exception when insufficient_privilege then null; end;
+  begin perform ai_org_usage(null); raise exception '5d: a member read org usage'; exception when insufficient_privilege then null; end;
+  begin perform platform_org_usage(null); raise exception '5e: a member read platform usage'; exception when insufficient_privilege then null; end;
+  select count(*) into v_n from ai_usage where user_id <> auth.uid();
+  if v_n <> 0 then raise exception '5f: a member sees % usage rows of others', v_n; end if;
+  select count(*) into v_n from ai_usage where user_id = auth.uid();
+  if v_n = 0 then raise exception '5g: a member cannot see their own usage'; end if;
+  select count(*) into v_n from ai_org_quotas;
+  if v_n <> 0 then raise exception '5h: a member sees org quotas'; end if;
+  select * into r from ai_my_usage();
+  if r.daily_limit is distinct from 200000 or r.used_today is distinct from 150 then raise exception '5i: ai_my_usage wrong: %', row_to_json(r); end if;
+  begin
+    insert into ai_usage (org_id, user_id, feature, model, outcome) values (current_setting('t.org_a')::uuid, auth.uid(), 'match', 'x', 'ok');
+    raise exception '5j: a member inserted usage directly';
+  exception when insufficient_privilege then null; end;
+  begin perform ai_record_usage(current_setting('t.org_a')::uuid, auth.uid(), 'match', 'x', 1, 1, 'ok'); raise exception '5k: a member called ai_record_usage'; exception when insufficient_privilege then null; end;
+  begin perform ai_quota_check(current_setting('t.org_a')::uuid, auth.uid()); raise exception '5l: a member called ai_quota_check'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
+-- 6. As an admin of another organisation ----------------------------------------
+select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.admin_b'), 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $$
+declare v_n int;
+begin
+  begin perform ai_clear_flag(current_setting('t.flag_m')::bigint); raise exception '6a: another org''s admin cleared a flag'; exception when insufficient_privilege then null; end;
+  begin perform ai_set_user_limit(current_setting('t.member_a')::uuid, 5); raise exception '6b: another org''s admin set a limit'; exception when insufficient_privilege then null; end;
+  select count(*) into v_n from ai_usage where org_id = current_setting('t.org_a')::uuid;
+  if v_n <> 0 then raise exception '6c: another org''s admin sees org A usage'; end if;
+  select count(*) into v_n from ai_user_flags where org_id = current_setting('t.org_a')::uuid;
+  if v_n <> 0 then raise exception '6d: another org''s admin sees org A flags'; end if;
+  if (ai_org_usage(null)->'org'->>'org_id')::uuid is distinct from current_setting('t.org_b')::uuid then raise exception '6e: ai_org_usage returned another org'; end if;
+end $$;
+reset role;
+
+-- 7. As an admin of org A ---------------------------------------------------------
+select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.admin_a'), 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $$
+declare v_n int; j jsonb;
+begin
+  begin perform platform_set_org_quota(current_setting('t.org_a')::uuid, 1, 'hard_stop'); raise exception '7a: an org admin set a platform quota'; exception when insufficient_privilege then null; end;
+  begin perform platform_org_usage(null); raise exception '7b: an org admin read platform usage'; exception when insufficient_privilege then null; end;
+  begin perform platform_org_detail(current_setting('t.org_a')::uuid, null); raise exception '7c: an org admin read platform detail'; exception when insufficient_privilege then null; end;
+
+  perform ai_set_user_limit(current_setting('t.member_a')::uuid, 1234);
+  if (select daily_tokens from ai_user_limits where user_id = current_setting('t.member_a')::uuid) is distinct from 1234 then raise exception '7d: override not saved'; end if;
+  begin perform ai_set_user_limit(current_setting('t.member_a')::uuid, -1); raise exception '7e: a negative limit was accepted'; exception when invalid_parameter_value then null; end;
+  perform ai_set_user_limit(current_setting('t.member_a')::uuid, null);
+  if exists (select 1 from ai_user_limits where user_id = current_setting('t.member_a')::uuid) then raise exception '7f: null did not reset the user to the default'; end if;
+  perform ai_set_user_limit(null, 150000);
+  if (select daily_tokens from ai_user_limits where org_id = current_setting('t.org_a')::uuid and user_id is null) is distinct from 150000 then raise exception '7g: org default not saved'; end if;
+  begin perform ai_set_user_limit(null, null); raise exception '7h: a null default was accepted'; exception when invalid_parameter_value then null; end;
+
+  select count(*) into v_n from ai_usage where org_id <> current_setting('t.org_a')::uuid;
+  if v_n <> 0 then raise exception '7i: an org admin sees other orgs'' usage'; end if;
+  select count(*) into v_n from ai_usage where org_id = current_setting('t.org_a')::uuid;
+  if v_n = 0 then raise exception '7j: an org admin cannot see their org''s usage'; end if;
+
+  j := ai_org_usage(null);
+  if (j->'org'->>'org_id')::uuid is distinct from current_setting('t.org_a')::uuid or (j->>'default_daily_tokens')::bigint is distinct from 150000 then
+    raise exception '7k: ai_org_usage wrong: %', j;
+  end if;
+  if coalesce((j->'org'->>'used')::bigint, -1) < 150 or coalesce(jsonb_array_length(j->'users'), 0) = 0 or coalesce(jsonb_array_length(j->'features'), 0) = 0 or coalesce(jsonb_array_length(j->'flags'), 0) = 0 then
+    raise exception '7l: ai_org_usage sections missing: %', j;
+  end if;
+  if not exists (select 1 from jsonb_array_elements(j->'users') u where (u->>'user_id')::uuid = current_setting('t.member_a')::uuid and (u->>'flagged')::boolean) then
+    raise exception '7m: the flagged member is not marked flagged';
+  end if;
+
+  perform ai_clear_flag(current_setting('t.flag_m')::bigint);
+  if exists (select 1 from ai_user_flags where id = current_setting('t.flag_m')::bigint and (cleared_at is null or paused_until > now())) then
+    raise exception '7n: clearing did not lift the pause';
+  end if;
+end $$;
+reset role;
+
+do $$
+declare r record;
+begin
+  select * into r from ai_quota_check(current_setting('t.org_a')::uuid, current_setting('t.member_a')::uuid);
+  if r.reason = 'paused_bot_check' then raise exception '7o: a cleared flag still pauses the user'; end if;
+end $$;
+
+-- 8. As the platform admin -----------------------------------------------------------
+select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.p'), 'role', 'authenticated')::text, true);
+set local role authenticated;
+do $$
+declare j jsonb; v_n int;
+begin
+  perform platform_set_org_quota(current_setting('t.org_a')::uuid, 3000000, 'soft_limit');
+  if not exists (select 1 from ai_org_quotas where org_id = current_setting('t.org_a')::uuid and monthly_tokens = 3000000 and overage_mode = 'soft_limit') then
+    raise exception '8a: platform quota not saved';
+  end if;
+  begin perform platform_set_org_quota(current_setting('t.org_a')::uuid, -5, 'hard_stop'); raise exception '8b: a negative quota was accepted'; exception when invalid_parameter_value then null; end;
+  begin perform platform_set_org_quota(current_setting('t.org_a')::uuid, 5, 'unlimited'); raise exception '8c: an unknown mode was accepted'; exception when invalid_parameter_value then null; end;
+  select count(distinct org_id) into v_n from ai_org_quotas;
+  if v_n < 2 then raise exception '8d: the platform admin cannot see every quota'; end if;
+  j := platform_org_usage(null);
+  if not exists (select 1 from jsonb_array_elements(j->'orgs') o where (o->>'org_id')::uuid = current_setting('t.org_a')::uuid and (o->>'quota')::bigint = 3000000) then
+    raise exception '8e: platform_org_usage misses org A: %', j;
+  end if;
+  if not exists (select 1 from jsonb_array_elements(j->'flags') f where (f->>'user_id')::uuid = current_setting('t.admin_a')::uuid) then
+    raise exception '8f: platform_org_usage misses the open flag';
+  end if;
+  j := platform_org_detail(current_setting('t.org_b')::uuid, null);
+  if (j->'org'->>'org_id')::uuid is distinct from current_setting('t.org_b')::uuid then raise exception '8g: platform_org_detail returned the wrong org'; end if;
+  perform ai_clear_flag((select id from ai_user_flags where user_id = current_setting('t.admin_a')::uuid));
+  if exists (select 1 from ai_user_flags where user_id = current_setting('t.admin_a')::uuid and cleared_at is null) then
+    raise exception '8h: the platform admin could not clear a flag';
+  end if;
+end $$;
+reset role;
+
+-- 9. As anon --------------------------------------------------------------------------
+set local role anon;
+do $$
+begin
+  begin perform count(*) from ai_usage; raise exception '9a: anon read ai_usage'; exception when insufficient_privilege then null; end;
+  begin perform ai_my_usage(); raise exception '9b: anon ran ai_my_usage'; exception when insufficient_privilege then null; end;
+  begin perform is_platform_admin(); raise exception '9c: anon ran is_platform_admin'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
 
 select 'all ai usage tests passed' as result;

@@ -311,3 +311,273 @@ revoke all on function public.ai_record_usage(uuid, uuid, text, text, integer, i
 grant execute on function public.ai_record_usage(uuid, uuid, text, text, integer, integer, text, text, text) to service_role;
 revoke all on function public.ai_bot_check(uuid, uuid, text, text) from public, anon, authenticated;
 grant execute on function public.ai_bot_check(uuid, uuid, text, text) to service_role;
+
+-- Platform admin: set an organisation's quota ------------------------------------
+create or replace function public.platform_set_org_quota(p_org_id uuid, p_monthly_tokens bigint, p_overage_mode text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_platform_admin() then
+    raise exception 'platform_set_org_quota: not allowed' using errcode = '42501';
+  end if;
+  if p_monthly_tokens is null or p_monthly_tokens < 0 then
+    raise exception 'platform_set_org_quota: monthly tokens must be 0 or more' using errcode = '22023';
+  end if;
+  if p_overage_mode is null or p_overage_mode not in ('hard_stop','soft_limit') then
+    raise exception 'platform_set_org_quota: overage mode must be hard_stop or soft_limit' using errcode = '22023';
+  end if;
+  insert into public.ai_org_quotas (org_id, monthly_tokens, overage_mode, updated_by, updated_at)
+  values (p_org_id, p_monthly_tokens, p_overage_mode, auth.uid(), now())
+  on conflict (org_id) do update
+    set monthly_tokens = excluded.monthly_tokens,
+        overage_mode = excluded.overage_mode,
+        updated_by = excluded.updated_by,
+        updated_at = now();
+end $$;
+
+-- Org owner/admin: default and per-user daily limits ----------------------------------
+create or replace function public.ai_set_user_limit(p_user_id uuid, p_daily_tokens bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_org uuid;
+  v_target_org uuid;
+begin
+  select u.org_id into v_org from public.users u where u.id = auth.uid() and u.role in ('owner','admin');
+  if v_org is null then
+    raise exception 'ai_set_user_limit: not allowed' using errcode = '42501';
+  end if;
+
+  if p_user_id is null then
+    if p_daily_tokens is null or p_daily_tokens < 0 then
+      raise exception 'ai_set_user_limit: the default daily limit must be 0 or more' using errcode = '22023';
+    end if;
+    insert into public.ai_user_limits (org_id, user_id, daily_tokens, updated_by, updated_at)
+    values (v_org, null, p_daily_tokens, auth.uid(), now())
+    on conflict (org_id) where user_id is null do update
+      set daily_tokens = excluded.daily_tokens, updated_by = excluded.updated_by, updated_at = now();
+    return;
+  end if;
+
+  select u.org_id into v_target_org from public.users u where u.id = p_user_id;
+  if v_target_org is distinct from v_org then
+    raise exception 'ai_set_user_limit: not allowed' using errcode = '42501';
+  end if;
+
+  if p_daily_tokens is null then
+    delete from public.ai_user_limits where org_id = v_org and user_id = p_user_id;
+    return;
+  end if;
+  if p_daily_tokens < 0 then
+    raise exception 'ai_set_user_limit: the daily limit must be 0 or more' using errcode = '22023';
+  end if;
+  insert into public.ai_user_limits (org_id, user_id, daily_tokens, updated_by, updated_at)
+  values (v_org, p_user_id, p_daily_tokens, auth.uid(), now())
+  on conflict (org_id, user_id) where user_id is not null do update
+    set daily_tokens = excluded.daily_tokens, updated_by = excluded.updated_by, updated_at = now();
+end $$;
+
+-- Clear a bot-check flag (lifts an active pause) --------------------------------------
+create or replace function public.ai_clear_flag(p_flag_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_org uuid;
+begin
+  select f.org_id into v_org from public.ai_user_flags f where f.id = p_flag_id;
+  if v_org is null or not (public.is_platform_admin() or public.ai_is_org_admin_of(v_org)) then
+    raise exception 'ai_clear_flag: not allowed' using errcode = '42501';
+  end if;
+  update public.ai_user_flags
+     set cleared_by = auth.uid(), cleared_at = now(), paused_until = least(paused_until, now())
+   where id = p_flag_id;
+end $$;
+
+-- Every user: today's usage ----------------------------------------------------------
+create or replace function public.ai_my_usage()
+returns table (used_today bigint, daily_limit bigint, resets_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_org uuid;
+  v_tz  text;
+  v_day date;
+begin
+  select u.org_id into v_org from public.users u where u.id = auth.uid();
+  if v_org is null then return; end if;
+  v_tz := public.ai_org_tz(v_org);
+  v_day := (now() at time zone v_tz)::date;
+  used_today := coalesce((select d.tokens from public.ai_usage_user_day d where d.user_id = auth.uid() and d.day = v_day), 0);
+  daily_limit := coalesce(
+    (select l.daily_tokens from public.ai_user_limits l where l.org_id = v_org and l.user_id = auth.uid()),
+    (select l.daily_tokens from public.ai_user_limits l where l.org_id = v_org and l.user_id is null),
+    0);
+  resets_at := (v_day + 1)::timestamp at time zone v_tz;
+  return next;
+end $$;
+
+-- Shared report for one organisation and month (internal) ---------------------------------
+create or replace function public.ai_usage_report(p_org_id uuid, p_month date, p_today date)
+returns jsonb language sql stable security definer set search_path = public as $$
+  with b as (
+    select public.ai_org_tz(p_org_id) as tz,
+           p_month as m_start,
+           (p_month + interval '1 month')::date as m_end
+  ), dl as (
+    select (select l.daily_tokens from public.ai_user_limits l where l.org_id = p_org_id and l.user_id is null) as daily_tokens
+  )
+  select jsonb_build_object(
+    'org', (
+      select jsonb_build_object(
+        'org_id', o.id, 'name', o.name, 'month', b.m_start,
+        'quota', coalesce(q.monthly_tokens, 0),
+        'overage_mode', coalesce(q.overage_mode, 'hard_stop'),
+        'used', coalesce(m.tokens, 0),
+        'remaining', greatest(coalesce(q.monthly_tokens, 0) - coalesce(m.tokens, 0), 0),
+        'overage', greatest(coalesce(m.tokens, 0) - coalesce(q.monthly_tokens, 0), 0),
+        'calls', coalesce(m.calls, 0),
+        'blocked_calls', coalesce(m.blocked_calls, 0),
+        'resets_month', b.m_end::timestamp at time zone b.tz)
+      from public.organizations o
+      cross join b
+      left join public.ai_org_quotas q on q.org_id = o.id
+      left join public.ai_usage_org_month m on m.org_id = o.id and m.month = b.m_start
+      where o.id = p_org_id),
+    'default_daily_tokens', (select dl.daily_tokens from dl),
+    'users', coalesce((
+      select jsonb_agg(x.j order by x.used_month desc, x.full_name)
+      from (
+        select u.full_name, coalesce(s.tokens, 0) as used_month,
+               jsonb_build_object(
+                 'user_id', u.id, 'full_name', u.full_name, 'role', u.role,
+                 'daily_limit', coalesce(l.daily_tokens, (select dl.daily_tokens from dl), 0),
+                 'is_override', l.id is not null,
+                 'used_today', coalesce((select d.tokens from public.ai_usage_user_day d where d.user_id = u.id and d.day = p_today), 0),
+                 'used_month', coalesce(s.tokens, 0),
+                 'calls', coalesce(s.calls, 0),
+                 'blocked_calls', coalesce(s.blocked_calls, 0),
+                 'flagged', exists (select 1 from public.ai_user_flags f where f.user_id = u.id and f.cleared_at is null)) as j
+        from public.users u
+        cross join b
+        left join public.ai_user_limits l on l.org_id = p_org_id and l.user_id = u.id
+        left join lateral (
+          select sum(d.tokens) as tokens, sum(d.calls) as calls, sum(d.blocked_calls) as blocked_calls
+          from public.ai_usage_user_day d
+          where d.user_id = u.id and d.day >= b.m_start and d.day < b.m_end
+        ) s on true
+        where u.org_id = p_org_id
+      ) x), '[]'::jsonb),
+    'features', coalesce((
+      select jsonb_agg(jsonb_build_object('feature', f.feature, 'tokens', f.tokens, 'calls', f.calls) order by f.tokens desc)
+      from (
+        select a.feature, sum(a.total_tokens) as tokens, count(*) filter (where a.outcome <> 'blocked') as calls
+        from public.ai_usage a cross join b
+        where a.org_id = p_org_id
+          and a.created_at >= b.m_start::timestamp at time zone b.tz
+          and a.created_at <  b.m_end::timestamp at time zone b.tz
+        group by a.feature
+      ) f), '[]'::jsonb),
+    'days', coalesce((
+      select jsonb_agg(jsonb_build_object('day', dd.day, 'tokens', dd.tokens) order by dd.day)
+      from (
+        select d.day, sum(d.tokens) as tokens
+        from public.ai_usage_user_day d cross join b
+        where d.org_id = p_org_id and d.day >= b.m_start and d.day < b.m_end
+        group by d.day
+      ) dd), '[]'::jsonb),
+    'flags', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', f.id, 'user_id', f.user_id, 'full_name', u.full_name, 'reason', f.reason, 'detail', f.detail,
+               'created_at', f.created_at, 'paused_until', f.paused_until, 'cleared_at', f.cleared_at, 'cleared_by', f.cleared_by)
+             order by f.created_at desc)
+      from public.ai_user_flags f
+      join public.users u on u.id = f.user_id
+      cross join b
+      where f.org_id = p_org_id
+        and (f.cleared_at is null or f.created_at >= b.m_start::timestamp at time zone b.tz)), '[]'::jsonb)
+  )
+$$;
+
+-- Org owner/admin: this organisation's usage ------------------------------------------
+create or replace function public.ai_org_usage(p_month date default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_org uuid;
+  v_tz  text;
+  v_today date;
+begin
+  select u.org_id into v_org from public.users u where u.id = auth.uid() and u.role in ('owner','admin');
+  if v_org is null then
+    raise exception 'ai_org_usage: not allowed' using errcode = '42501';
+  end if;
+  v_tz := public.ai_org_tz(v_org);
+  v_today := (now() at time zone v_tz)::date;
+  return public.ai_usage_report(v_org, date_trunc('month', coalesce(p_month, v_today))::date, v_today);
+end $$;
+
+-- Platform admin: every organisation ------------------------------------------------------
+create or replace function public.platform_org_usage(p_month date default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_month date;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'platform_org_usage: not allowed' using errcode = '42501';
+  end if;
+  v_month := date_trunc('month', coalesce(p_month, (now() at time zone 'Asia/Kolkata')::date))::date;
+  return jsonb_build_object(
+    'month', v_month,
+    'orgs', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'org_id', o.id, 'name', o.name,
+               'quota', coalesce(q.monthly_tokens, 0),
+               'overage_mode', coalesce(q.overage_mode, 'hard_stop'),
+               'used', coalesce(m.tokens, 0),
+               'pct_used', case when coalesce(q.monthly_tokens, 0) > 0
+                                then round(100.0 * coalesce(m.tokens, 0) / q.monthly_tokens, 1) end,
+               'calls', coalesce(m.calls, 0),
+               'blocked_calls', coalesce(m.blocked_calls, 0),
+               'overage', greatest(coalesce(m.tokens, 0) - coalesce(q.monthly_tokens, 0), 0),
+               'open_flags', (select count(*) from public.ai_user_flags f where f.org_id = o.id and f.cleared_at is null))
+             order by o.name)
+      from public.organizations o
+      left join public.ai_org_quotas q on q.org_id = o.id
+      left join public.ai_usage_org_month m on m.org_id = o.id and m.month = v_month), '[]'::jsonb),
+    'flags', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'id', f.id, 'org_id', f.org_id, 'org_name', o.name, 'user_id', f.user_id, 'full_name', u.full_name,
+               'reason', f.reason, 'detail', f.detail, 'created_at', f.created_at, 'paused_until', f.paused_until)
+             order by f.created_at desc)
+      from public.ai_user_flags f
+      join public.organizations o on o.id = f.org_id
+      join public.users u on u.id = f.user_id
+      where f.cleared_at is null), '[]'::jsonb)
+  );
+end $$;
+
+create or replace function public.platform_org_detail(p_org_id uuid, p_month date default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_tz text;
+  v_today date;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'platform_org_detail: not allowed' using errcode = '42501';
+  end if;
+  v_tz := public.ai_org_tz(p_org_id);
+  v_today := (now() at time zone v_tz)::date;
+  return public.ai_usage_report(p_org_id, date_trunc('month', coalesce(p_month, v_today))::date, v_today);
+end $$;
+
+-- Grants (client functions) ------------------------------------------------------------------
+revoke all on function public.ai_usage_report(uuid, date, date) from public, anon, authenticated;
+revoke all on function public.platform_set_org_quota(uuid, bigint, text) from public, anon;
+grant execute on function public.platform_set_org_quota(uuid, bigint, text) to authenticated;
+revoke all on function public.ai_set_user_limit(uuid, bigint) from public, anon;
+grant execute on function public.ai_set_user_limit(uuid, bigint) to authenticated;
+revoke all on function public.ai_clear_flag(bigint) from public, anon;
+grant execute on function public.ai_clear_flag(bigint) to authenticated;
+revoke all on function public.ai_my_usage() from public, anon;
+grant execute on function public.ai_my_usage() to authenticated;
+revoke all on function public.ai_org_usage(date) from public, anon;
+grant execute on function public.ai_org_usage(date) to authenticated;
+revoke all on function public.platform_org_usage(date) from public, anon;
+grant execute on function public.platform_org_usage(date) to authenticated;
+revoke all on function public.platform_org_detail(uuid, date) from public, anon;
+grant execute on function public.platform_org_detail(uuid, date) to authenticated;
