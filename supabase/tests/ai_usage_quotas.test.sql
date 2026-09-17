@@ -1,3 +1,4 @@
+```sql
 -- Tests for the AI usage & quota database layer (spec §4, §9).
 -- Run ONLY after the migration SQL, inside a transaction that is rolled back:
 --   begin; <supabase/pending/ai_usage_quotas.sql> <this file> rollback;
@@ -59,7 +60,6 @@ begin
     raise exception '1f: new organisation lacks the 200000 default daily limit';
   end if;
 end $$;
-
 
 -- 2. ai_record_usage --------------------------------------------------------
 do $$
@@ -190,5 +190,6 @@ begin
   if not r.flagged or r.reason <> 'repeated_request' then raise exception '4k: the 10th identical request must flag: %', row_to_json(r); end if;
   if (select (detail->>'repeats')::int from ai_user_flags where user_id = ad) <> 10 then raise exception '4l: detail.repeats should be 10 (blocked rows do not count)'; end if;
 end $$;
+```
 
 select 'all ai usage tests passed' as result;

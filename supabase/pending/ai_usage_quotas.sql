@@ -161,6 +161,8 @@ grant execute on function public.ai_is_org_admin_of(uuid) to authenticated, serv
 revoke all on function public.ai_org_tz(uuid) from public, anon, authenticated;
 revoke all on function public.ai_seed_new_org() from public, anon, authenticated;
 
+
+-- Quota check (gateway, service role) ----------------------------------------
 create or replace function public.ai_quota_check(p_org_id uuid, p_user_id uuid)
 returns table (
   allowed boolean, reason text, paused_until timestamptz,
@@ -306,4 +308,5 @@ grant execute on function public.ai_quota_check(uuid, uuid) to service_role;
 revoke all on function public.ai_record_usage(uuid, uuid, text, text, integer, integer, text, text, text) from public, anon, authenticated;
 grant execute on function public.ai_record_usage(uuid, uuid, text, text, integer, integer, text, text, text) to service_role;
 revoke all on function public.ai_bot_check(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.ai_bot_check(uuid, uuid, text, text) to service_role;
 
