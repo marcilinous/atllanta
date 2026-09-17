@@ -182,6 +182,26 @@ describe('match', () => {
     assert.equal(S.ai.length, 0);
   });
 
+  test('an application that does not exist returns 404, not 503', async () => {
+    tables();
+    S.tables.job_applications = { data: null, error: null };
+    const r = res(); await handlers.match(post({ application_id: 'app-404' }), r);
+    assert.deepEqual([r.statusCode, r.body], [404, { error: 'Application not found' }]);
+    assert.equal(S.ai.length, 0);
+    const appOp = S.db.find(e => e.table === 'job_applications');
+    assert.ok(appOp.ops.some(op => op[0] === 'maybeSingle'), 'the application lookup must use maybeSingle, not single');
+  });
+
+  test('a job lookup error is a genuine error, not a missing row, and surfaces as 503', async () => {
+    tables();
+    S.tables.jobs = { data: null, error: { message: 'db down' } };
+    const r = res(); await handlers.match(post({ application_id: 'app-1' }), r);
+    assert.deepEqual([r.statusCode, r.body], [503, { error: 'Could not load data — please try again' }]);
+    assert.equal(S.ai.length, 0);
+    const jobOp = S.db.find(e => e.table === 'jobs');
+    assert.ok(jobOp.ops.some(op => op[0] === 'maybeSingle'), 'the job lookup must use maybeSingle, not single');
+  });
+
   test('an update error while saving the match is reported, not leaked', async () => {
     tables();
     S.tables.job_applications = (ops) => ops[0][0] === 'update'
@@ -278,5 +298,14 @@ describe('screen-job', () => {
     const r = res(); await handlers['screen-job'](post({ job_id: 'job-9', method: 'ai' }), r);
     assert.equal(r.statusCode, 403);
     assert.equal(S.ai.length, 0);
+  });
+
+  test('a job that does not exist returns 404, not 503', async () => {
+    S.tables.jobs = { data: null, error: null };
+    const r = res(); await handlers['screen-job'](post({ job_id: 'job-404', method: 'ai' }), r);
+    assert.deepEqual([r.statusCode, r.body], [404, { error: 'Job not found' }]);
+    assert.equal(S.ai.length, 0);
+    const jobOp = S.db.find(e => e.table === 'jobs');
+    assert.ok(jobOp.ops.some(op => op[0] === 'maybeSingle'), 'the job lookup must use maybeSingle, not single');
   });
 });

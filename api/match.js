@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       .from("job_applications")
       .select("id, job_id, candidate_id")
       .eq("id", application_id)
-      .single();
+      .maybeSingle();
     if (error) return res.status(503).json({ error: "Could not load data — please try again" });
     app = data;
     if (!app) return res.status(404).json({ error: "Application not found" });
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     .from("jobs")
     .select("id, title, jd_raw_text, description, org_id")
     .eq("id", jobId)
-    .single();
+    .maybeSingle();
   if (jobError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!job) return res.status(404).json({ error: "Job or candidate not found" });
   if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     .from("candidates")
     .select("id, full_name, name, resume_text, resume_raw_text, org_id")
     .eq("id", candidateId)
-    .single();
+    .maybeSingle();
   if (candidateError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!candidate) return res.status(404).json({ error: "Job or candidate not found" });
   if (candidate.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this candidate" });

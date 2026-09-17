@@ -223,7 +223,7 @@ export default async function handler(req, res) {
     .from("jobs")
     .select("id, title, jd_raw_text, description, org_id")
     .eq("id", job_id)
-    .single();
+    .maybeSingle();
 
   if (jobError) return res.status(503).json({ error: "Could not load data — please try again" });
   if (!job) return res.status(404).json({ error: "Job not found" });
