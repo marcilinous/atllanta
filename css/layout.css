@@ -232,6 +232,16 @@
   margin: var(--space-1) 0;
 }
 
+.user-menu-version {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.user-menu-version:empty {
+  display: none;
+}
+
 .user-menu-header {
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);

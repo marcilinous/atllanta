@@ -117,6 +117,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Sign out
           </button>
+          <div class="user-menu-version" id="app-version"></div>
         </div>
       </div>
     </div>
@@ -150,6 +151,7 @@ import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 import { startEventProcessor } from '/js/event-processor.js';
 import { esc, timeAgo, initials, avColor } from '/js/ui.js';
+import { loadVersionLabel } from '/js/version.js';
 
 // Views
 import dashboard from '/views/dashboard.js';
@@ -276,6 +278,12 @@ if (!isFeatureAllowed('crm') && !isFeatureAllowed('crm_partners')) {
 if (!isFeatureAllowed('ai')) {
   document.getElementById('ai-toggle-btn')?.style.setProperty('display', 'none');
 }
+
+// Release version, shown at the bottom of the account menu.
+loadVersionLabel().then((label) => {
+  const el = document.getElementById('app-version');
+  if (el) el.textContent = label;
+});
 
 // Dark mode
 const savedTheme = localStorage.getItem('atllanta-theme');

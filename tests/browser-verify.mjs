@@ -118,6 +118,16 @@ console.log('\n--- generic tenant (partner_crm_enabled = false) ---');
   const { page, errors } = await boot(browser, { crmEnabled: true, partnerPack: false });
   ok('app shell became visible', await page.locator('#app:not(.hidden)').count(), 1);
   ok('Analytics nav restored', await page.locator('.nav-btn[data-view="analytics"]').count(), 1);
+  try {
+    const expectedVersion = (await (await fetch(`${BASE}/version.json`)).json()).version;
+    await page.waitForFunction(() => {
+      const el = document.getElementById('app-version');
+      return el && el.textContent !== '';
+    }, null, { timeout: 5000 });
+    ok('version label shows the deployed version', await page.locator('#app-version').textContent({ timeout: 2000 }), `Atllanta v${expectedVersion}`);
+  } catch (e) {
+    ok('version label shows the deployed version', `error: ${e.message.split('\n')[0]}`, 'Atllanta v<version>');
+  }
 
   ok('crm/partners   -> blocked', await visit(page, 'crm/partners'), 'Not available');
   ok('crm/field-sales-> blocked', await visit(page, 'crm/field-sales'), 'Not available');

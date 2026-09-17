@@ -1,4 +1,4 @@
-const CACHE_NAME = "atllanta-v43";
+const CACHE_NAME = "atllanta-1.0.1";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -36,6 +36,17 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
 
   if (request.method !== "GET") return;
+
+  // The release version must always come from the network; a cached copy
+  // would show users the previous version after a release.
+  if (new URL(request.url).pathname === "/version.json") {
+    event.respondWith(
+      fetch(request).catch(() =>
+        new Response("{}", { status: 503, headers: { "Content-Type": "application/json" } })
+      )
+    );
+    return;
+  }
 
   if (request.url.includes("/api/") || request.url.includes("supabase")) {
     event.respondWith(
