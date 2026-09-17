@@ -5,6 +5,14 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.0.2 — 2026-09-17
+
+### What changed
+- Internal documents, database files and test files are no longer downloadable from the website. Only the files the app needs are published.
+
+### Admins need to
+- Nothing.
+
 ## v1.0.1 — 2026-09-17
 
 ### What changed
