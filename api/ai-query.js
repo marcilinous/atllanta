@@ -1,6 +1,6 @@
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -14,6 +14,12 @@ async function getUserFromToken(token) {
 }
 
 export default async function handler(req, res) {
+  // Disabled until Phase 1 ports main's hardened version: this implementation
+  // runs a model-chosen table and filters with the service-role client, so it
+  // can read data the caller's role cannot. The assistant panel falls back to
+  // its built-in answers when this call fails.
+  return res.status(503).json({ error: "AI assistant is temporarily unavailable" });
+
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
   const token = (req.headers.authorization || "").replace("Bearer ", "");
