@@ -27,6 +27,12 @@
       ]
     },
     {
+      "source": "/version.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
       "source": "/(icon-192.svg|icon-512.svg)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" }
