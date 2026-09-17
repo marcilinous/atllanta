@@ -17,8 +17,8 @@ function entries() {
     .filter((l) => l && !l.startsWith('#'));
 }
 
-// Normalise "/docs", "docs/", "/docs/" to "docs".
-const norm = (p) => p.replace(/^\/+/, '').replace(/\/+$/, '');
+// Normalise "/docs", "docs/", "/docs/", "./docs" to "docs".
+const norm = (p) => p.replace(/^\.\//, '').replace(/^\/+/, '').replace(/\/+$/, '');
 
 test('blocks internal documents, database files and tests', () => {
   const blocked = new Set(entries().map(norm));
