@@ -1,5 +1,8 @@
 -- AI usage tracking, token quotas and bot check (spec 2026-09-17-ai-usage-quotas-design.md §4).
 
+-- Fail fast instead of queueing behind a long transaction on organizations/users.
+set local lock_timeout = '5s';
+
 -- Tables -------------------------------------------------------------------
 create table public.platform_admins (
   user_id    uuid primary key references auth.users(id) on delete cascade,
@@ -10,7 +13,7 @@ create table public.ai_org_quotas (
   org_id         uuid primary key references public.organizations(id) on delete cascade,
   monthly_tokens bigint not null check (monthly_tokens >= 0),
   overage_mode   text   not null default 'hard_stop' check (overage_mode in ('hard_stop','soft_limit')),
-  updated_by     uuid references auth.users(id),
+  updated_by     uuid references auth.users(id) on delete set null,
   updated_at     timestamptz not null default now()
 );
 
@@ -19,7 +22,7 @@ create table public.ai_user_limits (
   org_id       uuid not null references public.organizations(id) on delete cascade,
   user_id      uuid references public.users(id) on delete cascade,
   daily_tokens bigint not null check (daily_tokens >= 0),
-  updated_by   uuid references auth.users(id),
+  updated_by   uuid references auth.users(id) on delete set null,
   updated_at   timestamptz not null default now()
 );
 create unique index ai_user_limits_user_uq    on public.ai_user_limits (org_id, user_id) where user_id is not null;
@@ -71,7 +74,7 @@ create table public.ai_user_flags (
   detail       jsonb not null default '{}'::jsonb,
   paused_until timestamptz not null,
   created_at   timestamptz not null default now(),
-  cleared_by   uuid references auth.users(id),
+  cleared_by   uuid references auth.users(id) on delete set null,
   cleared_at   timestamptz
 );
 create index ai_user_flags_org_created_idx on public.ai_user_flags (org_id, created_at);
@@ -266,13 +269,16 @@ begin
   select count(*) into v_recent
     from public.ai_usage u
    where u.user_id = p_user_id and u.outcome <> 'blocked'
-     and u.created_at > now() - interval '60 seconds';
+     and u.created_at > now() - interval '60 seconds'
+     -- Only count usage since the latest flag, so clearing a flag does not re-flag on the same rows.
+     and u.created_at > coalesce((select max(f.created_at) from public.ai_user_flags f where f.user_id = p_user_id), '-infinity'::timestamptz);
 
   if p_request_hash is not null then
     select count(*) into v_repeats
       from public.ai_usage u
      where u.user_id = p_user_id and u.feature = p_feature and u.request_hash = p_request_hash
-       and u.outcome <> 'blocked' and u.created_at > now() - interval '5 minutes';
+       and u.outcome <> 'blocked' and u.created_at > now() - interval '5 minutes'
+       and u.created_at > coalesce((select max(f.created_at) from public.ai_user_flags f where f.user_id = p_user_id), '-infinity'::timestamptz);
   end if;
 
   if v_recent >= 60 then
@@ -387,7 +393,7 @@ begin
   end if;
   update public.ai_user_flags
      set cleared_by = auth.uid(), cleared_at = now(), paused_until = least(paused_until, now())
-   where id = p_flag_id;
+   where id = p_flag_id and cleared_at is null;
 end $$;
 
 -- Every user: today's usage ----------------------------------------------------------
@@ -484,13 +490,17 @@ returns jsonb language sql stable security definer set search_path = public as $
     'flags', coalesce((
       select jsonb_agg(jsonb_build_object(
                'id', f.id, 'user_id', f.user_id, 'full_name', u.full_name, 'reason', f.reason, 'detail', f.detail,
-               'created_at', f.created_at, 'paused_until', f.paused_until, 'cleared_at', f.cleared_at, 'cleared_by', f.cleared_by)
+               'created_at', f.created_at, 'paused_until', f.paused_until, 'cleared_at', f.cleared_at,
+               'cleared_by', f.cleared_by, 'cleared_by_name', cb.full_name)
              order by f.created_at desc)
       from public.ai_user_flags f
       join public.users u on u.id = f.user_id
+      left join public.users cb on cb.id = f.cleared_by
       cross join b
       where f.org_id = p_org_id
-        and (f.cleared_at is null or f.created_at >= b.m_start::timestamp at time zone b.tz)), '[]'::jsonb)
+        and (f.cleared_at is null
+             or (f.created_at >= b.m_start::timestamp at time zone b.tz
+                 and f.created_at < b.m_end::timestamp at time zone b.tz))), '[]'::jsonb)
   )
 $$;
 

@@ -71,7 +71,7 @@ ai_org_quotas
   org_id          uuid primary key references organizations(id) on delete cascade
   monthly_tokens  bigint not null check (monthly_tokens >= 0)
   overage_mode    text   not null default 'hard_stop' check (overage_mode in ('hard_stop','soft_limit'))
-  updated_by      uuid references auth.users(id)
+  updated_by      uuid references auth.users(id) on delete set null
   updated_at      timestamptz not null default now()
 
 ai_user_limits
@@ -79,7 +79,7 @@ ai_user_limits
   org_id        uuid not null references organizations(id) on delete cascade
   user_id       uuid references users(id) on delete cascade   -- null = organisation default
   daily_tokens  bigint not null check (daily_tokens >= 0)
-  updated_by    uuid references auth.users(id)
+  updated_by    uuid references auth.users(id) on delete set null
   updated_at    timestamptz not null default now()
   unique (org_id, user_id)            -- plus a partial unique index on (org_id) where user_id is null
 
@@ -123,7 +123,7 @@ ai_user_flags
   detail        jsonb not null default '{}'    -- e.g. {"calls_last_minute": 74} or {"feature":"match","repeats":12}
   paused_until  timestamptz not null
   created_at    timestamptz not null default now()
-  cleared_by    uuid references auth.users(id)
+  cleared_by    uuid references auth.users(id) on delete set null
   cleared_at    timestamptz
   index (org_id, created_at), index (user_id, paused_until)
 ```

@@ -116,6 +116,24 @@ begin
   end loop;
 end $$;
 
+-- 1d. Table privileges ---------------------------------------------------------
+do $$
+declare tb text; p text;
+begin
+  foreach tb in array array[
+    'public.platform_admins', 'public.ai_org_quotas', 'public.ai_user_limits', 'public.ai_usage',
+    'public.ai_usage_org_month', 'public.ai_usage_user_day', 'public.ai_user_flags'] loop
+    foreach p in array array['select', 'insert', 'update', 'delete', 'truncate'] loop
+      if has_table_privilege('anon', tb, p) then raise exception '1l: anon has % on %', p, tb; end if;
+    end loop;
+    foreach p in array array['insert', 'update', 'delete', 'truncate'] loop
+      if has_table_privilege('authenticated', tb, p) then raise exception '1m: authenticated has % on %', p, tb; end if;
+    end loop;
+    if not has_table_privilege('authenticated', tb, 'select') then raise exception '1n: authenticated lacks select on %', tb; end if;
+    if not has_table_privilege('service_role', tb, 'insert') then raise exception '1o: service_role lacks insert on %', tb; end if;
+  end loop;
+end $$;
+
 -- 2. ai_record_usage --------------------------------------------------------
 do $$
 declare
@@ -278,7 +296,7 @@ reset role;
 select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.admin_b'), 'role', 'authenticated')::text, true);
 set local role authenticated;
 do $$
-declare v_n int;
+declare v_n int; tb text;
 begin
   begin perform ai_clear_flag(current_setting('t.flag_m')::bigint); raise exception '6a: another org''s admin cleared a flag'; exception when insufficient_privilege then null; end;
   begin perform ai_set_user_limit(current_setting('t.member_a')::uuid, 5); raise exception '6b: another org''s admin set a limit'; exception when insufficient_privilege then null; end;
@@ -287,6 +305,10 @@ begin
   select count(*) into v_n from ai_user_flags where org_id = current_setting('t.org_a')::uuid;
   if v_n <> 0 then raise exception '6d: another org''s admin sees org A flags'; end if;
   if (ai_org_usage(null)->'org'->>'org_id')::uuid is distinct from current_setting('t.org_b')::uuid then raise exception '6e: ai_org_usage returned another org'; end if;
+  foreach tb in array array['public.ai_org_quotas', 'public.ai_usage_org_month', 'public.ai_user_limits', 'public.ai_usage_user_day'] loop
+    execute format('select count(*) from %s where org_id = $1', tb) into v_n using current_setting('t.org_a')::uuid;
+    if v_n <> 0 then raise exception '6f: another org''s admin sees % org A rows in %', v_n, tb; end if;
+  end loop;
 end $$;
 reset role;
 
@@ -294,7 +316,7 @@ reset role;
 select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.admin_a'), 'role', 'authenticated')::text, true);
 set local role authenticated;
 do $$
-declare v_n int; j jsonb;
+declare v_n int; j jsonb; tb text;
 begin
   begin perform platform_set_org_quota(current_setting('t.org_a')::uuid, 1, 'hard_stop'); raise exception '7a: an org admin set a platform quota'; exception when insufficient_privilege then null; end;
   begin perform platform_org_usage(null); raise exception '7b: an org admin read platform usage'; exception when insufficient_privilege then null; end;
@@ -313,6 +335,10 @@ begin
   if v_n <> 0 then raise exception '7i: an org admin sees other orgs'' usage'; end if;
   select count(*) into v_n from ai_usage where org_id = current_setting('t.org_a')::uuid;
   if v_n = 0 then raise exception '7j: an org admin cannot see their org''s usage'; end if;
+  foreach tb in array array['public.ai_org_quotas', 'public.ai_usage_org_month', 'public.ai_user_limits', 'public.ai_usage_user_day', 'public.ai_user_flags'] loop
+    execute format('select count(*) from %s where org_id <> $1', tb) into v_n using current_setting('t.org_a')::uuid;
+    if v_n <> 0 then raise exception '7q: an org admin sees % other-org rows in %', v_n, tb; end if;
+  end loop;
 
   j := ai_org_usage(null);
   if (j->'org'->>'org_id')::uuid is distinct from current_setting('t.org_a')::uuid or (j->>'default_daily_tokens')::bigint is distinct from 150000 then
@@ -337,6 +363,8 @@ declare r record;
 begin
   select * into r from ai_quota_check(current_setting('t.org_a')::uuid, current_setting('t.member_a')::uuid);
   if r.reason = 'paused_bot_check' then raise exception '7o: a cleared flag still pauses the user'; end if;
+  select * into r from ai_bot_check(current_setting('t.org_a')::uuid, current_setting('t.member_a')::uuid, 'assistant', 'h-new');
+  if r.flagged is not false then raise exception '7p: the next call after clearing re-flagged the user on the same rows'; end if;
 end $$;
 
 -- 8. As the platform admin -----------------------------------------------------------
