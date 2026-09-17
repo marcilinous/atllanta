@@ -1,0 +1,12 @@
+# Kept out of every Vercel deployment: internal documents, database files and
+# tests were publicly downloadable from the site. Paths are anchored to the
+# repo root. tests/vercelignore.test.mjs checks nothing the site needs is listed.
+/docs
+/supabase
+/tests
+/playwright.config.js
+/CLAUDE.md
+/DESIGN.md
+/README.md
+/.env.example
+/.superpowers
