@@ -509,7 +509,7 @@ export default async function recruitmentJobs(container) {
               <input type="radio" name="method" value="python" checked> <div><strong>Keyword</strong><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Free, instant</div></div>
             </label>
             <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:pointer;flex:1">
-              <input type="radio" name="method" value="ai"> <div><strong>AI (Groq)</strong><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">1 credit/resume</div></div>
+              <input type="radio" name="method" value="ai"> <div><strong>AI (Groq)</strong><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Uses AI tokens</div></div>
             </label>
           </div>
         </div>
@@ -555,7 +555,7 @@ export default async function recruitmentJobs(container) {
         barEl.style.width = '100%';
         const scored = (data.results || []).filter(r => r.score != null).length;
         const failed = (data.results || []).filter(r => r.error).length;
-        statusEl.textContent = `Done: ${scored} scored${failed ? `, ${failed} failed` : ''}${data.credits_used ? ` · ${data.credits_used} credits used` : ''}`;
+        statusEl.textContent = `Done: ${scored} scored${failed ? `, ${failed} not scored` : ''}${data.tokens_used ? ` · ${data.tokens_used.toLocaleString('en-IN')} AI tokens used` : ''}${data.remaining ? ` · ${data.remaining} more to screen — run again` : ''}`;
         btn.textContent = 'Done';
         toast(`Screening complete: ${scored} scored`);
         await loadData();

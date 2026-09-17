@@ -8,20 +8,7 @@
 // Body: { description: "...", job_id?: "..." }
 // Returns: { parsed_skills: { must_have, nice_to_have, ... } }
 
-import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
-
-const GROQ_MODEL = "openai/gpt-oss-120b";
-
-async function getUserFromToken(token) {
-  const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!resp.ok) return null;
-  return resp.json();
-}
+import { resolveCaller, runAI } from "../lib/aiGateway.js";
 
 function getExtension(filename) {
   const dot = filename.lastIndexOf(".");
@@ -38,13 +25,11 @@ export default async function handler(req, res) {
   }
 
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ error: "Missing auth token" });
-
-  const user = await getUserFromToken(token);
-  if (!user?.id) return res.status(401).json({ error: "Invalid session" });
+  const caller = await resolveCaller(token);
+  if (!caller.ok) return res.status(caller.status).json({ error: caller.error });
 
   const action = req.query?.action;
-  if (action === "parse-jd") return handleParseJD(req, res);
+  if (action === "parse-jd") return handleParseJD(req, res, caller);
 
   const { filename, data } = req.body || {};
   if (!filename || !data) {
@@ -97,12 +82,18 @@ export default async function handler(req, res) {
   return res.status(200).json({ text });
 }
 
-async function handleParseJD(req, res) {
+async function handleParseJD(req, res, caller) {
   const { description, job_id } = req.body || {};
   if (!description) return res.status(400).json({ error: "description is required" });
 
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!groqKey) return res.status(500).json({ error: "GROQ_API_KEY not configured" });
+  if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: "GROQ_API_KEY not configured" });
+
+  // Only parse into a job the caller's organisation owns.
+  if (job_id) {
+    const { data: job } = await caller.db.from("jobs").select("id, org_id").eq("id", job_id).maybeSingle();
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
+  }
 
   const prompt = `Extract skills from this job description. Return JSON only:
 {
@@ -116,39 +107,29 @@ async function handleParseJD(req, res) {
 Job Description:
 ${description.slice(0, 4000)}`;
 
-  const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: "system", content: "You extract structured skills from job descriptions. Return valid JSON only, no markdown." },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.1,
-      max_tokens: 1024,
-    }),
+  const ai = await runAI({
+    caller,
+    feature: "jd_parse",
+    messages: [
+      { role: "system", content: "You extract structured skills from job descriptions. Return valid JSON only, no markdown." },
+      { role: "user", content: prompt },
+    ],
+    maxTokens: 1024,
+    temperature: 0.1,
+    metadata: job_id ? { job_id } : {},
   });
-
-  if (!groqResp.ok) {
-    const err = await groqResp.text();
-    return res.status(502).json({ error: "Groq API error", details: err });
-  }
-
-  const result = await groqResp.json();
-  const text = result.choices?.[0]?.message?.content || "";
+  if (!ai.ok) return res.status(ai.status).json(ai.body);
 
   let parsed;
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    const jsonMatch = ai.text.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : ai.text);
   } catch {
-    return res.status(200).json({ raw: text, parsed_skills: null });
+    return res.status(200).json({ raw: ai.text, parsed_skills: null });
   }
 
   if (job_id) {
-    const sb = supabaseAdmin();
-    await sb.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id);
+    await caller.db.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id);
   }
 
   return res.status(200).json({ parsed_skills: parsed });

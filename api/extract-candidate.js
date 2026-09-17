@@ -1,22 +1,10 @@
 // POST /api/extract-candidate
-// Takes raw resume text, uses Groq to extract structured candidate details.
+// Takes raw resume text, uses AI (through lib/aiGateway.js) to extract
+// structured candidate details.
 // Body: { resume_text: "..." }
 // Returns: { name, email, phone, summary }
 
-import { SUPABASE_URL } from "../lib/supabaseServer.js";
-
-const GROQ_MODEL = "openai/gpt-oss-120b";
-
-async function getUserFromToken(token) {
-  const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!resp.ok) return null;
-  return resp.json();
-}
+import { resolveCaller, runAI } from "../lib/aiGateway.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -26,16 +14,13 @@ export default async function handler(req, res) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel → Settings → Environment Variables (enable for Preview)." });
   }
-
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ error: "Missing auth token" });
-
-  const user = await getUserFromToken(token);
-  if (!user?.id) return res.status(401).json({ error: "Invalid session" });
-
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ error: "GROQ_API_KEY is not set on the server." });
   }
+
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const caller = await resolveCaller(token);
+  if (!caller.ok) return res.status(caller.status).json({ error: caller.error });
 
   const { resume_text } = req.body || {};
   if (!resume_text || !resume_text.trim()) {
@@ -50,33 +35,18 @@ If a field is not found, use null. For phone, include country code if visible (e
 RESUME TEXT:
 ${resume_text.slice(0, 4000)}`;
 
-  const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.1,
-      max_tokens: 300,
-      reasoning_effort: "low",
-      messages: [{ role: "user", content: prompt }],
-    }),
+  const ai = await runAI({
+    caller,
+    feature: "candidate_extract",
+    messages: [{ role: "user", content: prompt }],
+    maxTokens: 300,
+    temperature: 0.1,
   });
+  if (!ai.ok) return res.status(ai.status).json(ai.body);
 
-  if (!groqResp.ok) {
-    const detail = await groqResp.text();
-    return res.status(502).json({ error: "Groq request failed", detail });
-  }
-
-  const groqData = await groqResp.json();
   let parsed;
   try {
-    const raw = (groqData.choices?.[0]?.message?.content || "")
-      .replace(/```json|```/g, "")
-      .trim();
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(ai.text.replace(/```json|```/g, "").trim());
   } catch {
     return res.status(502).json({ error: "Could not parse model response" });
   }

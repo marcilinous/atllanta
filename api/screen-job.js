@@ -1,13 +1,13 @@
 // POST /api/screen-job
 // Batch-scores candidates for a given job.
 // Body: { job_id, mode: "unscored" | "all", application_ids?: string[], method: "ai" | "python" }
-// method=ai  → Groq LLM scoring (costs 1 credit per candidate)
+// method=ai  → AI scoring through lib/aiGateway.js (uses AI tokens; max 50 candidates per request)
 // method=python → keyword + TF-IDF algorithmic scoring (free)
-// Returns: { results: [{ application_id, candidate_name, score, error? }], credits_used }
+// Returns: { results: [{ application_id, candidate_name, score, error? }], tokens_used, processed, remaining, method }
 
-import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { resolveCaller, runAI } from "../lib/aiGateway.js";
 
-const GROQ_MODEL = "openai/gpt-oss-120b";
+const AI_BATCH_LIMIT = 50;
 
 // ── Algorithmic matching engine ─────────────────────────────────────
 
@@ -194,19 +194,6 @@ function algorithmicMatch(jdText, resumeText) {
   };
 }
 
-// ── Auth helper ─────────────────────────────────────────────────────
-
-async function getUserFromToken(token) {
-  const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!resp.ok) return null;
-  return resp.json();
-}
-
 // ── Handler ─────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -219,12 +206,10 @@ export default async function handler(req, res) {
   }
 
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ error: "Missing auth token" });
+  const caller = await resolveCaller(token);
+  if (!caller.ok) return res.status(caller.status).json({ error: caller.error });
 
-  const user = await getUserFromToken(token);
-  if (!user?.id) return res.status(401).json({ error: "Invalid or expired session — please log in again" });
-
-  const db = supabaseAdmin();
+  const db = caller.db;
   const { job_id, mode, application_ids, method } = req.body || {};
   if (!job_id) return res.status(400).json({ error: "job_id is required" });
 
@@ -241,17 +226,7 @@ export default async function handler(req, res) {
     .single();
 
   if (!job) return res.status(404).json({ error: "Job not found" });
-
-  const { data: profile } = await db
-    .from("users")
-    .select("org_id, role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const allowed = profile && profile.org_id && profile.org_id === job.org_id;
-  if (!allowed) return res.status(403).json({ error: "No access to this job" });
-
-  const orgId = job.org_id;
+  if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
 
   const jd = job.jd_raw_text || job.description || "";
   if (!jd.trim()) {
@@ -269,10 +244,13 @@ export default async function handler(req, res) {
     appsQuery = appsQuery.is("match_score", null);
   }
 
-  const { data: apps } = await appsQuery;
-  if (!apps?.length) {
-    return res.status(200).json({ results: [], credits_used: 0, message: "No candidates to screen" });
+  const { data: allApps } = await appsQuery;
+  if (!allApps?.length) {
+    return res.status(200).json({ results: [], tokens_used: 0, processed: 0, remaining: 0, method: useAI ? "ai" : "python", message: "No candidates to screen" });
   }
+
+  const apps = useAI ? allApps.slice(0, AI_BATCH_LIMIT) : allApps;
+  const remaining = allApps.length - apps.length;
 
   const candIds = apps.map((a) => a.candidate_id);
   const { data: candidates } = await db
@@ -283,27 +261,22 @@ export default async function handler(req, res) {
   const candMap = {};
   (candidates || []).forEach((c) => { candMap[c.id] = c; });
 
-  const { data: org } = await db
-    .from("organizations")
-    .select("id, credits_balance, credit_overage_mode")
-    .eq("id", orgId)
-    .single();
-
   const results = [];
-  let creditsUsed = 0;
-  let creditsRemaining = org.credits_balance;
+  let tokensUsed = 0;
+  let stopMessage = null;   // set by the first gateway refusal; later candidates are not sent to AI
 
   for (const app of apps) {
     const cand = candMap[app.candidate_id];
-    if (!(cand?.resume_text || cand?.resume_raw_text)?.trim()) {
-      results.push({ application_id: app.id, candidate_name: cand?.full_name || cand?.name || "Unknown", score: null, error: "No resume text" });
+    const candidateName = cand?.full_name || cand?.name || "Unknown";
+    const resumeText = cand?.resume_text || cand?.resume_raw_text;
+    if (!resumeText?.trim()) {
+      results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: "No resume text" });
       continue;
     }
 
     if (useAI) {
-      // ── AI matching (Groq) ──────────────────────────────────────
-      if (org.credit_overage_mode === "hard_stop" && creditsRemaining <= 0) {
-        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Out of credits" });
+      if (stopMessage) {
+        results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: stopMessage });
         continue;
       }
 
@@ -315,36 +288,30 @@ JOB DESCRIPTION:
 ${jd.slice(0, 6000)}
 
 RESUME:
-${(cand.resume_text || cand.resume_raw_text).slice(0, 6000)}
+${resumeText.slice(0, 6000)}
 
 Respond ONLY with minified JSON, no markdown fences, in this exact shape:
 {"score": <0-100 number>, "summary": "<2-3 sentence assessment>", "strengths": ["..."], "gaps": ["..."]}`;
 
+      const ai = await runAI({
+        caller,
+        feature: "screen",
+        messages: [{ role: "user", content: prompt }],
+        maxTokens: 600,
+        temperature: 0.2,
+        metadata: { application_id: app.id, job_id: job.id },
+      });
+
+      if (!ai.ok) {
+        const message = ai.body?.error || "AI request failed";
+        if (ai.status === 429 || ai.status === 503) stopMessage = message;
+        results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: message });
+        continue;
+      }
+
+      tokensUsed += ai.usage.total;
       try {
-        const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: GROQ_MODEL,
-            temperature: 0.2,
-            max_tokens: 600,
-            reasoning_effort: "low",
-            messages: [{ role: "user", content: prompt }],
-          }),
-        });
-
-        if (!groqResp.ok) {
-          results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Groq API error" });
-          continue;
-        }
-
-        const groqData = await groqResp.json();
-        const raw = (groqData.choices?.[0]?.message?.content || "")
-          .replace(/```json|```/g, "").trim();
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(ai.text.replace(/```json|```/g, "").trim());
         const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
 
         await db.from("job_applications").update({
@@ -355,24 +322,14 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
 
-        creditsRemaining -= 1;
-        creditsUsed += 1;
-        await db.from("organizations").update({ credits_balance: creditsRemaining }).eq("id", orgId);
-        await db.from("credit_ledger").insert({
-          organization_id: orgId,
-          action_type: "resume_match",
-          credits_delta: -1,
-          reference_id: app.id,
-        });
-
-        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score, summary: parsed.summary });
-      } catch (err) {
-        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Parse error" });
+        results.push({ application_id: app.id, candidate_name: candidateName, score, summary: parsed.summary });
+      } catch {
+        results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: "Parse error" });
       }
     } else {
       // ── Algorithmic matching (free) ─────────────────────────────
       try {
-        const result = algorithmicMatch(jd, cand.resume_text || cand.resume_raw_text);
+        const result = algorithmicMatch(jd, resumeText);
         const score = result.score;
 
         await db.from("job_applications").update({
@@ -383,12 +340,18 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
           updated_at: new Date().toISOString(),
         }).eq("id", app.id);
 
-        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score, summary: result.summary });
-      } catch (err) {
-        results.push({ application_id: app.id, candidate_name: cand.full_name || cand.name, score: null, error: "Matching error" });
+        results.push({ application_id: app.id, candidate_name: candidateName, score, summary: result.summary });
+      } catch {
+        results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: "Matching error" });
       }
     }
   }
 
-  return res.status(200).json({ results, credits_used: creditsUsed, credits_remaining: creditsRemaining, method: useAI ? "ai" : "python" });
+  return res.status(200).json({
+    results,
+    tokens_used: tokensUsed,
+    processed: apps.length,
+    remaining,
+    method: useAI ? "ai" : "python",
+  });
 }
