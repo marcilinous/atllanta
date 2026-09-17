@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.1.0 — 2026-09-17
+
+### What changed
+- Behind the scenes, Atllanta can now record AI usage per organisation, user and feature; hold a monthly AI token quota per organisation and a daily limit per user; and pause a user's AI for 10 minutes when their use looks automated. Nothing uses this yet, so AI features behave exactly as before.
+- Every existing organisation starts with 2,000,000 AI tokens a month (stops at the limit) and a default of 200,000 tokens a day per user. New organisations start with 2,000 tokens a month.
+
+### Admins need to
+- Nothing.
+
 ## v1.0.2 — 2026-09-17
 
 ### What changed
