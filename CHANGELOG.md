@@ -9,6 +9,7 @@ was promoted to production.
 
 ### What changed
 - The app now shows its version at the bottom of the account menu (click your avatar), so you can always tell which release you are using.
+- After a release, the app fetches its version fresh instead of from its offline cache, and old cached files are cleared, so the label always shows the release you are on.
 
 ### Admins need to
 - Nothing.

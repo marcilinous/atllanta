@@ -232,7 +232,8 @@ The bot check (decision 2.13, `ai_bot_check`) replaces a fixed per-minute rate l
 - `CHANGELOG.md`: newest first; per release: version, date, "What changed" (plain language), "Admins need to" (if anything).
 - `version.json` at the site root: `{ "version": "x.y.z" }`, served statically (no function) with `Cache-Control: no-store`. (No commit hash: the merge commit is not known when the release PR is written; the git tag records it.)
 - The version is shown as "Atllanta vX.Y.Z" at the bottom of the account menu (click the avatar), read from `/version.json` at load. (The sidebar is icon-only, 64px wide, so it has no room for text.)
-- Each release PR bumps `VERSION`, `package.json`, `version.json` and `CHANGELOG.md`. After the owner promotes it and the live check passes, the promoted commit is tagged `vX.Y.Z` and pushed.
+- Each release PR bumps `VERSION`, `package.json`, `version.json`, `sw.js` `CACHE_NAME` and `CHANGELOG.md`. After the owner promotes it and the live check passes, the promoted commit is tagged `vX.Y.Z` and pushed.
+- `sw.js` `CACHE_NAME` is `"atllanta-" + VERSION` (a unit test enforces it), so each release installs a new service worker that deletes old caches. The service worker fetches `/version.json` from the network only, never from Cache Storage. Pages served from the old cache can still show the previous app for one load after a release; the version label itself is always current.
 - A unit test fails if `VERSION`, `package.json` `version` and `version.json` disagree.
 - Baseline: tag `3b5f39b` as `v1.0.0` with a changelog entry describing the Phase 0 production state.
 
@@ -241,7 +242,7 @@ The bot check (decision 2.13, `ai_bot_check`) replaces a fixed per-minute rate l
 | Version | Contents | User-visible |
 |---|---|---|
 | v1.0.0 | Baseline tag on `3b5f39b` (current production) | — |
-| v1.0.1 | Versioning mechanics (section 7) | Version line in sidebar |
+| v1.0.1 | Versioning mechanics (section 7) | Version line in account menu |
 | v1.1.0 | Migration: tables, RLS, functions, seed (section 4) | No |
 | v1.2.0 | `lib/aiGateway.js` + recruitment endpoints on quotas; credits stop (section 5) | Recruitment AI shows tokens / quota messages |
 | v1.3.0 | Platform console + organisation AI usage page + "AI today" indicator (section 6) | Yes |
