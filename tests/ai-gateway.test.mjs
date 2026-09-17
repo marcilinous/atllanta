@@ -217,22 +217,36 @@ describe('runAI', () => {
     assert.equal(groqCalls().length, 0);
   });
 
-  test('a Groq failure returns 502 and records an error row with no tokens and no request hash', async () => {
+  test('a Groq failure returns 502 and records an error row with no tokens and no request hash', async (t) => {
+    t.mock.method(console, 'error', () => {});
     S.groq = () => new Response('upstream boom', { status: 500 });
     const c = await caller();
     const r = await gw.runAI({ caller: c, feature: 'jd_parse', messages, maxTokens: 1024 });
     assert.equal(r.status, 502);
-    assert.equal(r.body.error, 'AI request failed — please try again');
+    assert.deepEqual(r.body, { error: 'AI request failed — please try again' });
     const rec = rpcs('ai_record_usage')[0].args;
     assert.deepEqual([rec.p_outcome, rec.p_prompt, rec.p_completion, rec.p_block_reason, rec.p_request_hash], ['error', 0, 0, null, null]);
   });
 
-  test('a network error reaching Groq is handled like a Groq failure', async () => {
+  test('a network error reaching Groq is handled like a Groq failure', async (t) => {
+    t.mock.method(console, 'error', () => {});
     S.groq = () => { throw new Error('ECONNRESET'); };
     const c = await caller();
     const r = await gw.runAI({ caller: c, feature: 'match', messages, maxTokens: 600 });
     assert.equal(r.status, 502);
     assert.equal(rpcs('ai_record_usage')[0].args.p_outcome, 'error');
+  });
+
+  test('an unparseable Groq body (200 with invalid JSON) returns 502 and records an error row', async (t) => {
+    t.mock.method(console, 'error', () => {});
+    S.groq = () => new Response('not json', { status: 200 });
+    const c = await caller();
+    const r = await gw.runAI({ caller: c, feature: 'match', messages, maxTokens: 600 });
+    assert.equal(r.status, 502);
+    assert.deepEqual(r.body, { error: 'AI request failed — please try again' });
+    assert.equal(rpcs('ai_record_usage').length, 1);
+    const rec = rpcs('ai_record_usage')[0].args;
+    assert.deepEqual([rec.p_outcome, rec.p_prompt, rec.p_completion, rec.p_block_reason, rec.p_request_hash], ['error', 0, 0, null, null]);
   });
 
   test('a failed usage record is logged but the result is still returned', async (t) => {
