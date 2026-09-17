@@ -195,6 +195,47 @@ Mined from LibreUIUX `accessibility-compliance`.
 
 ---
 
+## 8a. Charting — Chart.js (owner-approved exception)
+
+Analytics charts use **Chart.js** (pinned, ESM via the jsdelivr CDN the app
+already uses — `chart.js@4.4.1/auto/+esm`), lazy-loaded only on the view that
+needs it. This is a deliberate, owner-approved exception to §2's vanilla-only
+rule for charts specifically — it is a library, not a framework, and hand-rolled
+SVG was declined for the Sales snapshot. Charts pass concrete colours (Chart.js
+can't resolve CSS `var()`); read `--color-text-secondary` / `--color-border` off
+the root for theme-aware axes, and destroy chart instances before re-rendering.
+Do not reach for other chart libs; do not use Chart.js for non-analytics UI.
+
+## 9a. Navigation — the Back control (global rule)
+
+A "Back" control ALWAYS returns the user to their **previous page** (browser
+history), never a hardcoded route. Render it with `backButton()` from `js/ui.js`,
+or put `data-back` on the control; a global handler (`js/ui.js`) calls
+`history.back()`, falling back to the element's `href` (then the dashboard) only
+on a fresh load with no history.
+
+```js
+import { backButton } from '../../js/ui.js';
+// in a page header:
+`${backButton('crm')}`            // "← Back"; 'crm' is only the fresh-load fallback
+// or, on any element:
+`<a href="#/crm" class="btn btn-secondary" data-back>← Back</a>`
+```
+
+Do NOT hardcode a back destination (`<a href="#/crm">← CRM</a>`). Label it
+"← Back", not the name of a specific screen. Wizard/step "Back" buttons (moving to
+a previous step, not a previous page) are exempt.
+
+## 9b. UI copy — no internal process explanations (critical)
+
+Never surface internal process, policy, or business-logic rationale in the product
+UI. No explainer banners, helper notes, or microcopy that describe *why* the
+company works a way or *how* data is treated internally (e.g. "recorded as the
+partner reports it — we don't verify the end customer"). The UI states what a
+field is and what to do — nothing about the process behind it. Keep such rationale
+in code comments / docs only. Labels and placeholders name the input plainly
+("Name", "Remarks"), never editorialize ("Name (as told)").
+
 ## 10. How to build UI (Define → Build → Review → Refine)
 
 From LibreUIUX `premium-saas-design`, adapted:

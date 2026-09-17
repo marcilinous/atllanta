@@ -1,6 +1,6 @@
 {
   "name": "atllanta",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "AI-powered resume-to-JD matching, scheduling and outreach for HR teams and staffing agencies.",
@@ -11,6 +11,12 @@
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0"
+    "@playwright/test": "^1.52.0",
+    "serve": "^14.2.6"
+  },
+  "scripts": {
+    "test:unit": "node --test tests/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test:browser": "node tests/browser-verify.mjs"
   }
 }

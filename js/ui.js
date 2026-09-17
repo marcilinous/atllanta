@@ -1,5 +1,29 @@
 import sb from './supabase.js';
 
+// Global back navigation: any element with [data-back] returns to the user's
+// PREVIOUS page (browser history), never a hardcoded route. On a fresh load with
+// no history to go back to, it falls back to the element's href, then the
+// dashboard. Standard: render the "← Back" control with backButton().
+if (typeof document !== 'undefined' && !window.__atllantaBackHandler) {
+  window.__atllantaBackHandler = true;
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-back]');
+    if (!el) return;
+    e.preventDefault();
+    if (window.history.length > 1) { window.history.back(); return; }
+    const href = el.getAttribute('href');
+    window.location.hash = (href && href !== '#') ? href
+      : (el.dataset.back ? '#/' + el.dataset.back.replace(/^#?\/?/, '') : '#/dashboard');
+  });
+}
+
+// Standard "← Back" control. Optional fallbackRoute (e.g. 'crm') is where it goes
+// only on a fresh load with no browser history.
+export function backButton(fallbackRoute = '', label = 'Back', cls = 'btn btn-secondary') {
+  const href = fallbackRoute ? ` href="#/${esc(fallbackRoute)}"` : ' href="#"';
+  return `<a${href} class="${cls}" data-back>← ${esc(label)}</a>`;
+}
+
 export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])

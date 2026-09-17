@@ -5,7 +5,7 @@
 
 import { SUPABASE_URL } from "../lib/supabaseServer.js";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -60,6 +60,7 @@ ${resume_text.slice(0, 4000)}`;
       model: GROQ_MODEL,
       temperature: 0.1,
       max_tokens: 300,
+      reasoning_effort: "low",
       messages: [{ role: "user", content: prompt }],
     }),
   });

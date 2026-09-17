@@ -7,7 +7,7 @@
 
 import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 // ── Algorithmic matching engine ─────────────────────────────────────
 
@@ -331,6 +331,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
             model: GROQ_MODEL,
             temperature: 0.2,
             max_tokens: 600,
+            reasoning_effort: "low",
             messages: [{ role: "user", content: prompt }],
           }),
         });

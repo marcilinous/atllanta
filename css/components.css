@@ -47,6 +47,62 @@
 .btn-lg { height: 42px; padding: var(--space-3) var(--space-6); font-size: var(--text-base); }
 .btn-block { width: 100%; }
 
+/* ── Segmented control ────────────────────────
+   A pill group of mutually-exclusive toggles (grain, dimension, tabs).
+   Reads as one control, not a row of loose buttons. */
+.seg {
+  display: inline-flex;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  padding: 3px;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.seg::-webkit-scrollbar { display: none; }
+.seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  padding: 7px 12px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg-btn:hover { color: var(--color-text-primary); }
+.seg-btn.is-active {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Control bar ──────────────────────────────
+   Labeled clusters of filters/toggles that wrap cleanly on mobile. */
+.control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.control-group { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.control-group.grow { flex: 1; min-width: 0; }
+/* Keep a control bar on one straight line; scroll horizontally if cramped. */
+.control-bar.nowrap { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.control-bar.nowrap::-webkit-scrollbar { display: none; }
+.control-bar.nowrap .control-group { flex-wrap: nowrap; flex-shrink: 0; }
+.control-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 /* ── Input ────────────────────────────────── */
 .form-group { margin-bottom: var(--space-4); }
 

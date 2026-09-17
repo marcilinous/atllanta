@@ -27,15 +27,18 @@ async function processEvents() {
 
   processing = true;
   try {
-    const { data: events, error } = await sb
-      .from('events')
-      .select('*')
-      .eq('org_id', org.id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
-      .limit(BATCH_SIZE);
+    // Claim a batch atomically. claim_events() marks the rows `processing`
+    // and returns them, so no two consumers (browser tab or server backstop)
+    // ever run the same recipe. A plain SELECT + UPDATE cannot do this: the
+    // events table has no UPDATE policy, so client-side status writes are
+    // silently dropped by RLS.
+    const { data: events, error } = await sb.rpc('claim_events', { batch_size: BATCH_SIZE });
 
-    if (error || !events?.length) return;
+    if (error) {
+      console.error('claim_events failed:', error.message);
+      return;
+    }
+    if (!events?.length) return;
 
     for (const event of events) {
       await processOne(event, org);
@@ -49,29 +52,25 @@ async function processEvents() {
 
 async function processOne(event, org) {
   try {
-    await sb.from('events').update({ status: 'processing' }).eq('id', event.id);
-
     const handler = HANDLERS[event.event_type];
     if (handler) {
-      await handler(event.payload, org, event.actor_id);
+      await handler(event.payload, org, event.actor_id, event.id);
     }
-
-    await sb.from('events').update({
-      status: 'completed',
-      processed_at: new Date().toISOString(),
-      attempts: (event.attempts || 0) + 1
-    }).eq('id', event.id);
+    await sb.rpc('resolve_event', { event_id: event.id, new_status: 'completed' });
   } catch (e) {
     console.error(`Event ${event.event_type} failed:`, e);
-    const attempts = (event.attempts || 0) + 1;
-    await sb.from('events').update({
-      status: attempts >= 3 ? 'failed' : 'pending',
-      attempts
-    }).eq('id', event.id);
+    // attempts was already incremented by claim_events; fail permanently
+    // after the 3rd try, otherwise re-queue for another pass.
+    const finalStatus = (event.attempts || 0) >= 3 ? 'failed' : 'pending';
+    await sb.rpc('resolve_event', { event_id: event.id, new_status: finalStatus, p_error: String(e?.message || e).slice(0, 500) });
   }
 }
 
-async function notify(orgId, userId, title, body, module, entityType, entityId) {
+// `email` flags a notification for outbound email. It is queued via
+// email_status='pending' and delivered by the server-side dispatcher
+// (api/event-processor.js), which holds the Resend key. The browser never
+// sends email directly.
+async function notify(orgId, userId, title, body, module, entityType, entityId, email = false) {
   if (!userId) return;
   await sb.from('notifications').insert({
     org_id: orgId,
@@ -82,11 +81,12 @@ async function notify(orgId, userId, title, body, module, entityType, entityId) 
     entity_type: entityType || null,
     entity_id: entityId || null,
     channel: 'in_app',
-    status: 'unread'
+    status: 'unread',
+    email_status: email ? 'pending' : 'none'
   });
 }
 
-async function notifyByRole(orgId, roles, title, body, module, entityType, entityId) {
+async function notifyByRole(orgId, roles, title, body, module, entityType, entityId, email = false) {
   const { data: users } = await sb
     .from('users')
     .select('id')
@@ -104,7 +104,8 @@ async function notifyByRole(orgId, roles, title, body, module, entityType, entit
     entity_type: entityType || null,
     entity_id: entityId || null,
     channel: 'in_app',
-    status: 'unread'
+    status: 'unread',
+    email_status: email ? 'pending' : 'none'
   }));
   await sb.from('notifications').insert(rows);
 }
@@ -130,48 +131,50 @@ const HANDLERS = {
     const managerId = await getManager(p.user_id);
     const name = await getUserName(p.user_id);
     if (managerId) {
-      await notify(org.id, managerId, 'New leave request', `${name} has applied for leave`, 'leave', 'leave_request', p.leave_request_id);
+      await notify(org.id, managerId, 'New leave request', `${name} has applied for leave`, 'leave', 'leave_request', p.leave_request_id, true);
     }
     await notifyByRole(org.id, ['admin', 'owner'], 'New leave request', `${name} has applied for leave`, 'leave', 'leave_request', p.leave_request_id);
   },
 
-  'leave.request.approved': async (p, org) => {
+  'leave.request.approved': async (p, org, actorId, eventId) => {
     const approverName = await getUserName(p.approved_by);
-    await notify(org.id, p.user_id, 'Leave approved', `Your leave request was approved by ${approverName}`, 'leave', 'leave_request', p.leave_request_id);
+    await notify(org.id, p.user_id, 'Leave approved', `Your leave request was approved by ${approverName}`, 'leave', 'leave_request', p.leave_request_id, true);
 
     if (p.days && p.leave_type_id && p.user_id) {
       const year = new Date().getFullYear();
       const days = parseFloat(p.days) || 0;
       if (days > 0) {
-        const { data: bal } = await sb
-          .from('leave_balances')
-          .select('id, used')
-          .eq('user_id', p.user_id)
-          .eq('leave_type_id', p.leave_type_id)
-          .eq('year', year)
-          .single();
-
-        if (bal) {
-          await sb.from('leave_balances').update({
-            used: (parseFloat(bal.used) || 0) + days
-          }).eq('id', bal.id);
-        } else {
-          await sb.from('leave_balances').insert({
-            org_id: org.id,
-            user_id: p.user_id,
-            leave_type_id: p.leave_type_id,
-            year,
-            opening_balance: 0,
-            accrued: 0,
-            used: days
+        // Idempotent: apply the used-days increment at most once per event, so a
+        // retry (or the server backstop re-running this) can't double-count.
+        const firstTime = eventId
+          ? (await sb.rpc('claim_side_effect', { p_event_id: eventId, p_effect_key: 'leave_used' })).data
+          : true;
+        if (firstTime) {
+          const { data: newUsed } = await sb.rpc('apply_leave_usage', {
+            p_user_id: p.user_id,
+            p_leave_type_id: p.leave_type_id,
+            p_year: year,
+            p_days: days,
           });
+
+          if (newUsed == null) {
+            await sb.from('leave_balances').upsert({
+              org_id: org.id,
+              user_id: p.user_id,
+              leave_type_id: p.leave_type_id,
+              year,
+              opening_balance: 0,
+              accrued: 0,
+              used: days
+            }, { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
+          }
         }
       }
     }
   },
 
   'leave.request.rejected': async (p, org) => {
-    await notify(org.id, p.user_id, 'Leave rejected', 'Your leave request was rejected', 'leave', 'leave_request', p.leave_request_id);
+    await notify(org.id, p.user_id, 'Leave rejected', 'Your leave request was rejected', 'leave', 'leave_request', p.leave_request_id, true);
   },
 
   'attendance.checkin.completed': async (p, org) => {
@@ -214,12 +217,12 @@ const HANDLERS = {
     const managerId = await getManager(p.user_id);
     const name = await getUserName(p.user_id);
     if (managerId) {
-      await notify(org.id, managerId, 'Regularization request', `${name} has requested attendance regularization`, 'attendance', 'attendance_regularization', p.regularization_id);
+      await notify(org.id, managerId, 'Regularization request', `${name} has requested attendance regularization`, 'attendance', 'attendance_regularization', p.regularization_id, true);
     }
   },
 
   'attendance.regularization.approved': async (p, org) => {
-    await notify(org.id, p.user_id, 'Regularization approved', 'Your attendance regularization was approved', 'attendance', 'attendance_regularization', p.regularization_id);
+    await notify(org.id, p.user_id, 'Regularization approved', 'Your attendance regularization was approved', 'attendance', 'attendance_regularization', p.regularization_id, true);
   },
 
   'people.employee.created': async (p, org) => {
@@ -240,7 +243,7 @@ const HANDLERS = {
         accrued: t.annual_quota || 0,
         used: 0
       }));
-      await sb.from('leave_balances').insert(balances);
+      await sb.from('leave_balances').upsert(balances, { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
     }
 
     const managerId = await getManager(p.employee_id);
@@ -253,8 +256,16 @@ const HANDLERS = {
   },
 
   'recruitment.candidate.shortlisted': async (p, org) => {
-    const { data: job } = await sb.from('jobs').select('title, created_by').eq('id', p.job_id).single();
-    if (job?.created_by) {
+    const { data: job } = await sb.from('jobs').select('title, created_by, hiring_manager_id').eq('id', p.job_id).single();
+    // The assigned hiring manager schedules the interview, so the action item
+    // goes to them; the job's author is the fallback and, when different, gets
+    // a plain heads-up. Keep this in step with the server recipe in
+    // api/event-processor.js — whichever processor claims the event first wins.
+    const owner = job?.hiring_manager_id || job?.created_by;
+    if (owner) {
+      await notify(org.id, owner, 'Candidate shortlisted — schedule interview', `A candidate has been shortlisted for ${job.title || 'a position'}. Please schedule an interview.`, 'recruitment', 'job_application', p.application_id, true);
+    }
+    if (job?.created_by && job.created_by !== owner) {
       await notify(org.id, job.created_by, 'Candidate shortlisted', `A candidate has been shortlisted for ${job.title || 'a position'}`, 'recruitment', 'job_application', p.application_id);
     }
   },
@@ -281,7 +292,8 @@ const HANDLERS = {
             entity_type: 'helpdesk_ticket',
             entity_id: p.ticket_id,
             channel: 'in_app',
-            status: 'unread'
+            status: 'unread',
+            email_status: 'pending'
           }));
         if (rows.length) {
           await sb.from('notifications').insert(rows);
@@ -291,13 +303,13 @@ const HANDLERS = {
     }
 
     if (!notified) {
-      await notifyByRole(org.id, ['admin', 'owner'], 'New helpdesk ticket', `${name} raised: ${p.title || p.subject || 'a new ticket'}`, 'helpdesk', 'helpdesk_ticket', p.ticket_id);
+      await notifyByRole(org.id, ['admin', 'owner'], 'New helpdesk ticket', `${name} raised: ${p.title || p.subject || 'a new ticket'}`, 'helpdesk', 'helpdesk_ticket', p.ticket_id, true);
     }
   },
 
   'helpdesk.ticket.updated': async (p, org) => {
     if (p.user_id && p.status) {
-      await notify(org.id, p.user_id, 'Ticket updated', `Your helpdesk ticket has been ${p.status}`, 'helpdesk', 'helpdesk_ticket', p.ticket_id);
+      await notify(org.id, p.user_id, 'Ticket updated', `Your helpdesk ticket has been ${p.status}`, 'helpdesk', 'helpdesk_ticket', p.ticket_id, true);
     }
   },
 
@@ -318,19 +330,20 @@ const HANDLERS = {
         entity_type: 'announcement',
         entity_id: null,
         channel: 'in_app',
-        status: 'unread'
+        status: 'unread',
+        email_status: 'none'
       }));
       await sb.from('notifications').insert(rows);
     }
   },
 
   'finance.expense.created': async (p, org) => {
-    await notifyByRole(org.id, ['admin', 'owner'], 'New expense claim', `An expense of ${p.amount || '—'} has been submitted for approval`, 'finance', 'expense', p.expense_id);
+    await notifyByRole(org.id, ['admin', 'owner'], 'New expense claim', `An expense of ${p.amount || '—'} has been submitted for approval`, 'finance', 'expense', p.expense_id, true);
   },
 
   'finance.expense.approved': async (p, org) => {
     if (p.user_id) {
-      await notify(org.id, p.user_id, 'Expense approved', `Your expense claim has been approved`, 'finance', 'expense', p.expense_id);
+      await notify(org.id, p.user_id, 'Expense approved', `Your expense claim has been approved`, 'finance', 'expense', p.expense_id, true);
     }
   },
 
@@ -344,5 +357,44 @@ const HANDLERS = {
 
   'recruitment.candidates.bulk_uploaded': async (p, org) => {
     await notifyByRole(org.id, ['admin', 'owner'], 'Resumes uploaded', `${p.count || 0} candidate resumes were uploaded`, 'recruitment', null, null);
+  },
+
+  // ── CRM ──────────────────────────────────────────────
+  // owner_id is carried in the payload so the recipe never depends on the
+  // processing browser being able to read the (role-restricted) CRM record.
+  'crm.lead.created': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'New lead assigned', `${p.name || 'A lead'} was assigned to you`, 'crm', 'lead', p.lead_id, true);
+    }
+  },
+
+  'crm.lead.converted': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'Lead converted', 'A lead you own was converted to an account', 'crm', 'account', p.account_id || null);
+    }
+  },
+
+  'crm.opportunity.created': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'New deal assigned', `${p.name || 'A deal'} was assigned to you`, 'crm', 'opportunity', p.opportunity_id, true);
+    }
+  },
+
+  'crm.opportunity.won': async (p, org, actorId) => {
+    const ownerId = p.owner_id;
+    const body = `${p.name || 'A deal'} was marked won`;
+    if (ownerId && ownerId !== actorId) {
+      await notify(org.id, ownerId, 'Deal won 🎉', body, 'crm', 'opportunity', p.opportunity_id, true);
+    }
+    const mgr = ownerId ? await getManager(ownerId) : null;
+    if (mgr && mgr !== actorId && mgr !== ownerId) {
+      await notify(org.id, mgr, 'Deal won 🎉', body, 'crm', 'opportunity', p.opportunity_id, true);
+    }
+  },
+
+  'crm.opportunity.lost': async (p, org, actorId) => {
+    if (p.owner_id && p.owner_id !== actorId) {
+      await notify(org.id, p.owner_id, 'Deal lost', `${p.name || 'A deal'} was marked lost`, 'crm', 'opportunity', p.opportunity_id);
+    }
   }
 };

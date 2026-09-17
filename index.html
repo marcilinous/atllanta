@@ -40,9 +40,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-tooltip">People</span>
       </button>
+      <button class="nav-btn" data-view="crm" aria-label="CRM">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-3"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
+        <span class="nav-tooltip">CRM</span>
+      </button>
       <button class="nav-btn" data-view="reports" aria-label="Reports" data-role="manager">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span class="nav-tooltip">Reports</span>
+      </button>
+      <button class="nav-btn" data-view="analytics" aria-label="Analytics" data-role="manager">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="nav-tooltip">Analytics</span>
       </button>
       <button class="nav-btn" data-view="documents" aria-label="Documents">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -109,6 +117,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Sign out
           </button>
+          <div class="user-menu-version" id="app-version"></div>
         </div>
       </div>
     </div>
@@ -136,11 +145,13 @@
 import sb from '/js/supabase.js';
 import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
+import { loadFeatureAccess, isFeatureAllowed, FEATURES, setCrmEnabled, setPartnerPack } from '/js/features.js';
 import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
 import { initGlobalSearch } from '/js/search.js';
 import { initAIPanel, toggleAIPanel } from '/js/ai.js';
 import { startEventProcessor } from '/js/event-processor.js';
 import { esc, timeAgo, initials, avColor } from '/js/ui.js';
+import { loadVersionLabel } from '/js/version.js';
 
 // Views
 import dashboard from '/views/dashboard.js';
@@ -176,6 +187,9 @@ import approvalsInbox from '/views/approvals.js';
 import inboxView from '/views/inbox.js';
 import onboarding from '/views/onboarding.js';
 import reportsView from '/views/reports/index.js';
+import analyticsHome from '/views/analytics/index.js';
+import analyticsQuestion from '/views/analytics/builder.js';
+import analyticsDashboard from '/views/analytics/dashboard.js';
 import documentsView from '/views/documents/index.js';
 import financeView from '/views/finance/index.js';
 import adminView from '/views/admin/index.js';
@@ -192,6 +206,19 @@ import lettersView from '/views/people/letters.js';
 import lifecycleView from '/views/people/lifecycle.js';
 import peopleHub from '/views/people/index.js';
 import profileSettings from '/views/settings/profile.js';
+import crmHub from '/views/crm/index.js';
+import crmLeads from '/views/crm/leads.js';
+import crmFieldSales from '/views/crm/field-sales.js';
+import crmPjp from '/views/crm/pjp.js';
+import crmSales from '/views/crm/sales.js';
+import crmPartners from '/views/crm/partners.js';
+import crmPartnerDetail from '/views/crm/partner-detail.js';
+import crmVisitForm from '/views/crm/visit-form.js';
+import crmEvents from '/views/crm/events.js';
+import crmProspects from '/views/crm/prospects.js';
+import crmOpportunities from '/views/crm/opportunities.js';
+import crmExports from '/views/crm/exports.js';
+import crmReports from '/views/crm/reports.js';
 
 const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
@@ -232,6 +259,30 @@ document.querySelectorAll('.nav-btn[data-role="manager"]').forEach(btn => {
 });
 document.querySelectorAll('.nav-btn[data-role="admin"]').forEach(btn => {
   if (!isAdmin) btn.style.display = 'none';
+});
+
+// Platform + admin/HR-configurable feature access. Platform gates (generic CRM,
+// the RTcompu partner pack) are NOT bypassed by an org's own admins, so a tenant
+// without the pack never sees the partner screens. Loaded before the router so
+// the very first route is gated too.
+setCrmEnabled(org?.crm_enabled);
+setPartnerPack(org?.partner_crm_enabled);
+await loadFeatureAccess({ orgId: org?.id, userId: user?.id, role: userRole, isAdmin });
+FEATURES.forEach(f => {
+  if (f.locked || isFeatureAllowed(f.key)) return;
+  document.querySelectorAll(`.nav-btn[data-view="${f.key}"]`).forEach(btn => { btn.style.display = 'none'; });
+});
+if (!isFeatureAllowed('crm') && !isFeatureAllowed('crm_partners')) {
+  document.querySelectorAll('.nav-btn[data-view="crm"]').forEach(btn => { btn.style.display = 'none'; });
+}
+if (!isFeatureAllowed('ai')) {
+  document.getElementById('ai-toggle-btn')?.style.setProperty('display', 'none');
+}
+
+// Release version, shown at the bottom of the account menu.
+loadVersionLabel().then((label) => {
+  const el = document.getElementById('app-version');
+  if (el) el.textContent = label;
 });
 
 // Dark mode
@@ -431,6 +482,9 @@ registerRoute('employees/orgchart', orgChart);
 registerRoute('approvals', approvalsInbox);
 registerRoute('onboarding', onboarding);
 registerRoute('reports', reportsView);
+registerRoute('analytics', analyticsHome);
+registerRoute('analytics/question', analyticsQuestion);
+registerRoute('analytics/dashboard', analyticsDashboard);
 registerRoute('documents', documentsView);
 registerRoute('finance', financeView);
 registerRoute('admin', adminView);
@@ -445,6 +499,19 @@ registerRoute('finance/categories', expenseCategoriesView);
 registerRoute('assets', assetsView);
 registerRoute('letters', lettersView);
 registerRoute('lifecycle', lifecycleView);
+registerRoute('crm', crmHub);
+registerRoute('crm/leads', crmLeads);
+registerRoute('crm/field-sales', crmFieldSales);
+registerRoute('crm/pjp', crmPjp);
+registerRoute('crm/sales', crmSales);
+registerRoute('crm/partners', crmPartners);
+registerRoute('crm/partner', crmPartnerDetail);
+registerRoute('crm/log-visit', crmVisitForm);
+registerRoute('crm/events', crmEvents);
+registerRoute('crm/prospects', crmProspects);
+registerRoute('crm/opportunities', crmOpportunities);
+registerRoute('crm/exports', crmExports);
+registerRoute('crm/reports', crmReports);
 
 initRouter(document.getElementById('main-content'));
 
