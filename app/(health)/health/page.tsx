@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { count } from "drizzle-orm";
-import { getDb } from "@/src/db";
+import { getDb, isDatabaseConfigured } from "@/src/db";
 import { organizations, users } from "@/src/db/schema/platform";
 import { ComponentSample } from "./component-sample";
 
@@ -49,7 +49,7 @@ export default async function HealthPage() {
     // Never the message: driver messages can carry the host or user name.
     const code = (err as { code?: unknown } | null)?.code;
     console.error("health: database check failed", {
-      envPresent: Boolean(process.env.DATABASE_URL),
+      envPresent: isDatabaseConfigured(),
       code: typeof code === "string" ? code : undefined,
     });
   }

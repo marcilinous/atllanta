@@ -30,6 +30,11 @@ function buildClient(): Db | null {
   return drizzle(client, { schema: platformSchema });
 }
 
+/** Whether the connection string is set at all. Never exposes its value. */
+export function isDatabaseConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
 /**
  * Returns the Drizzle client, or throws a generic error if DATABASE_URL is
  * not configured. Never leaks the connection string or a raw driver error.
