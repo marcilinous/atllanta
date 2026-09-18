@@ -1,4 +1,5 @@
 {
+  "framework": "nextjs",
   "cleanUrls": true,
   "crons": [
     { "path": "/api/event-processor", "schedule": "0 3 * * *" }
