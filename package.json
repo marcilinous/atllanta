@@ -1,6 +1,6 @@
 {
   "name": "atllanta",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "AI-powered resume-to-JD matching, scheduling and outreach for HR teams and staffing agencies.",

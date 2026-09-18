@@ -398,6 +398,8 @@ export default async function recruitmentJobs(container) {
       startBtn.textContent = 'Processing...';
       const token = await getAuthToken();
       let successCount = 0;
+      let aiStopped = false;
+      let batchGatewayError = null;
 
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
@@ -414,17 +416,33 @@ export default async function recruitmentJobs(container) {
           const parseData = await parseResp.json();
           if (!parseResp.ok) throw new Error(parseData.error);
 
-          const extractResp = await fetch('/api/extract-candidate', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ resume_text: parseData.text }),
-          });
-          const extractData = await extractResp.json();
-          if (!extractResp.ok) throw new Error(extractData.error);
+          let name = file.name.replace(/\.[^.]+$/, '');
+          let email = null;
+          let phone = null;
 
-          const name = extractData.name || file.name.replace(/\.[^.]+$/, '');
-          const email = extractData.email || null;
-          const phone = extractData.phone || null;
+          if (!aiStopped) {
+            const extractResp = await fetch('/api/extract-candidate', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ resume_text: parseData.text }),
+            });
+            const extractData = await extractResp.json();
+            if (!extractResp.ok) {
+              if (!batchGatewayError) {
+                batchGatewayError = extractData.error;
+                toast(batchGatewayError);
+              }
+              // Any gateway refusal (quota, Groq outage, usage-check failure) stops
+              // AI extraction for the rest of the batch — not just 429 — so a
+              // large upload during an outage doesn't fire one failing AI call per
+              // file and trip the bot check's calls-per-minute rule.
+              aiStopped = true;
+            } else {
+              name = extractData.name || name;
+              email = extractData.email || null;
+              phone = extractData.phone || null;
+            }
+          }
 
           let candId;
           if (email || phone) {
@@ -509,7 +527,7 @@ export default async function recruitmentJobs(container) {
               <input type="radio" name="method" value="python" checked> <div><strong>Keyword</strong><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Free, instant</div></div>
             </label>
             <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:pointer;flex:1">
-              <input type="radio" name="method" value="ai"> <div><strong>AI (Groq)</strong><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">1 credit/resume</div></div>
+              <input type="radio" name="method" value="ai"> <div><strong>AI (Groq)</strong><div style="font-size:var(--text-xs);color:var(--color-text-secondary)">Uses AI tokens</div></div>
             </label>
           </div>
         </div>
@@ -554,10 +572,12 @@ export default async function recruitmentJobs(container) {
 
         barEl.style.width = '100%';
         const scored = (data.results || []).filter(r => r.score != null).length;
-        const failed = (data.results || []).filter(r => r.error).length;
-        statusEl.textContent = `Done: ${scored} scored${failed ? `, ${failed} failed` : ''}${data.credits_used ? ` · ${data.credits_used} credits used` : ''}`;
+        const errored = (data.results || []).filter(r => r.error);
+        const failed = errored.length;
+        const message = errored.find(r => r.error !== 'No resume text')?.error || errored[0]?.error;
+        statusEl.textContent = `Done: ${scored} scored${failed ? `, ${failed} not scored` : ''}${data.tokens_used ? ` · ${data.tokens_used.toLocaleString('en-IN')} AI tokens used` : ''}${data.remaining ? ` · ${data.remaining} not screened (50 per run)` : ''}${message ? ` · ${message}` : ''}`;
         btn.textContent = 'Done';
-        toast(`Screening complete: ${scored} scored`);
+        toast(scored === 0 && message ? message : `Screening complete: ${scored} scored`);
         await loadData();
         renderJobs();
       } catch (err) {

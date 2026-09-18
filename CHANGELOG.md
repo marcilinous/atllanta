@@ -5,6 +5,18 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.0 — 2026-09-17
+
+### What changed
+- Recruitment AI (reading resumes, parsing job descriptions, matching and AI screening) now counts AI tokens against your organisation's monthly quota and each person's daily limit, instead of credits. Credits are no longer deducted.
+- If a limit is reached, the screen says so ("You've used today's AI limit. It resets at midnight." or "Your organisation's monthly AI quota is used up. It resets on the 1st.").
+- AI screening handles up to 50 candidates per run; candidates without resume text don't count toward the 50. Run "Unscored only" again for the rest.
+- Unusual bursts of AI requests pause that person's AI for 10 minutes and notify the organisation's owners and admins.
+- Matching and job-description parsing now check that the job and candidate belong to your organisation.
+
+### Admins need to
+- Nothing for existing organisations: they start with 2,000,000 AI tokens a month and 200,000 per person per day. New organisations start with 2,000 tokens a month until the platform owner raises it.
+
 ## v1.1.0 — 2026-09-17
 
 ### What changed
