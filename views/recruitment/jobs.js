@@ -398,7 +398,7 @@ export default async function recruitmentJobs(container) {
       startBtn.textContent = 'Processing...';
       const token = await getAuthToken();
       let successCount = 0;
-      let quotaHit = false;
+      let aiStopped = false;
       let batchGatewayError = null;
 
       for (let i = 0; i < selectedFiles.length; i++) {
@@ -420,7 +420,7 @@ export default async function recruitmentJobs(container) {
           let email = null;
           let phone = null;
 
-          if (!quotaHit) {
+          if (!aiStopped) {
             const extractResp = await fetch('/api/extract-candidate', {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -432,7 +432,11 @@ export default async function recruitmentJobs(container) {
                 batchGatewayError = extractData.error;
                 toast(batchGatewayError);
               }
-              if (extractResp.status === 429) quotaHit = true;
+              // Any gateway refusal (quota, Groq outage, usage-check failure) stops
+              // AI extraction for the rest of the batch — not just 429 — so a
+              // large upload during an outage doesn't fire one failing AI call per
+              // file and trip the bot check's calls-per-minute rule.
+              aiStopped = true;
             } else {
               name = extractData.name || name;
               email = extractData.email || null;
