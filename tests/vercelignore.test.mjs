@@ -33,7 +33,7 @@ test('never blocks what the site or its functions need', () => {
     'public/reset-password.html', 'public/privacy.html', 'public/terms.html', 'public/schedule.html',
     'public/sw.js', 'public/manifest.json', 'public/version.json', 'public/icon-192.svg', 'public/icon-512.svg',
     'server/legacy', 'VERSION', 'CHANGELOG.md', 'package.json', 'package-lock.json', 'vercel.json',
-    'next.config.mjs', 'tsconfig.json'];
+    'next.config.mjs', 'tsconfig.json', 'postcss.config.mjs', 'next-env.d.ts'];
   for (const line of entries()) {
     const e = norm(line);
     assert.ok(!e.includes('*'), `wildcards are not allowed in .vercelignore (found "${line}"); list paths explicitly`);

@@ -6,11 +6,14 @@
   "description": "AI-powered resume-to-JD matching, scheduling and outreach for HR teams and staffing agencies.",
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "drizzle-orm": "^0.45.2",
     "googleapis": "^173.0.0",
     "mammoth": "^1.12.0",
     "next": "16.3.5",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
@@ -19,6 +22,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "serve": "^14.2.6",
@@ -33,6 +37,7 @@
     "lint": "eslint",
     "test:unit": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
-    "test:browser": "node tests/browser-verify.mjs"
+    "test:browser": "node tests/browser-verify.mjs",
+    "db:introspect": "drizzle-kit introspect"
   }
 }

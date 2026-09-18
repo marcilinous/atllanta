@@ -22,6 +22,20 @@ test('every legacy endpoint is reachable through the catch-all', () => {
   }
 });
 
+test('the dispatch table has exactly 12 entries whose keys match server/legacy exactly', () => {
+  const route = fs.readFileSync(path.join(ROOT, 'pages/api/[...legacy].js'), 'utf8');
+  const block = route.match(/const handlers = \{([\s\S]*?)\n\};/);
+  assert.ok(block, 'could not find the handlers table in pages/api/[...legacy].js');
+  const keys = [...block[1].matchAll(/^\s*"?([\w-]+)"?\s*:\s*\(\)\s*=>\s*import/gm)].map((m) => m[1]);
+  const files = fs.readdirSync(path.join(ROOT, 'server/legacy'))
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => f.replace(/\.js$/, ''));
+  assert.equal(keys.length, 12, `expected exactly 12 dispatch entries, found ${keys.length}`);
+  assert.deepEqual([...keys].sort(), [...files].sort(),
+    'dispatch table keys must exactly match the file names in server/legacy/ — ' +
+    'deleting an endpoint from only one of the two places must fail this test');
+});
+
 test('no server-only secret is referenced from app/ or components/', () => {
   const offenders = [];
   const walk = (dir) => {
@@ -31,7 +45,7 @@ test('no server-only secret is referenced from app/ or components/', () => {
       if (e.isDirectory()) walk(p);
       else if (/\.(ts|tsx|js|jsx)$/.test(e.name)) {
         const src = fs.readFileSync(p, 'utf8');
-        if (src.includes('SUPABASE_SERVICE_ROLE_KEY') || src.includes('GROQ_API_KEY')) offenders.push(p);
+        if (src.includes('SUPABASE_SERVICE_ROLE_KEY') || src.includes('GROQ_API_KEY') || src.includes('DATABASE_URL')) offenders.push(p);
       }
     }
   };
@@ -45,4 +59,6 @@ test('vercel.json keeps the framework pin and the event-processor cron', () => {
   assert.equal(cfg.framework, 'nextjs', 'vercel.json must force framework: "nextjs" (Vercel does not auto-detect this tree)');
   const cron = (cfg.crons || []).find((c) => c.path === '/api/event-processor');
   assert.ok(cron, 'vercel.json must keep a cron whose path is /api/event-processor');
+  assert.equal(cfg.cleanUrls, undefined,
+    'vercel.json must not set cleanUrls — it defeats Next\'s rewrite-to-static-html and broke the first previews');
 });
