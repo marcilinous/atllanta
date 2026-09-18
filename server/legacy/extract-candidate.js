@@ -4,7 +4,7 @@
 // Body: { resume_text: "..." }
 // Returns: { name, email, phone, summary }
 
-import { resolveCaller, runAI } from "../lib/aiGateway.js";
+import { resolveCaller, runAI } from "../../lib/aiGateway.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

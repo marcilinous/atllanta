@@ -2,8 +2,8 @@
 // POST /api/schedule { token, slot_id } — public: book a slot
 // Each candidate gets a unique link with 24hr auto-expiry.
 
-import { supabaseAdmin } from "../lib/supabaseServer.js";
-import { createMeetEvent } from "../lib/googleMeet.js";
+import { supabaseAdmin } from "../../lib/supabaseServer.js";
+import { createMeetEvent } from "../../lib/googleMeet.js";
 
 export default async function handler(req, res) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {

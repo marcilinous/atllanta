@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "../lib/supabaseServer.js";
+import { supabaseAdmin } from "../../lib/supabaseServer.js";
 
 const BATCH_SIZE = 10;
 const MAX_ATTEMPTS = 3;

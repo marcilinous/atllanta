@@ -3,7 +3,7 @@
 // Scores a candidate's resume against the job's JD with AI and stores the result
 // on the application row. AI usage is checked and recorded by lib/aiGateway.js.
 
-import { resolveCaller, runAI } from "../lib/aiGateway.js";
+import { resolveCaller, runAI } from "../../lib/aiGateway.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
