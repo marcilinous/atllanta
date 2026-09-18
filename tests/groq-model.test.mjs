@@ -18,7 +18,7 @@ function sources(dir) {
     return /\.(js|mjs|ts)$/.test(e.name) ? [rel] : [];
   });
 }
-const all = () => [...sources('api'), ...sources('js'), ...sources('lib'), ...sources('views')];
+const all = () => [...sources('server/legacy'), ...sources('public/js'), ...sources('lib'), ...sources('public/views')];
 
 test('no source file uses a retired Groq model', () => {
   const hits = [];
