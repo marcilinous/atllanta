@@ -11,18 +11,32 @@
 >    things stand and what to work on next.
 > 2. Work only on the **first unchecked item** in the current phase unless
 >    told otherwise. Don't jump ahead to a later phase.
-> 3. When a checklist item is finished, check it off (`- [x]`) and add a
+> 3. **Before starting an unchecked item, verify it isn't already built.**
+>    This file can drift from the codebase — work done outside a tracked
+>    session, or done but never logged. Quickly check (grep the schema file,
+>    check the route/table exists, run the relevant query) rather than
+>    assuming the checklist is accurate. If it's already done: check it off,
+>    add a note tagged `(found already built — not built this session)`
+>    with what you verified, and move to the next unchecked item. Don't
+>    rebuild something that already exists just because the box was empty.
+> 4. When an item is finished, check it off (`- [x]`) and add a
 >    one-line note under that phase's **Notes** with the date and what
 >    changed (schema, file, or decision).
-> 4. When every item in a phase is checked, mark the phase `✅ Done`, bump
+> 5. When every item in a phase is checked, mark the phase `✅ Done`, bump
 >    the version in `Current State`, and move the "you are here" marker to
 >    the next phase.
-> 5. If you hit a blocker or make a decision that changes scope, log it
+> 6. If you hit a blocker or make a decision that changes scope, log it
 >    under **Decisions & Blockers** instead of silently deviating — don't
 >    edit the phase checklist to match what happened; fix the blocker or
 >    flag it for the owner.
-> 6. Never delete history from this file. Completed phases stay, collapsed
+> 7. Never delete history from this file. Completed phases stay, collapsed
 >    mentally but not removed — they're the record of what shipped when.
+> 8. If found-already-built work belongs to a **later phase** than the
+>    active one, check off that item in its own phase section (don't move
+>    it), note it the same way, but leave `Current State` pointing at the
+>    active phase — a stray finished item in a future phase doesn't mean
+>    that phase is ready to start; the earlier phase's prerequisites still
+>    need to hold.
 
 ---
 
