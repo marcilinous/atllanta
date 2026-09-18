@@ -245,11 +245,18 @@ crm_custom_records(id, org_id, entity_id, data jsonb, created_by,
 vocabulary, not table names. Renaming would touch every partner screen, RPC and
 policy for no user-visible gain.
 
-**RTcompu partner vertical:** stays live and untouched until its modules are
-replaced, then is retired as part of Phase 8 (decision 2026-09-18). Its data
-(`crm_partner_details`, `crm_visits`, `crm_calls`, `crm_events`, PJP plans,
-`crm_report_*`) is the largest dataset in the system — nothing is dropped without
-an export the owner has confirmed.
+**RTcompu partner vertical: it stays (decision 2026-09-18).** It is custom-built
+for one tenant — partner master, field visits and calls, journey plans, Tally report
+import, and its sales analytics — and it keeps running as it is, gated by
+`organizations.partner_crm_enabled`. It is not generalised, not rebuilt on the
+custom-entity engine, and not retired. Its data (`crm_partner_details`,
+`crm_visits`, `crm_calls`, `crm_events`, PJP plans, `crm_report_*`) is the largest
+dataset in the system and stays put.
+
+**What was dropped instead:** the earlier plan to turn distribution into an Atllanta
+product line — a generic distribution/field-sales module offered to every tenant.
+Atllanta ships the four modules plus Helpdesk and Projects; distribution stays a
+one-tenant customisation, not a roadmap item.
 **Directory:** `src/app/(dashboard)/crm/`, `src/modules/crm/`,
 `src/db/schema/crm.ts`
 

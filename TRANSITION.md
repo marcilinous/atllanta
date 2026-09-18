@@ -212,9 +212,10 @@ migration.
 > the data path before writing schema. See Decisions & Blockers.
 >
 > **Scope (owner decision 2026-09-18):** migrate the **generic** CRM only. The
-> RTcompu partner vertical is not ported and not rebuilt on the custom engine — it
-> keeps running on the legacy stack until its modules are cut over, then retires in
-> Phase 8 with a confirmed export. Live table names stay as they are.
+> RTcompu partner vertical is custom-built for one tenant and stays exactly as it is
+> — not ported, not rebuilt on the custom engine, not retired. Distribution is no
+> longer an Atllanta product line, so nothing generic is built from it. Live table
+> names stay as they are.
 
 - [ ] Generic CRM: accounts, contacts, leads, pipelines, deals, activities
 - [ ] Custom CRM: entity definitions, field definitions, custom records
@@ -364,11 +365,16 @@ noticeboard `posts`, the approvals inbox, outbound webhooks + `api_keys` +
    usage screen, and the "AI today" indicator. Nothing else — no new features.
    Rationale: quotas are live and unmanageable without those screens; everything
    else would be built twice.
-3. **Partner vertical: keep it running until cutover, then decommission.** It stays
-   live for its tenant while the new stack replaces the modules it depends on, and
-   is retired in Phase 8 — not ported, not rebuilt on the custom-entity engine.
-   Nothing is dropped without an export the owner has confirmed; 6,132 partner rows
-   and 83,453 report rows are involved.
+3. **Partner vertical stays; the distribution *product line* is dropped.**
+   (Corrected 2026-09-18 after an initial misreading — the first version of this
+   entry said the vertical itself was being decommissioned. It is not.)
+   - **Stays as it is:** the RTcompu partner/field-sales CRM. Custom-built for one
+     tenant, gated by `partner_crm_enabled`, holding 6,132 partner rows and 83,453
+     imported report rows. No port, no rebuild, no generalisation, no retirement.
+   - **Decommissioned:** the earlier plan to make distribution an Atllanta product
+     line — a generic distribution/field-sales module for every tenant. It leaves
+     the roadmap; nothing is deleted from the database because of it.
+   - **Open:** where the vertical lives after cutover (see the open question below).
 4. **Keep the live table names; the target doc is corrected.** `crm_opportunities`
    (not `crm_deals`), `crm_pipeline_stages` (not `crm_pipelines`), `job_applications`
    (not `applications`), `interview_slots` (not `interview_booking_links`),
@@ -382,4 +388,21 @@ noticeboard `posts`, the approvals inbox, outbound webhooks + `api_keys` +
 **Consequences to carry into planning:** Phase 8's "old vanilla-JS deployment
 removed" becomes the *last* module's cutover, not a single event; Phase 10's flag
 layer must model two gates, not one; and every phase that touches CRM must leave the
-partner screens working until their replacement ships.
+partner screens working, since they are staying.
+
+### 2026-09-18 — Open question: where does the partner vertical live after cutover?
+
+Decision 3 keeps it running as-is, and decision 6 moves modules one at a time — but
+Phase 8 ends with the legacy deployment removed. Those meet at RTcompu. Three ways
+out, owner's call before Phase 6 planning starts:
+
+- **Port it as a tenant-specific module** on the new stack, screens unchanged in
+  behaviour. Most work; one deployment at the end.
+- **Keep the legacy app deployed for RTcompu only**, on its own URL, reading the same
+  database. No port; two deployments to maintain, and the legacy freeze becomes
+  permanent for that code.
+- **Rebuild it on the custom-entity engine** once that engine exists. Least code
+  long-term, highest risk to a working system with the largest dataset.
+
+Until this is answered, Phase 8's "old deployment removed" item is blocked, not the
+rest of the transition.

@@ -24,8 +24,8 @@ file.
 - **All six owner decisions settled the same day** (full text in `TRANSITION.md` →
   Decisions & Blockers): ship v1.2.0 then freeze (merged as `a7431b2`); after the
   freeze the legacy app gets security fixes **and** the v1.3.0 AI screens, nothing
-  else; the RTcompu partner vertical keeps running until its modules cut over and is
-  then decommissioned with a confirmed export, not ported; live table names win and
+  else; the RTcompu partner vertical **stays as it is** (custom-built for one tenant) while
+  the *distribution product line* is dropped from Atllanta's roadmap; live table names win and
   `CLAUDE.md` was corrected to them; `org_modules` **and** `feature_access` both
   stay; cutover is module-by-module on the shared database.
 - Practical effect: no big-bang switch to plan for, and every CRM phase must leave
