@@ -33,13 +33,13 @@
 - **Stack target:** see `CLAUDE.md`
 - **Last updated:** 2026-09-18 — baseline verified against the live database and the
   production branch, and all six owner decisions settled; see Decisions & Blockers.
-- **Waiting on:** the owner's promotion of v1.2.0 (merged as `a7431b2`), then tag
-  `legacy-frozen` and start Phase 0 item 3 (the Next.js scaffold).
+- **Next unchecked item:** Phase 0 item 3 — scaffold the Next.js (App Router) +
+  TypeScript project per `CLAUDE.md` §5.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — currently **v1.1.0** live,
-**v1.2.0** pending the owner's merge and promotion), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.0** live since
+2026-09-18), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -72,9 +72,9 @@ vanilla-JS/Supabase-direct code no longer runs in production.
 **Goal:** Freeze what exists today; stand up the new repo skeleton without
 touching production.
 
-- [ ] Tag/branch the current vanilla-JS/Supabase codebase as `legacy-frozen`
-- [ ] Confirm which tables in production still use `client_id`/`memberships`
-      (recruitment tables per old CLAUDE.md §13) — list them here
+- [x] Tag/branch the current vanilla-JS/Supabase codebase as `legacy-frozen`
+- [x] Confirm which tables in production still use `client_id`/`memberships`
+      (recruitment tables per old CLAUDE.md §13) — list them here: **none**
 - [ ] Scaffold new Next.js (App Router) + TypeScript project per CLAUDE.md §5
 - [ ] Set up Drizzle ORM + `drizzle.config.ts` pointed at the **same**
       Supabase Postgres instance (shared DB during transition)
@@ -85,9 +85,14 @@ touching production.
   the live database has no `memberships` table and no `client_id` column on
   `jobs`; recruitment moved onto `org_id` in the legacy app's own Phase 1. The
   list this item asks for is therefore empty. Verified by query, not by memory.
-- 2026-09-18 — Item 1 (`legacy-frozen`): decided. v1.2.0 is merged (`a7431b2`);
-  tag the freeze on that commit once the owner has promoted it, so the freeze point
-  includes the AI gateway and the two cross-tenant fixes.
+- 2026-09-18 — Items 1 and 2 done. v1.2.0 was merged (`a7431b2`), promoted by the
+  owner, and verified live: `/version.json` reads 1.2.0, unauthenticated API calls
+  are refused, `/api/ai-query` returns 503, internal docs are not downloadable, and
+  `tests/browser-verify.mjs` passes 22/22 against production. Tags `v1.2.0` and
+  `legacy-frozen` both point at `a7431b2`, so the freeze point includes the AI
+  gateway and the two cross-tenant fixes.
+- 2026-09-18 — Item 2's answer is **none**: no `memberships` table, no `client_id`
+  column anywhere in the live database.
 - 2026-09-18 — After the freeze the legacy app still receives security fixes and the
   v1.3.0 AI screens (owner decision 2). Plan those as legacy releases (`vX.Y.Z`),
   not as transition phases.
