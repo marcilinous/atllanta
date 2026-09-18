@@ -36,6 +36,30 @@ export function isDatabaseConfigured(): boolean {
 }
 
 /**
+ * TEMPORARY (Phase 0): yes/no facts about the connection string's shape, for
+ * diagnosing ERR_INVALID_URL without logging any part of the value.
+ */
+export function describeDatabaseUrlShape(): Record<string, boolean | number> {
+  const v = process.env.DATABASE_URL ?? "";
+  const rest = v.replace(/^postgres(ql)?:\/\//, "");
+  const lastAt = rest.lastIndexOf("@");
+  const userinfo = lastAt >= 0 ? rest.slice(0, lastAt) : "";
+  const password = userinfo.includes(":") ? userinfo.slice(userinfo.indexOf(":") + 1) : "";
+  return {
+    schemeOk: /^postgres(ql)?:\/\//.test(v),
+    surroundingWhitespace: v !== v.trim(),
+    innerWhitespace: /\s/.test(v.trim()),
+    quoted: /^["']|["']$/.test(v.trim()),
+    startsWithVarName: v.trim().startsWith("DATABASE_URL"),
+    brackets: /[[\]]/.test(v),
+    atCount: (rest.match(/@/g) ?? []).length,
+    passwordHasHashQuestionSlash: /[#?/]/.test(password),
+    passwordHasBadPercent: /%(?![0-9A-Fa-f]{2})/.test(password),
+    port6543: /:6543\//.test(v),
+  };
+}
+
+/**
  * Returns the Drizzle client, or throws a generic error if DATABASE_URL is
  * not configured. Never leaks the connection string or a raw driver error.
  */

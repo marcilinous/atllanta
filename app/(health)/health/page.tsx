@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { count } from "drizzle-orm";
-import { getDb, isDatabaseConfigured } from "@/src/db";
+import { describeDatabaseUrlShape, getDb, isDatabaseConfigured } from "@/src/db";
 import { organizations, users } from "@/src/db/schema/platform";
 import { ComponentSample } from "./component-sample";
 
@@ -50,6 +50,7 @@ export default async function HealthPage() {
     const code = (err as { code?: unknown } | null)?.code;
     console.error("health: database check failed", {
       envPresent: isDatabaseConfigured(),
+      shape: describeDatabaseUrlShape(),
       code: typeof code === "string" ? code : undefined,
     });
   }
