@@ -5,6 +5,12 @@
 > Every architectural decision, tenancy rule, module boundary, naming convention,
 > and requirement is here. When in doubt, this file wins.
 >
+> **Working in a single context window?** Start with `docs/context/index.md` — the
+> context pack. It maps the repo, splits the product into module files, and tells you
+> which one file to read for the task in hand, so you never read the whole codebase.
+> This file stays the authority on *what Atllanta must be*; the pack describes *where
+> things are and how to work*.
+>
 > **Status:** This document describes the **canonical target**. Part of the code
 > still runs on an older agency/`client_id` model and is being migrated onto this
 > base (see §13, Alignment Status). Where code and this file disagree, this file
