@@ -1,26 +1,88 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* The legacy design tokens are the single source of truth (DESIGN.md §2–§4).
+   Imported unlayered, so they win over Tailwind's layered defaults for any
+   shared name (--text-*, --font-sans, --shadow-*), and their
+   [data-theme="dark"] and [data-module] overrides reach every shadcn component
+   through the aliases below. Do not copy values out of this file. */
+@import "../public/css/tokens.css";
 
+/* Dark mode is whatever the legacy app sets on <html data-theme="dark">. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* shadcn's semantic variables, expressed as legacy tokens. No raw colours. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Legacy body is the secondary canvas; fields and secondary buttons sit on --color-bg. */
+  --background: var(--color-bg-secondary);
+  --field: var(--color-bg);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-accent);
+  --primary-hover: var(--color-accent-hover);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--color-bg-secondary);
+  --secondary-foreground: var(--color-text-primary);
+  --muted: var(--color-bg-secondary);
+  --muted-foreground: var(--color-text-tertiary);
+  --accent: var(--color-accent-light);
+  --accent-foreground: var(--color-text-primary);
+  --destructive: var(--color-error);
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-accent);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-field: var(--field);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* shadcn rounds controls with rounded-lg and surfaces with rounded-xl;
+     legacy rounds controls with --radius-md (7px) and cards with --radius-lg
+     (10px). Shift by one step so both land on the legacy values. rounded-sm
+     needs no entry: the token --radius-sm (5px) already wins. */
+  --radius-md: var(--radius-sm);
+  --radius-lg: var(--radius-md);
+  --radius-xl: var(--radius-lg);
+  --radius-2xl: var(--radius-xl);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  html {
+    /* --font-inter is next/font's self-hosted Inter; the token stack follows. */
+    font-family: var(--font-inter), var(--font-sans);
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: var(--text-base);
+    line-height: var(--line-height-normal);
+  }
 }

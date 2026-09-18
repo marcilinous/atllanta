@@ -3,6 +3,11 @@ import path from "node:path";
 import { count } from "drizzle-orm";
 import { getDb } from "@/src/db";
 import { organizations, users } from "@/src/db/schema/platform";
+import { ComponentSample } from "./component-sample";
+
+// Rendered per request so the counts are live. This costs one serverless
+// function (budget: 10, see global constraints).
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Health — Atllanta",
@@ -43,28 +48,30 @@ export default async function HealthPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-1 flex-col justify-center gap-6 px-6 py-16">
+    <main className="mx-auto flex max-w-xl flex-1 flex-col justify-center gap-6 px-6 py-16">
       <h1 className="text-2xl font-semibold">Health</h1>
 
       {configured && counts ? (
         <dl className="grid grid-cols-2 gap-4">
           <div>
-            <dt className="text-sm text-zinc-500">Organizations</dt>
+            <dt className="text-sm text-muted-foreground">Organizations</dt>
             <dd className="text-3xl font-semibold">{counts.organizations}</dd>
           </div>
           <div>
-            <dt className="text-sm text-zinc-500">Users</dt>
+            <dt className="text-sm text-muted-foreground">Users</dt>
             <dd className="text-3xl font-semibold">{counts.users}</dd>
           </div>
         </dl>
       ) : (
-        <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-lg border border-warning bg-(--color-warning-light) px-4 py-3 text-sm text-warning">
           Database not configured. Set the database connection string in the
           environment to enable this check.
         </p>
       )}
 
-      <p className="text-sm text-zinc-500">Version {version}</p>
+      <ComponentSample />
+
+      <p className="text-sm text-muted-foreground">Version {version}</p>
     </main>
   );
 }
