@@ -43,8 +43,15 @@ export default async function HealthPage() {
 
   try {
     counts = await readCounts();
-  } catch {
+  } catch (err) {
     configured = false;
+    // Server log only, for telling "variable missing" from "connection failed".
+    // Never the message: driver messages can carry the host or user name.
+    const code = (err as { code?: unknown } | null)?.code;
+    console.error("health: database check failed", {
+      envPresent: Boolean(process.env.DATABASE_URL),
+      code: typeof code === "string" ? code : undefined,
+    });
   }
 
   return (
