@@ -21,9 +21,15 @@ file.
   Recruitment, Analytics and Helpdesk already exist (the tracker assumed some were
   new), tenancy is already `org_id`, and the real migration weight is CRM —
   6,132 partners and 83,453 report rows against negligible HRMS/recruitment data.
-- Six decisions are waiting on the owner (freeze depth, partner-vertical strategy,
-  naming, `feature_access` vs `org_modules`, cutover shape, and whether v1.2.0 ships
-  before the freeze). They are logged in `TRANSITION.md` → Decisions & Blockers.
+- **All six owner decisions settled the same day** (full text in `TRANSITION.md` →
+  Decisions & Blockers): ship v1.2.0 then freeze (merged as `a7431b2`); after the
+  freeze the legacy app gets security fixes **and** the v1.3.0 AI screens, nothing
+  else; the RTcompu partner vertical keeps running until its modules cut over and is
+  then decommissioned with a confirmed export, not ported; live table names win and
+  `CLAUDE.md` was corrected to them; `org_modules` **and** `feature_access` both
+  stay; cutover is module-by-module on the shared database.
+- Practical effect: no big-bang switch to plan for, and every CRM phase must leave
+  the partner screens working until their replacement ships.
 
 ## 2026-09-18 — Context pack created
 

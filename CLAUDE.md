@@ -45,6 +45,10 @@
 - **Module Enablement Per Org:** Modules are not globally always-on. `admin`
   controls which modules are enabled for their org, and which roles
   (system or custom) can access each enabled module (see §3.5).
+- **Module-by-module cutover:** the new stack replaces one module at a time
+  (decision 2026-09-18). Both stacks share one Supabase database, so each module
+  moves behind its own routing rule and the legacy screens for every other module
+  keep working. No big-bang switch.
 - **Decoupled Cross-Module Communication:** Modules never perform direct
   joins or write mutations across other modules' raw transactional tables.
   Cross-module interoperability is executed exclusively via Server
@@ -96,7 +100,21 @@ org_modules(id, org_id, module_key, is_enabled, enabled_by, enabled_at)
 roles(id, org_id, name, slug, is_system, description, created_by, created_at)
 role_permissions(id, org_id, role_id, module_key, permission text, created_at)
 -- permission is one of: view | create | edit | delete | approve
+
+-- Already live in the legacy database; they carry forward unchanged.
+feature_access(id, org_id, subject_type role|user, subject_key, feature_key, allowed)
+platform_admins(user_id)                       -- platform owner: sets org AI quotas
+ai_org_quotas(org_id, monthly_tokens, overage_mode, updated_by, updated_at)
+ai_user_limits(org_id, user_id, daily_tokens)  -- user_id null = the org default
+ai_usage(...), ai_usage_org_month(...), ai_usage_user_day(...), ai_user_flags(...)
+api_keys(...), webhook_endpoints(...), webhook_deliveries(...), rate_limits(...)
 ```
+
+**Two gates, both kept (decision 2026-09-18).** `org_modules` answers *is this
+module switched on for this org*; `feature_access` answers *may this role or this
+person see it*. A module hidden by either is unreachable, and Server Actions must
+check both — they solve different problems, so neither replaces the other.
+
 **Directory:** `src/app/(platform)/`, `src/lib/auth/`, `src/lib/events/`,
 `src/db/schema/platform.ts`
 
@@ -126,8 +144,8 @@ role_permissions(id, org_id, role_id, module_key, permission text, created_at)
   access (API keys, webhooks, integration settings, Langfuse trace access,
   event bus inspection) but not billing or org deletion (that stays
   `owner`-only).
-- Permission checks live in one place (`js/auth.js`-equivalent
-  `src/lib/auth/permissions.ts`), resolving system role defaults first,
+- Permission checks live in one place (`src/lib/auth/permissions.ts`; the legacy
+  equivalents are `js/auth.js` and `js/features.js`), resolving system role defaults first,
   then custom-role `role_permissions` overrides. The AI Assistant is not an
   exception — it resolves permissions through the same path.
 - Creating/editing a custom role, or changing its permissions, emits
@@ -156,7 +174,13 @@ expenses(id, org_id, user_id, category_id, amount, currency, receipt_file_id,
          status, approved_by)
 expense_categories(id, org_id, name)
 announcements(id, org_id, title, body, author_id, published_at)
+posts(id, org_id, author_id, body, created_at)          -- noticeboard
+work_locations(id, org_id, name, lat, lng, radius_m)    -- geofenced check-in
 ```
+
+Carried over from the legacy app and not to be dropped by omission: geofenced
+check-in against `work_locations`, the approvals inbox, employee lifecycle and
+generated letters, and the document store (Storage + `files`).
 **Directory:** `src/app/(dashboard)/hrms/`, `src/modules/hrms/`,
 `src/db/schema/hrms.ts`
 
@@ -191,14 +215,15 @@ customization engine.
 **Core Tables:**
 ```sql
 -- Generic CRM
+-- crm_accounts is a VIEW over crm_partner_details with INSTEAD OF triggers.
 crm_accounts(id, org_id, name, industry, website, owner_id, created_at, updated_at)
 crm_contacts(id, org_id, account_id, full_name, email, phone, title,
              is_primary, created_at)
 crm_leads(id, org_id, full_name, company, email, phone, source, status,
           qualification_score, owner_id, created_at)
-crm_pipelines(id, org_id, name, is_default, stages jsonb, created_at)
-crm_deals(id, org_id, account_id, pipeline_id, title, value, currency,
-          stage, status, expected_close, owner_id, created_at)
+crm_pipeline_stages(id, org_id, name, position, probability, created_at)
+crm_opportunities(id, org_id, account_id, stage_id, title, value, currency,
+                  status, expected_close, owner_id, created_at)
 crm_activities(id, org_id, entity_type, entity_id, type, body, due_at,
                done, actor_id, created_at)
 
@@ -214,6 +239,17 @@ crm_custom_records(id, org_id, entity_id, data jsonb, created_by,
                     created_at, updated_at)
 -- Indexing: GIN index applied on crm_custom_records(data)
 ```
+
+**Live names win (decision 2026-09-18).** The database keeps
+`crm_opportunities` and `crm_pipeline_stages`; "deals" and "pipelines" are
+vocabulary, not table names. Renaming would touch every partner screen, RPC and
+policy for no user-visible gain.
+
+**RTcompu partner vertical:** stays live and untouched until its modules are
+replaced, then is retired as part of Phase 8 (decision 2026-09-18). Its data
+(`crm_partner_details`, `crm_visits`, `crm_calls`, `crm_events`, PJP plans,
+`crm_report_*`) is the largest dataset in the system — nothing is dropped without
+an export the owner has confirmed.
 **Directory:** `src/app/(dashboard)/crm/`, `src/modules/crm/`,
 `src/db/schema/crm.ts`
 
@@ -292,14 +328,13 @@ jobs(id, org_id, title, department_id, description, skills_required jsonb,
 candidates(id, org_id, full_name, email, phone, is_phone_verified,
            resume_file_id, parsed_skills jsonb, parsed_experience jsonb,
            raw_resume_text text, created_at)
-applications(id, org_id, job_id, candidate_id, current_stage,
-             match_score numeric, match_summary jsonb, notes text,
-             created_at, updated_at)
-interviewer_calendars(id, org_id, user_id, provider, access_token,
-                       refresh_token, token_expiry, working_hours jsonb,
-                       created_at)
-interview_booking_links(id, org_id, application_id, interviewer_id, token,
-                         duration_minutes, is_used, expires_at, created_at)
+job_applications(id, org_id, job_id, candidate_id, status, match_score numeric,
+                 match_summary text, match_raw_response jsonb,
+                 created_at, updated_at)
+user_google_tokens(id, org_id, user_id, access_token, refresh_token,
+                   token_expiry, created_at)
+interview_slots(id, org_id, job_id, candidate_id, token, starts_at,
+                duration_minutes, is_booked, expires_at, created_at)
 interviews(id, org_id, application_id, interviewer_id, scheduled_at,
            duration_minutes, meet_link, calendar_event_id, status,
            feedback_notes, feedback_rating, created_at)
@@ -389,6 +424,14 @@ automation and natural-language data retrieval.
 - **Two-Step Mutation Guard:** All read queries execute dynamically, while
   any destructive mutation (INSERT, UPDATE, DELETE) requires explicit
   confirmation via an interactive UI modal prior to execution.
+- **One gateway, always metered:** every Groq call — assistant, JD parsing,
+  resume extraction, matching, screening — goes through a single server-side
+  gateway that resolves the caller, runs the bot check and the quota check, calls
+  the model, and records the exact tokens used. Org monthly quotas and per-user
+  daily limits live in `ai_org_quotas` / `ai_user_limits`; the platform owner sets
+  the org quota, the org's owner/admin sets user limits. Carried over from the
+  legacy v1.2.0 gateway (`docs/context/ai.md`) — the new stack calls the same
+  database functions, or metering silently stops at cutover.
 - **Observability:** Every Groq call (intent parsing, JD generation, resume
   matching) is traced through **Langfuse** — prompt, input/output, latency,
   and cost logged per `org_id`. `developer` role has read access to traces;

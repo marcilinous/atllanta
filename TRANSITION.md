@@ -31,8 +31,10 @@
 - **Version:** `v0.0.0` — transition not yet started
 - **Active phase:** Phase 0 (Baseline & Scaffold)
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-18 — baseline verified against the live database and
-  the production branch; see **Verified baseline** in Decisions & Blockers.
+- **Last updated:** 2026-09-18 — baseline verified against the live database and the
+  production branch, and all six owner decisions settled; see Decisions & Blockers.
+- **Waiting on:** the owner's promotion of v1.2.0 (merged as `a7431b2`), then tag
+  `legacy-frozen` and start Phase 0 item 3 (the Next.js scaffold).
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -83,10 +85,12 @@ touching production.
   the live database has no `memberships` table and no `client_id` column on
   `jobs`; recruitment moved onto `org_id` in the legacy app's own Phase 1. The
   list this item asks for is therefore empty. Verified by query, not by memory.
-- 2026-09-18 — Item 1 (`legacy-frozen`) should be tagged **after v1.2.0 is
-  promoted**, so the freeze point includes the AI gateway and the two
-  cross-tenant fixes in it. Tagging earlier freezes a version with known
-  tenant-isolation holes.
+- 2026-09-18 — Item 1 (`legacy-frozen`): decided. v1.2.0 is merged (`a7431b2`);
+  tag the freeze on that commit once the owner has promoted it, so the freeze point
+  includes the AI gateway and the two cross-tenant fixes.
+- 2026-09-18 — After the freeze the legacy app still receives security fixes and the
+  v1.3.0 AI screens (owner decision 2). Plan those as legacy releases (`vX.Y.Z`),
+  not as transition phases.
 
 ---
 
@@ -206,6 +210,11 @@ migration.
 > heaviest data in the system — 6,132 partner records and 83,453 imported report
 > rows across 14 screens. Treat this phase as *migration + new engine*, and plan
 > the data path before writing schema. See Decisions & Blockers.
+>
+> **Scope (owner decision 2026-09-18):** migrate the **generic** CRM only. The
+> RTcompu partner vertical is not ported and not rebuilt on the custom engine — it
+> keeps running on the legacy stack until its modules are cut over, then retires in
+> Phase 8 with a confirmed export. Live table names stay as they are.
 
 - [ ] Generic CRM: accounts, contacts, leads, pipelines, deals, activities
 - [ ] Custom CRM: entity definitions, field definitions, custom records
@@ -344,21 +353,33 @@ attendance + `work_locations`, documents/`files`, lifecycle and letters,
 noticeboard `posts`, the approvals inbox, outbound webhooks + `api_keys` +
 `rate_limits`, and the legacy credits columns (unused since v1.2.0).
 
-### 2026-09-18 — Decisions needed from the owner before Phase 0 closes
+### 2026-09-18 — Owner decisions (all six settled)
 
-1. **Ship v1.2.0 first, then freeze?** Recommended: promote v1.2.0 (it closes two
-   cross-tenant holes and puts AI on quotas), then tag `legacy-frozen`.
-2. **Freeze depth.** After the tag, does the legacy app get *security fixes only*,
-   or also small features while the new stack is built? This decides whether the
-   security patch for the advisor findings lands on legacy, on the new stack, or
-   both.
-3. **CRM partner vertical:** port as-is, or rebuild it as the first customer of
-   the custom-entity engine?
-4. **Naming:** adopt the target names (`crm_deals`, `applications`,
-   `interviewer_calendars`) and rename live tables, or keep the live names and
-   correct the target doc? Renames touch RPCs, policies and every screen.
-5. **`feature_access` → `org_modules`:** replace, or keep both (module-level
-   enablement *and* per-role/per-user visibility)? They solve different problems.
-6. **Cutover shape:** module-by-module behind a reverse proxy, or one big switch
-   at Phase 8? Both stacks share the database, so module-by-module is feasible
-   but needs a routing rule per module.
+1. **Ship v1.2.0, then freeze.** PR #104 merged as `a7431b2`; the owner promotes it,
+   then `legacy-frozen` is tagged on that commit — so the freeze point includes the
+   AI gateway and the two cross-tenant fixes.
+2. **Freeze depth: fixes + the v1.3.0 AI screens.** While the new stack is built,
+   the legacy app may receive security and data-loss fixes (the advisor findings)
+   **and** the already-planned v1.3.0 work: the platform console, the per-org AI
+   usage screen, and the "AI today" indicator. Nothing else — no new features.
+   Rationale: quotas are live and unmanageable without those screens; everything
+   else would be built twice.
+3. **Partner vertical: keep it running until cutover, then decommission.** It stays
+   live for its tenant while the new stack replaces the modules it depends on, and
+   is retired in Phase 8 — not ported, not rebuilt on the custom-entity engine.
+   Nothing is dropped without an export the owner has confirmed; 6,132 partner rows
+   and 83,453 report rows are involved.
+4. **Keep the live table names; the target doc is corrected.** `crm_opportunities`
+   (not `crm_deals`), `crm_pipeline_stages` (not `crm_pipelines`), `job_applications`
+   (not `applications`), `interview_slots` (not `interview_booking_links`),
+   `user_google_tokens` (not `interviewer_calendars`). `CLAUDE.md` now matches.
+5. **Keep both gates.** `org_modules` (is the module on for this org) and
+   `feature_access` (may this role or person see it) both survive; Server Actions
+   check both.
+6. **Cutover is module-by-module**, each behind its own routing rule, on the shared
+   database. No big-bang switch at Phase 8.
+
+**Consequences to carry into planning:** Phase 8's "old vanilla-JS deployment
+removed" becomes the *last* module's cutover, not a single event; Phase 10's flag
+layer must model two gates, not one; and every phase that touches CRM must leave the
+partner screens working until their replacement ships.
