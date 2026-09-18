@@ -61,11 +61,12 @@ export default async function handler(req, res) {
   if (candidate.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this candidate" });
 
   if (!app) {
-    const { data } = await db
+    const { data, error: upsertErr } = await db
       .from("job_applications")
       .upsert({ job_id: jobId, candidate_id: candidateId }, { onConflict: "job_id,candidate_id" })
       .select("id, job_id, candidate_id")
       .single();
+    if (upsertErr) return res.status(500).json({ error: "Could not create the application — please try again" });
     app = data;
     if (!app) return res.status(500).json({ error: "Could not create the application" });
   }

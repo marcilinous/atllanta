@@ -120,7 +120,9 @@ describe('parse-resume parse-jd', () => {
     assert.equal(r.statusCode, 200);
     assert.deepEqual(r.body.parsed_skills.must_have, ['Java']);
     assert.deepEqual([S.ai[0].feature, S.ai[0].maxTokens], ['jd_parse', 1024]);
-    assert.ok(S.db.some(e => e.table === 'jobs' && e.ops[0][0] === 'update'));
+    const jobsUpdate = S.db.find(e => e.table === 'jobs' && e.ops[0][0] === 'update');
+    assert.ok(jobsUpdate);
+    assert.ok(jobsUpdate.ops.some(op => op[0] === 'eq' && op[1] === 'org_id' && op[2] === 'org-1'), 'the jobs update must be scoped to the caller\'s org');
   });
 
   test('a file upload with no file still needs a valid caller and never calls AI', async () => {
@@ -202,6 +204,16 @@ describe('match', () => {
     assert.ok(jobOp.ops.some(op => op[0] === 'maybeSingle'), 'the job lookup must use maybeSingle, not single');
   });
 
+  test('an upsert error while creating the application is reported, not leaked, and never calls AI', async () => {
+    tables();
+    S.tables.job_applications = (ops) => ops[0][0] === 'upsert'
+      ? { data: null, error: { message: 'connection reset' } }
+      : { data: { id: 'app-1', job_id: 'job-1', candidate_id: 'cand-1' }, error: null };
+    const r = res(); await handlers.match(post({ job_id: 'job-1', candidate_id: 'cand-1' }), r);
+    assert.deepEqual([r.statusCode, r.body], [500, { error: 'Could not create the application — please try again' }]);
+    assert.equal(S.ai.length, 0);
+  });
+
   test('an update error while saving the match is reported, not leaked', async () => {
     tables();
     S.tables.job_applications = (ops) => ops[0][0] === 'update'
@@ -255,6 +267,33 @@ describe('screen-job', () => {
     assert.equal(r.body.results[0].score, 70);
     assert.deepEqual(r.body.results.slice(1).map(x => x.error), [limited.body.error, limited.body.error]);
     assert.equal(r.body.tokens_used, 500);
+  });
+
+  test('a 429 on the very first candidate makes exactly 1 AI call and every result carries the message with 0 tokens', async () => {
+    setup(3);
+    S.aiResults = [limited];
+    const r = res(); await handlers['screen-job'](post({ job_id: 'job-1', method: 'ai' }), r);
+    assert.equal(S.ai.length, 1);
+    assert.deepEqual(r.body.results.map(x => x.error), [limited.body.error, limited.body.error, limited.body.error]);
+    assert.equal(r.body.tokens_used, 0);
+  });
+
+  test('a 502 from the gateway on the first candidate stops screening like 429/503, making exactly 1 AI call', async () => {
+    setup(3);
+    const serverError = { ok: false, status: 502, body: { error: 'AI request failed — please try again' } };
+    S.aiResults = [serverError];
+    const r = res(); await handlers['screen-job'](post({ job_id: 'job-1', method: 'ai' }), r);
+    assert.equal(S.ai.length, 1);
+    assert.deepEqual(r.body.results.map(x => x.error), [serverError.body.error, serverError.body.error, serverError.body.error]);
+  });
+
+  test('a 503 from the gateway on the first candidate stops screening like 429, making exactly 1 AI call', async () => {
+    setup(3);
+    const unavailable = { ok: false, status: 503, body: { error: 'AI usage check is unavailable — please try again shortly' } };
+    S.aiResults = [unavailable];
+    const r = res(); await handlers['screen-job'](post({ job_id: 'job-1', method: 'ai' }), r);
+    assert.equal(S.ai.length, 1);
+    assert.deepEqual(r.body.results.map(x => x.error), [unavailable.body.error, unavailable.body.error, unavailable.body.error]);
   });
 
   test('handles at most 50 candidates per request and reports the remainder', async () => {

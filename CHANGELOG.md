@@ -15,7 +15,7 @@ was promoted to production.
 - Matching and job-description parsing now check that the job and candidate belong to your organisation.
 
 ### Admins need to
-- Nothing. Every organisation starts with 2,000,000 AI tokens a month and 200,000 per person per day.
+- Nothing for existing organisations: they start with 2,000,000 AI tokens a month and 200,000 per person per day. New organisations start with 2,000 tokens a month until the platform owner raises it.
 
 ## v1.1.0 — 2026-09-17
 

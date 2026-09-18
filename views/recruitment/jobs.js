@@ -398,6 +398,8 @@ export default async function recruitmentJobs(container) {
       startBtn.textContent = 'Processing...';
       const token = await getAuthToken();
       let successCount = 0;
+      let quotaHit = false;
+      let batchGatewayError = null;
 
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
@@ -414,17 +416,29 @@ export default async function recruitmentJobs(container) {
           const parseData = await parseResp.json();
           if (!parseResp.ok) throw new Error(parseData.error);
 
-          const extractResp = await fetch('/api/extract-candidate', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ resume_text: parseData.text }),
-          });
-          const extractData = await extractResp.json();
-          if (!extractResp.ok) throw new Error(extractData.error);
+          let name = file.name.replace(/\.[^.]+$/, '');
+          let email = null;
+          let phone = null;
 
-          const name = extractData.name || file.name.replace(/\.[^.]+$/, '');
-          const email = extractData.email || null;
-          const phone = extractData.phone || null;
+          if (!quotaHit) {
+            const extractResp = await fetch('/api/extract-candidate', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ resume_text: parseData.text }),
+            });
+            const extractData = await extractResp.json();
+            if (!extractResp.ok) {
+              if (!batchGatewayError) {
+                batchGatewayError = extractData.error;
+                toast(batchGatewayError);
+              }
+              if (extractResp.status === 429) quotaHit = true;
+            } else {
+              name = extractData.name || name;
+              email = extractData.email || null;
+              phone = extractData.phone || null;
+            }
+          }
 
           let candId;
           if (email || phone) {

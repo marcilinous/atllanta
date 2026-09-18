@@ -316,7 +316,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
 
       if (!ai.ok) {
         const message = ai.body?.error || "AI request failed";
-        if (ai.status === 429 || ai.status === 503) stopMessage = message;
+        if (ai.status === 429 || ai.status === 503 || ai.status === 502) stopMessage = message;
         results.push({ application_id: app.id, candidate_name: candidateName, score: null, error: message });
         continue;
       }

@@ -184,21 +184,36 @@ describe('runAI', () => {
     ['org_month_exhausted', "Your organisation's monthly AI quota is used up. It resets on the 1st."],
     ['paused_bot_check', 'AI is paused for 10 minutes because of unusual activity. Your admin has been notified.'],
   ]) {
-    test(`quota reason ${reason} blocks with 429 and the exact message`, async () => {
+    test(`quota reason ${reason} blocks with 429 and the exact message, with no org totals for a member`, async () => {
       S.rpc.ai_quota_check = { data: [{ ...allowedQuota, allowed: false, reason, user_used: 200000 }], error: null };
       const c = await caller();
+      assert.equal(c.role, 'member');
       const r = await gw.runAI({ caller: c, feature: 'candidate_extract', messages, maxTokens: 300 });
       assert.equal(r.status, 429);
       assert.equal(r.body.error, message);
       assert.equal(r.body.reason, reason);
       assert.deepEqual(r.body.quota, {
-        user_used: 200000, user_limit: 200000, org_used: 10, org_quota: 2000000,
+        user_used: 200000, user_limit: 200000,
         resets_day: allowedQuota.resets_day, resets_month: allowedQuota.resets_month, paused_until: null,
       });
+      assert.equal('org_used' in r.body.quota, false);
+      assert.equal('org_quota' in r.body.quota, false);
       assert.equal(groqCalls().length, 0);
       assert.deepEqual([rpcs('ai_record_usage')[0].args.p_outcome, rpcs('ai_record_usage')[0].args.p_block_reason], ['blocked', reason]);
     });
   }
+
+  test('an admin sees org_used and org_quota in the 429 quota body', async () => {
+    S.profile = { data: { id: 'user-1', org_id: 'org-1', role: 'admin', status: 'active' }, error: null };
+    S.rpc.ai_quota_check = { data: [{ ...allowedQuota, allowed: false, reason: 'user_day_exhausted', user_used: 200000 }], error: null };
+    const c = await caller();
+    const r = await gw.runAI({ caller: c, feature: 'candidate_extract', messages, maxTokens: 300 });
+    assert.equal(r.status, 429);
+    assert.deepEqual(r.body.quota, {
+      user_used: 200000, user_limit: 200000, org_used: 10, org_quota: 2000000,
+      resets_day: allowedQuota.resets_day, resets_month: allowedQuota.resets_month, paused_until: null,
+    });
+  });
 
   test('fails closed with 503 when the bot check errors', async () => {
     S.rpc.ai_bot_check = { data: null, error: { message: 'db down' } };
@@ -256,6 +271,28 @@ describe('runAI', () => {
     const r = await gw.runAI({ caller: c, feature: 'match', messages, maxTokens: 600 });
     assert.equal(r.ok, true);
     assert.equal(errors.mock.calls[0].arguments[0], 'ai_record_usage failed:');
+  });
+
+  test('caller metadata cannot override org_id or feature in the trace', async () => {
+    const c = await caller();
+    S.log = [];
+    await gw.runAI({
+      caller: c, feature: 'match', messages, maxTokens: 600,
+      metadata: { org_id: 'evil', feature: 'x', job_id: 'j' },
+    });
+    const trace = S.log.find(e => e.langfuse).langfuse;
+    assert.deepEqual(trace.metadata, { org_id: 'org-1', feature: 'match', job_id: 'j' });
+  });
+
+  test('an AbortError from fetch (timeout) returns 502 and records exactly one error row', async (t) => {
+    t.mock.method(console, 'error', () => {});
+    S.groq = () => { const e = new Error('The operation was aborted'); e.name = 'AbortError'; throw e; };
+    const c = await caller();
+    const r = await gw.runAI({ caller: c, feature: 'match', messages, maxTokens: 600 });
+    assert.equal(r.status, 502);
+    assert.deepEqual(r.body, { error: 'AI request failed — please try again' });
+    assert.equal(rpcs('ai_record_usage').length, 1);
+    assert.equal(rpcs('ai_record_usage')[0].args.p_outcome, 'error');
   });
 
   test('the request hash differs by feature and by messages', async () => {

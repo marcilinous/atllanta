@@ -130,7 +130,7 @@ ${description.slice(0, 4000)}`;
   }
 
   if (job_id) {
-    const { error: updateErr } = await caller.db.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id);
+    const { error: updateErr } = await caller.db.from("jobs").update({ parsed_skills: parsed }).eq("id", job_id).eq("org_id", caller.orgId);
     if (updateErr) return res.status(500).json({ error: "Could not save the parsed skills — please try again" });
   }
 
