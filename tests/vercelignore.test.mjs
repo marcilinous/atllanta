@@ -22,15 +22,18 @@ const norm = (p) => p.replace(/^\.\//, '').replace(/^\/+/, '').replace(/\/+$/, '
 
 test('blocks internal documents, database files and tests', () => {
   const blocked = new Set(entries().map(norm));
-  for (const p of ['docs', 'supabase', 'tests', 'playwright.config.js', 'CLAUDE.md', 'DESIGN.md', 'README.md', '.env.example', '.superpowers']) {
+  for (const p of ['docs', 'supabase', 'tests', 'playwright.config.js', 'CLAUDE.md', 'DESIGN.md', 'README.md', '.env.example', '.superpowers', 'TRANSITION.md']) {
     assert.ok(blocked.has(p), `.vercelignore should block ${p}`);
   }
 });
 
 test('never blocks what the site or its functions need', () => {
-  const required = ['api', 'lib', 'js', 'css', 'views', 'index.html', 'login.html', 'reset-password.html',
-    'privacy.html', 'terms.html', 'schedule.html', 'sw.js', 'manifest.json', 'version.json', 'VERSION',
-    'CHANGELOG.md', 'package.json', 'package-lock.json', 'vercel.json', 'icon-192.svg', 'icon-512.svg'];
+  const required = ['app', 'pages', 'public', 'server', 'lib', 'src',
+    'public/js', 'public/css', 'public/views', 'public/index.html', 'public/login.html',
+    'public/reset-password.html', 'public/privacy.html', 'public/terms.html', 'public/schedule.html',
+    'public/sw.js', 'public/manifest.json', 'public/version.json', 'public/icon-192.svg', 'public/icon-512.svg',
+    'server/legacy', 'VERSION', 'CHANGELOG.md', 'package.json', 'package-lock.json', 'vercel.json',
+    'next.config.mjs', 'tsconfig.json'];
   for (const line of entries()) {
     const e = norm(line);
     assert.ok(!e.includes('*'), `wildcards are not allowed in .vercelignore (found "${line}"); list paths explicitly`);
