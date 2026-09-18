@@ -32,8 +32,20 @@ Module map: `docs/context/`.
   allowed here are the mechanical moves this plan names. No behaviour changes, no
   refactors, no "while I'm here".
 - **One Vercel deployment, one domain.** No new project, no subdomain.
-- **Function budget:** the deployment must build with **at most 12 serverless
-  functions**. Legacy endpoints collapse to one catch-all; Next adds its own.
+- **Function budget: at most 10 serverless functions on any preview, and fewer is
+  better** (owner instruction 2026-09-18: stay below 12 with headroom). Legacy
+  endpoints collapse to one catch-all; Next adds its own. Count on every preview
+  before merging. If a build exceeds 10, apply the workaround ladder in order and
+  report which rung was needed:
+  1. Collapse new Next API routes into one catch-all per area, the same trick the
+     legacy endpoints use.
+  2. Make pages static or client-rendered (`export const dynamic = "force-static"`,
+     or a client component fetching through an existing route) so they need no
+     function of their own.
+  3. Move scheduled work into the existing `/api/event-processor` dispatch instead of
+     adding a cron route.
+  4. Only then, and only with the owner's go-ahead, discuss raising the plan limit.
+  Never solve it by deleting a legacy endpoint from the dispatch table.
 - **No schema changes.** Drizzle is introspection-only in Phase 0: no `db:push`, no
   generated migration is applied. The database is shared with the live app.
 - **Secrets stay server-side.** `SUPABASE_SERVICE_ROLE_KEY` may never be imported into a
@@ -144,7 +156,8 @@ npm run build                      # must succeed
 BASE_URL=http://localhost:3000 node tests/browser-verify.mjs   # after `npm start`
 ```
 Then deploy the branch and record, in the report:
-1. **Function count** on the preview (Vercel deployment → Functions). Must be ≤ 12.
+1. **Function count** on the preview (Vercel deployment → Functions). Must be ≤ 10,
+   and report the exact number and what each function is.
 2. **Legacy parity** on the preview: `/` serves the legacy shell, `/login` works,
    `/version.json` reads 1.2.0, `/api/ai-query` returns 503, `/api/extract-candidate`
    without a token returns 401, and `BASE_URL=<preview> node tests/browser-verify.mjs`
@@ -154,8 +167,8 @@ Then deploy the branch and record, in the report:
 
 - [ ] **Step 5: Report, then stop**
 
-Write findings to the task report. **If the function count exceeds 12, or legacy parity
-fails, stop and report — do not proceed to Task 2.** Either is a plan-level problem the
+Write findings to the task report. **If the function count exceeds 10 after the
+workaround ladder, or legacy parity fails, stop and report — do not proceed to Task 2.** Either is a plan-level problem the
 controller must rule on (consolidate further, or raise the cap with the owner).
 
 ### Task 2: Land the scaffold and the relocation for real
@@ -351,7 +364,8 @@ Accept the tokens from Step 1; do not accept shadcn's default palette.
    `CACHE_NAME` and, for the first Next route that replaces a legacy screen, add a
    navigation-scope rule (or unregister and re-register the worker).
 3. **Function budget is now shared.** Every new Next route handler counts against the
-   same cap as the legacy catch-all. Check the count on each preview before merging.
+   same cap as the legacy catch-all. Check the count on each preview before merging,
+   and keep it at 10 or below (owner instruction).
 4. **Cron depends on the catch-all.** `/api/event-processor` runs daily at 03:00 UTC; if
    the dispatch table loses that key, events stop draining silently. `tests/scaffold.test.mjs`
    guards it.
