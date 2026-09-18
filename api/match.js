@@ -1,95 +1,75 @@
 // POST /api/match
 // Body: { application_id } OR { job_id, candidate_id }
-// Scores a candidate's resume against the job's JD via Groq, stores the
-// result on the application row, charges 1 credit to the owning org.
-//
-// Auth: expects the caller's Supabase access token in the Authorization
-// header. The token is verified, then RLS-equivalent access is checked
-// before the service-role client does the write.
+// Scores a candidate's resume against the job's JD with AI and stores the result
+// on the application row. AI usage is checked and recorded by lib/aiGateway.js.
 
-import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
-
-const GROQ_MODEL = "openai/gpt-oss-120b";
-
-async function getUserFromToken(token) {
-  const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  });
-  if (!resp.ok) return null;
-  return resp.json();
-}
+import { resolveCaller, runAI } from "../lib/aiGateway.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Use POST" });
   }
-
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ error: "Missing auth token" });
-
-  const user = await getUserFromToken(token);
-  if (!user?.id) return res.status(401).json({ error: "Invalid session" });
-
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY is not set on the server." });
+  }
   if (!process.env.GROQ_API_KEY) {
-    return res.status(500).json({
-      error: "GROQ_API_KEY is not set on the server.",
-    });
+    return res.status(500).json({ error: "GROQ_API_KEY is not set on the server." });
   }
 
-  const db = supabaseAdmin();
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const caller = await resolveCaller(token);
+  if (!caller.ok) return res.status(caller.status).json({ error: caller.error });
+
+  const db = caller.db;
   const { application_id, job_id, candidate_id } = req.body || {};
 
-  // Resolve or create the application row
-  let app;
+  // Resolve the job first, so ownership is checked before anything is written.
+  let app = null;
+  let jobId = job_id;
+  let candidateId = candidate_id;
   if (application_id) {
-    const { data } = await db
+    const { data, error } = await db
       .from("job_applications")
       .select("id, job_id, candidate_id")
       .eq("id", application_id)
-      .single();
+      .maybeSingle();
+    if (error) return res.status(503).json({ error: "Could not load data — please try again" });
     app = data;
-  } else if (job_id && candidate_id) {
-    const { data } = await db
-      .from("job_applications")
-      .upsert(
-        { job_id, candidate_id },
-        { onConflict: "job_id,candidate_id" }
-      )
-      .select("id, job_id, candidate_id")
-      .single();
-    app = data;
+    if (!app) return res.status(404).json({ error: "Application not found" });
+    jobId = app.job_id;
+    candidateId = app.candidate_id;
+  } else if (!(job_id && candidate_id)) {
+    return res.status(400).json({ error: "application_id, or job_id and candidate_id, are required" });
   }
-  if (!app) return res.status(404).json({ error: "Application not found" });
 
-  // Load job + candidate + org, and verify the caller can access this client
-  const { data: job } = await db
+  const { data: job, error: jobError } = await db
     .from("jobs")
     .select("id, title, jd_raw_text, description, org_id")
-    .eq("id", app.job_id)
-    .single();
-  const { data: candidate } = await db
-    .from("candidates")
-    .select("id, full_name, name, resume_text, resume_raw_text")
-    .eq("id", app.candidate_id)
-    .single();
-
-  if (!job || !candidate) {
-    return res.status(404).json({ error: "Job or candidate not found" });
-  }
-
-  const { data: profile } = await db
-    .from("users")
-    .select("org_id, role")
-    .eq("id", user.id)
+    .eq("id", jobId)
     .maybeSingle();
+  if (jobError) return res.status(503).json({ error: "Could not load data — please try again" });
+  if (!job) return res.status(404).json({ error: "Job or candidate not found" });
+  if (job.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this job" });
 
-  const allowed = profile && profile.org_id && profile.org_id === job.org_id;
-  if (!allowed) return res.status(403).json({ error: "No access to this job" });
+  const { data: candidate, error: candidateError } = await db
+    .from("candidates")
+    .select("id, full_name, name, resume_text, resume_raw_text, org_id")
+    .eq("id", candidateId)
+    .maybeSingle();
+  if (candidateError) return res.status(503).json({ error: "Could not load data — please try again" });
+  if (!candidate) return res.status(404).json({ error: "Job or candidate not found" });
+  if (candidate.org_id !== caller.orgId) return res.status(403).json({ error: "No access to this candidate" });
 
-  const orgId = job.org_id;
+  if (!app) {
+    const { data, error: upsertErr } = await db
+      .from("job_applications")
+      .upsert({ job_id: jobId, candidate_id: candidateId }, { onConflict: "job_id,candidate_id" })
+      .select("id, job_id, candidate_id")
+      .single();
+    if (upsertErr) return res.status(500).json({ error: "Could not create the application — please try again" });
+    app = data;
+    if (!app) return res.status(500).json({ error: "Could not create the application" });
+  }
 
   const jd = job.jd_raw_text || job.description || "";
   const resume = candidate.resume_text || candidate.resume_raw_text || "";
@@ -99,17 +79,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // Check credits (soft_bill lets it go negative; hard_stop blocks)
-  const { data: org } = await db
-    .from("organizations")
-    .select("id, credits_balance, credit_overage_mode")
-    .eq("id", orgId)
-    .single();
-  if (org.credit_overage_mode === "hard_stop" && org.credits_balance <= 0) {
-    return res.status(402).json({ error: "Out of credits. Top up to continue matching." });
-  }
-
-  // Call Groq
   const prompt = `You are an expert technical recruiter. Score how well this resume matches the job description.
 
 JOB TITLE: ${job.title}
@@ -123,40 +92,25 @@ ${resume.slice(0, 6000)}
 Respond ONLY with minified JSON, no markdown fences, in this exact shape:
 {"score": <0-100 number>, "summary": "<2-3 sentence assessment>", "strengths": ["..."], "gaps": ["..."]}`;
 
-  const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.2,
-      max_tokens: 600,
-      reasoning_effort: "low",
-      messages: [{ role: "user", content: prompt }],
-    }),
+  const ai = await runAI({
+    caller,
+    feature: "match",
+    messages: [{ role: "user", content: prompt }],
+    maxTokens: 600,
+    temperature: 0.2,
+    metadata: { application_id: app.id, job_id: job.id },
   });
+  if (!ai.ok) return res.status(ai.status).json(ai.body);
 
-  if (!groqResp.ok) {
-    const detail = await groqResp.text();
-    return res.status(502).json({ error: "Groq request failed", detail });
-  }
-
-  const groqData = await groqResp.json();
   let parsed;
   try {
-    const raw = (groqData.choices?.[0]?.message?.content || "")
-      .replace(/```json|```/g, "")
-      .trim();
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(ai.text.replace(/```json|```/g, "").trim());
   } catch {
     return res.status(502).json({ error: "Could not parse model response" });
   }
 
   const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
 
-  // Persist result
   const { error: updateErr } = await db
     .from("job_applications")
     .update({
@@ -167,19 +121,7 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
       updated_at: new Date().toISOString(),
     })
     .eq("id", app.id);
-  if (updateErr) return res.status(500).json({ error: updateErr.message });
-
-  // Charge 1 credit
-  await db
-    .from("organizations")
-    .update({ credits_balance: org.credits_balance - 1 })
-    .eq("id", orgId);
-  await db.from("credit_ledger").insert({
-    organization_id: orgId,
-    action_type: "resume_match",
-    credits_delta: -1,
-    reference_id: app.id,
-  });
+  if (updateErr) return res.status(500).json({ error: "Could not save the match — please try again" });
 
   return res.status(200).json({
     application_id: app.id,
@@ -187,6 +129,6 @@ Respond ONLY with minified JSON, no markdown fences, in this exact shape:
     summary: parsed.summary,
     strengths: parsed.strengths || [],
     gaps: parsed.gaps || [],
-    credits_remaining: org.credits_balance - 1,
+    tokens_used: ai.usage.total,
   });
 }

@@ -167,7 +167,7 @@ All functions are `SECURITY DEFINER` with `search_path = public`. Execute is rev
 The only module allowed to call `api.groq.com`.
 
 ```
-runAI({ token, feature, messages, maxTokens, temperature, traceName, metadata })
+runAI({ caller, feature, messages, maxTokens, temperature, metadata })   // caller = await resolveCaller(token)
   → { ok: true, text, usage: { prompt, completion, total }, user, orgId }
   | { ok: false, status, error, quota }     // status 401 | 403 | 429 | 502
 ```
@@ -182,7 +182,7 @@ runAI({ token, feature, messages, maxTokens, temperature, traceName, metadata })
 5. On a Groq error: `ai_record_usage(... 0, 0, 'error')`, return `502`.
 6. On success: `ai_record_usage` (with `request_hash`) using `usage.prompt_tokens` / `usage.completion_tokens`, fire-and-forget `logGroqGeneration` with `{ org_id, feature, ...metadata }`, return the text and usage.
 
-Also exports `resolveCaller(token)` for endpoints that need the user before any AI call (e.g. job ownership checks), so a request authenticates once.
+Also exports `resolveCaller(token)` for endpoints that need the user before any AI call (e.g. job ownership checks), so a request authenticates once. `runAI` takes that caller, so each request authenticates once.
 
 ### 5.2 Endpoint changes
 
