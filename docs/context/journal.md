@@ -10,6 +10,21 @@ file.
 
 ---
 
+## 2026-09-18 — Stack transition adopted (Next.js + Drizzle)
+
+- The owner's target architecture (`CLAUDE.md`) and migration tracker
+  (`TRANSITION.md`) are now in the repo. The previous vanilla-JS charter moved to
+  `docs/legacy/CLAUDE-legacy.md` and still governs the live app until Phase 8.
+- **Both stacks will share one Supabase database**, so no schema change may break the
+  legacy screens while they are still serving users.
+- Baseline was verified against the live database before planning: CRM, HRMS,
+  Recruitment, Analytics and Helpdesk already exist (the tracker assumed some were
+  new), tenancy is already `org_id`, and the real migration weight is CRM —
+  6,132 partners and 83,453 report rows against negligible HRMS/recruitment data.
+- Six decisions are waiting on the owner (freeze depth, partner-vertical strategy,
+  naming, `feature_access` vs `org_modules`, cutover shape, and whether v1.2.0 ships
+  before the freeze). They are logged in `TRANSITION.md` → Decisions & Blockers.
+
 ## 2026-09-18 — Context pack created
 
 - `docs/context/` now holds the working instructions and one file per module

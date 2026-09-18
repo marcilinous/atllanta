@@ -1,489 +1,490 @@
 # CLAUDE.md — Atllanta Foundation & Requirements
 
-> **What this file is:** The single source of truth for what Atllanta is, how it
-> is structured, and what it must do. Read it completely before writing any code.
-> Every architectural decision, tenancy rule, module boundary, naming convention,
-> and requirement is here. When in doubt, this file wins.
+> **What this file is:** The definitive single source of truth for Atllanta's
+> target architecture, tenancy boundaries, conventions, and functional
+> modularity. Read it completely before writing any code. When code and this
+> document conflict, this file wins.
 >
-> **Working in a single context window?** Start with `docs/context/index.md` — the
-> context pack. It maps the repo, splits the product into module files, and tells you
-> which one file to read for the task in hand, so you never read the whole codebase.
-> This file stays the authority on *what Atllanta must be*; the pack describes *where
-> things are and how to work*.
+> **Stack note:** This supersedes the earlier vanilla-JS/Supabase-only
+> CLAUDE.md. Atllanta is now standardized on a type-safe **Next.js (App
+> Router) + TypeScript + Supabase + Drizzle ORM + Tailwind CSS / shadcn/ui**
+> full-stack monolith.
 >
-> **Status:** This document describes the **canonical target**. Part of the code
-> still runs on an older agency/`client_id` model and is being migrated onto this
-> base (see §13, Alignment Status). Where code and this file disagree, this file
-> is the direction; the code is the debt.
+> **Read this before you write code — two stacks are live at once.** This file
+> is the **target**. Production today still runs the vanilla-JS/Supabase-direct
+> app, and it keeps running until Phase 8 of `TRANSITION.md` retires it. So:
+> - **Where are we?** `TRANSITION.md` — read it first, every session. It holds
+>   the current phase and the next unchecked item.
+> - **Working on the live app?** Its rules are `docs/legacy/CLAUDE-legacy.md`
+>   (vanilla JS, no framework) and the module map in `docs/context/`. Fixes and
+>   releases there follow the legacy rules — do not half-migrate a live screen.
+> - **Working on the new stack?** This file wins.
+> - **Both stacks share one Supabase database** during the transition, so any
+>   schema change must keep the legacy app working until its screens are retired.
 
 ---
 
-## 1. What Is Atllanta
+## 1. Core Principles & Non-Negotiables
 
-Atllanta is a **single-tenant-per-company Business Operating System** — one product
-that connects people, customers, work, and operations under one identity, one
-permission model, one design system, and one AI assistant.
-
-**One company = one `organization`.** Every user belongs to exactly one org and
-holds exactly one role. Every business-data table carries `org_id` and is isolated
-by a single Postgres row-level-security pattern.
-
-Atllanta is composed of **four business modules** on **one shared Platform layer**:
-
-1. **HRMS / People** — employee lifecycle: directory, attendance, leave, assets,
-   expenses, helpdesk, announcements, documents.
-2. **Recruitment & Interview Automation** — CV↔JD matching (Groq), candidate
-   pipeline, and automated interview scheduling (Google Meet).
-3. **CRM** — customers, contacts, leads, and a configurable sales pipeline.
-4. **Analytics** — cross-module dashboards and reporting.
-
-**One-line pitch:** Companies come for the AI hiring tool, stay for the operating
-system that runs the rest of the company.
-
-**Build history to know:** Atllanta began as an agency recruitment SaaS
-(`organizations → clients → jobs`) and later grew an HR/People layer scoped by
-`org_id`. That left two tenancy models fused together. The canonical model below
-(single `org_id`, no agency tier) is the resolution. Do not add new code on the
-old `client_id`/`memberships` model.
+- **Single-Tenant per Company:** One company = one `organization` (`org_id`).
+  Multi-tenant agency/reseller models (`client_id`, `memberships`) are
+  deprecated.
+- **Strict Tenant Isolation:** Every business table carries
+  `org_id uuid not null references organizations(id)`.
+- **Zero Trust & Client Isolation:**
+  - Supabase client sessions evaluate Row-Level Security (RLS) policies via
+    `auth_org_id()`.
+  - All mutations run **server-side** through Next.js **Server Actions**
+    with schema validation via **Zod** and transactions via **Drizzle ORM**.
+  - The `service_role` key is strictly forbidden in frontend code, public
+    server actions, and AI execution paths.
+- **System Roles + Custom Roles:** Five built-in system roles —
+  `owner`, `admin`, `developer`, `manager`, `member`. `admin` can additionally
+  define **custom roles** scoped to the org, each with its own permission set
+  (see §3.5, Roles & Module Access).
+- **Module Enablement Per Org:** Modules are not globally always-on. `admin`
+  controls which modules are enabled for their org, and which roles
+  (system or custom) can access each enabled module (see §3.5).
+- **Decoupled Cross-Module Communication:** Modules never perform direct
+  joins or write mutations across other modules' raw transactional tables.
+  Cross-module interoperability is executed exclusively via Server
+  Actions/APIs or the asynchronous Event Bus.
 
 ---
 
-## 2. Stack
+## 2. Technical Stack
 
-| Layer | Tool | Non-negotiable |
-|-------|------|----------------|
-| Database | **Supabase (PostgreSQL 15+)** | ✅ |
-| Auth | **Supabase Auth** | ✅ |
-| Storage | **Supabase Storage** | ✅ |
-| Hosting | **Vercel** | ✅ |
-| Frontend | **Vanilla JS + HTML + CSS** (no framework) | ✅ |
-| AI / LLM | **Groq (LLaMA)** — already integrated | ✅ |
-| Email | **Resend** | ✅ |
-| Vector search | pgvector (Supabase) | Later |
-| WhatsApp / Maps | BSP / Google Maps | Later |
-
-**Hard rules:**
-- Zero monthly cost during build/pilot — free tiers only.
-- No React, Next.js, TypeScript, or Tailwind unless the owner explicitly asks.
-- No npm packages for what vanilla JS covers.
-- Supabase client (`@supabase/supabase-js`) via CDN, not npm.
-- **`anon` key + RLS only. Never `service_role` in frontend or AI paths.** If the
-  user can't see it in the UI, the AI can't see it either.
+| Layer | Technology | Usage & Scope |
+|---|---|---|
+| Framework | Next.js (App Router, React 19+) | Server Components for streaming data fetch, Server Actions for mutations. |
+| Language | TypeScript (Strict Mode) | End-to-end type safety across schemas, actions, and UI components. |
+| Database & Auth | Supabase (PostgreSQL 15+) | Auth (SSR cookie sessions), RLS policies, Storage buckets. |
+| ORM & Migrations | Drizzle ORM + Drizzle Kit | Type-safe SQL generation, relational modeling, automated migrations. |
+| Design System | Tailwind CSS + shadcn/ui | Accessible components, responsive layout, inline SVG icons (no emojis as functional icons). |
+| LLM & Inference | Groq SDK (LLaMA) | High-speed structured parsing for CVs, JD generation, and copilot actions. |
+| Integrations | Google Calendar, Resend, WhatsApp BSP | Calendar synchronization, transactional email, and outbound messaging. |
+| LLM Observability | Langfuse | Tracing, prompt/version tracking, and evaluation for all Groq calls (JD generation, resume matching, AI Assistant). |
 
 ---
 
-## 3. Architecture — Modular Monolith
+## 3. Modular Architecture & Data Model
 
-One Supabase project. One Vercel deployment. Modules are separated by folder and
-schema boundaries, not services or repos.
+### Module 0: Shared Platform & Identity
 
-```
-Atllanta (single deployment)
-│
-├── Platform Layer (shared — every module uses these, no business logic)
-│     ├── Identity (auth, org, roles, permissions)
-│     ├── Tenancy + RLS (single org_id isolation)
-│     ├── Event bus (events table + processor)
-│     ├── Notifications (in-app, email via Resend)
-│     ├── Audit (append-only action log)
-│     ├── Files (Supabase Storage)
-│     ├── Global search
-│     └── AI Assistant (Groq, permission-aware)
-│
-├── Application Layer (four modules — each OWNS its data)
-│     ├── HRMS / People
-│     ├── Recruitment & Interview Automation
-│     ├── CRM
-│     └── Analytics (owns no business tables — reads via APIs/views)
-│
-└── Infrastructure: Supabase (Postgres + Auth + Storage + Edge Functions), Vercel
-```
+Foundational identity, tenant isolation, global user roles, append-only
+auditing, file metadata, and the decoupled system event bus.
 
-### Core rules (enforced, not aspirational)
-1. **Modules own their data.** A module never reads another module's tables
-   directly — it calls that module's API or reacts to its events.
-2. **No shared business logic.** Only shared *platform* services (auth, files,
-   notifications, audit, events, search, AI).
-3. **Every mutation publishes an event.** Format `module.entity.action`, e.g.
-   `people.employee.created`, `recruitment.candidate.shortlisted`,
-   `crm.deal.won`, `leave.request.approved`.
-4. **All data access goes through RLS.** No `service_role` key in frontend code.
-5. **Every endpoint checks permission** through the same layer as the UI. The AI
-   assistant is not an exception.
-
----
-
-## 4. Multi-Tenancy (the base)
-
-**Model:** shared database, one org per company, row-level security per org.
-
-Every business table has `org_id uuid not null references organizations(id)`.
-A single security-definer helper resolves the caller's org, and every table gets
-the same four policies:
-
+**Core Tables:**
 ```sql
--- One helper, used by every policy
-create or replace function auth_org_id() returns uuid
-  language sql security definer stable
-  as $$ select org_id from users where id = auth.uid() $$;
-
--- Standard policy set on EVERY org-scoped table
-alter table <t> enable row level security;
-create policy "org_select" on <t> for select using (org_id = auth_org_id());
-create policy "org_insert" on <t> for insert with check (org_id = auth_org_id());
-create policy "org_update" on <t> for update using (org_id = auth_org_id());
-create policy "org_delete" on <t> for delete using (org_id = auth_org_id());
-```
-
-**Canonical tenant key is `org_id`.** Not `organization_id`, not `client_id`.
-The agency tier (`clients`, `memberships`, `auth_accessible_client_ids()`,
-`org_type`) is being removed — see §13.
-
-**Critical test (must pass at all times):** create two orgs, insert data in both,
-and verify user A cannot read user B's data under *any* query path, on every table,
-under the `anon` key.
-
----
-
-## 5. Roles & Permissions
-
-Four fixed roles on `users.role`:
-
-| Role | Scope |
-|------|-------|
-| `owner` | Full control of the org, billing, deletion. |
-| `admin` | Manage users, settings, all module data. |
-| `manager` | Approve/act within their team/department. |
-| `member` | Self-service: own attendance, leave, profile, assigned work. |
-
-No custom-permission UI. Role checks live in one place (`js/auth.js` + RLS), and
-the UI hides what a role can't do (`data-role` on nav in `index.html`).
-
----
-
-## 6. Canonical Data Model
-
-`org_id` on every business table. Names below are the target; where the live
-schema still differs (recruitment tables on `client_id`), §13 tracks the gap.
-
-### 6.1 Platform & Identity
-```
 organizations(id, name, slug, logo_url, timezone, currency, plan_tier,
               payment_status, created_at, updated_at)
-users(id → auth.users, org_id, full_name, email, phone, avatar_url,
-      role owner|admin|manager|member, designation, department_id, team_id,
-      reporting_manager_id, status, date_of_joining)
+users(id references auth.users, org_id, full_name, email, phone, avatar_url,
+      role owner|admin|developer|manager|member, custom_role_id, designation,
+      department_id, team_id, reporting_manager_id, status, date_of_joining)
 departments(id, org_id, name, head_id)
 teams(id, org_id, department_id, name, lead_id)
 invitations(id, org_id, email, role, token, status, expires_at)
 audit_logs(id, org_id, user_id, module, entity_type, entity_id, action,
-           old_values jsonb, new_values jsonb, created_at)   -- append only
+           old_values jsonb, new_values jsonb, created_at)
 events(id, org_id, event_type, actor_id, payload jsonb, status, attempts,
        created_at, processed_at)
-notifications(id, org_id, user_id, title, body, module, entity_type, entity_id,
-              channel, status, sent_at)
+notifications(id, org_id, user_id, title, body, module, entity_type,
+              entity_id, channel, status, sent_at)
 files(id, org_id, uploaded_by, file_name, file_path, file_size, mime_type,
       entity_type, entity_id, created_at)
+org_modules(id, org_id, module_key, is_enabled, enabled_by, enabled_at)
+roles(id, org_id, name, slug, is_system, description, created_by, created_at)
+role_permissions(id, org_id, role_id, module_key, permission text, created_at)
+-- permission is one of: view | create | edit | delete | approve
 ```
-
-### 6.2 HRMS / People
-```
-attendance, attendance_regularizations, work_schedules, holidays,
-leave_types, leave_balances, leave_requests,
-assets, asset_assignments, expenses, expense_categories,
-helpdesk_categories, helpdesk_category_handlers, helpdesk_tickets,
-announcements, posts
-```
-
-### 6.3 Recruitment & Interview Automation
-```
-jobs, candidates, applications (match_score, match_summary, stage),
-interviews, interview_slots
-```
-(These tables exist; they migrate `client_id → org_id` in Phase 1.)
-
-### 6.4 CRM (to build)
-```
-crm_accounts(id, org_id, name, industry, website, owner_id, created_at)
-crm_contacts(id, org_id, account_id, full_name, email, phone, title)
-crm_leads(id, org_id, full_name, company, email, phone, source, status, owner_id)
-crm_pipelines(id, org_id, name, stages jsonb)     -- configurable stages
-crm_deals(id, org_id, account_id, pipeline_id, title, value, currency, stage,
-          owner_id, expected_close, status open|won|lost, created_at)
-crm_activities(id, org_id, entity_type, entity_id, type note|call|task|email,
-               body, due_at, done, actor_id, created_at)
-```
-
-### 6.5 Analytics
-Owns no business tables. Reads through each module's API or dedicated SQL views
-(`analytics_*` views / materialized views), never by selecting another module's
-tables directly.
-
-### 6.6 Indexes & FTS
-Every `org_id` gets an index. Keep the existing FTS columns on `users`,
-`candidates`, `jobs` (generated `tsvector` + GIN). Add module-local indexes on
-hot filter columns (status, dates, owner).
+**Directory:** `src/app/(platform)/`, `src/lib/auth/`, `src/lib/events/`,
+`src/db/schema/platform.ts`
 
 ---
 
-## 7. Module Boundaries & Event Contracts
+### 3.5 Roles & Module Access
 
-Cross-module needs are met by **events** or a **module API**, never a foreign
-table read.
+**Module enablement (org-level):**
+- Every module (HRMS, CRM, Analytics, Recruitment, Helpdesk, Projects, AI
+  Assistant) has a row in `org_modules` per org, `is_enabled` defaulting to
+  `false` on org creation.
+- Only `owner`/`admin` can toggle `org_modules.is_enabled`. A disabled
+  module is hidden from nav (`data-role`/`data-module` gating) and its
+  Server Actions reject with a permission error even if called directly.
+- Toggling emits `platform.module.enabled` / `platform.module.disabled`.
 
-| Event | → Reactions |
-|-------|-------------|
-| `people.employee.created` | Create leave balances for the year → notify manager + HR |
-| `leave.request.created` | Notify manager; if > 3 days also HR |
-| `leave.request.approved` | Update balance + attendance → notify employee |
-| `recruitment.candidate.shortlisted` | Notify hiring manager → create interview task |
-| `attendance.checkin.completed` | If late, mark late → notify manager on 3rd late/month |
-| `crm.lead.converted` | Create account + deal → notify owner |
-| `crm.deal.won` | Notify owner + manager → (optional) analytics refresh |
-
-The processor is `js/event-processor.js` (client trigger) / `api/event-processor.js`
-(serverless drain). Publish with `js/events.js` `publishEvent(type, payload)`.
-
----
-
-## 8. Requirements
-
-### 8.1 Non-functional (platform — apply to every module)
-- **Tenant isolation:** the two-org test (§4) passes on every table, always.
-- **Auth:** email/password + Google OAuth (both wired in `login.html`). **Add the
-  missing password-reset flow** — `resetPasswordForEmail` on `login.html` and a
-  `PASSWORD_RECOVERY` handler in `js/auth.js` (currently only `SIGNED_OUT` is
-  handled at `js/auth.js:55`).
-- **Security:** `anon` + RLS only; no `service_role` client-side or in AI paths;
-  every user-rendered string passes `esc()` (`js/ui.js`).
-- **Events:** every mutation publishes `module.entity.action`.
-- **Design system:** views compose `css/tokens.css` + `css/components.css`
-  classes. Do not add token-laced inline `style=""` strings (there are ~1,700 to
-  unwind). One icon system: inline SVG. No emoji as UI icons.
-- **Reuse ladder:** before new code, reuse a `js/ui.js` helper, then stdlib, then
-  a platform service. `js/ui.js` already exports `esc, toast, openModal, closeModal,
-  formatDate, timeAgo, initials, avColor, scoreBar, stagePill, showError,
-  loadingSkeleton, getAuthToken`.
-
-### 8.2 Functional — per module
-- **HRMS / People:** directory + profile + org chart; attendance check-in/out +
-  regularization; leave apply/approve + balances + calendar + holidays; assets;
-  expenses; helpdesk tickets; announcements; document store; lifecycle & letters.
-- **Recruitment & Interview Automation:** create job/JD → Groq skill parse; upload
-  resumes (single + bulk) → parse; match → ranked scores + breakdown; shortlist/
-  reject pipeline; schedule interviews with slots + Google Meet; candidate profile
-  with scores + interview history.
-- **CRM:** accounts; contacts; leads with source/status; deals on a configurable
-  pipeline; activity/note/task timeline; convert lead → account+deal; owner
-  assignment. All `org_id`-scoped + RLS + events.
-- **Analytics:** per-module KPI dashboards; date-range + department filters;
-  export; reads via module APIs / `analytics_*` views only. Replaces the ad-hoc
-  `views/reports/*` screens.
+**Roles (system + custom):**
+- `owner`, `admin`, `developer`, `manager`, `member` are **system roles**
+  (`roles.is_system = true`), seeded per org, not editable/deletable.
+- `admin` can create **custom roles** scoped to the org (`roles.is_system =
+  false`), each with a name and a set of module-level permissions stored in
+  `role_permissions` (per module: `view` / `create` / `edit` / `delete` /
+  `approve`).
+- A user is assigned exactly one role via `users.role` (system) **or**
+  `users.custom_role_id` (custom) — never both.
+- The `developer` role is a system role with technical/config-adjacent
+  access (API keys, webhooks, integration settings, Langfuse trace access,
+  event bus inspection) but not billing or org deletion (that stays
+  `owner`-only).
+- Permission checks live in one place (`js/auth.js`-equivalent
+  `src/lib/auth/permissions.ts`), resolving system role defaults first,
+  then custom-role `role_permissions` overrides. The AI Assistant is not an
+  exception — it resolves permissions through the same path.
+- Creating/editing a custom role, or changing its permissions, emits
+  `platform.role.created` / `platform.role.updated`.
 
 ---
 
-## 9. File Structure (actual)
+### Module 1: HRMS (Human Resource Management)
+
+Directory management, presence tracking, leave balances, asset inventory,
+employee expenses, and company notices.
+
+**Core Tables:**
+```sql
+attendance(id, org_id, user_id, date, check_in, check_out, status, regularized)
+attendance_regularizations(id, org_id, attendance_id, reason, status, approved_by)
+work_schedules(id, org_id, name, details jsonb)
+holidays(id, org_id, name, holiday_date)
+leave_types(id, org_id, name, default_days)
+leave_balances(id, org_id, user_id, leave_type_id, balance, year)
+leave_requests(id, org_id, user_id, leave_type_id, start_date, end_date,
+               reason, status, approved_by)
+assets(id, org_id, name, serial_number, category, status)
+asset_assignments(id, org_id, asset_id, user_id, assigned_at, returned_at)
+expenses(id, org_id, user_id, category_id, amount, currency, receipt_file_id,
+         status, approved_by)
+expense_categories(id, org_id, name)
+announcements(id, org_id, title, body, author_id, published_at)
+```
+**Directory:** `src/app/(dashboard)/hrms/`, `src/modules/hrms/`,
+`src/db/schema/hrms.ts`
+
+**Emitted Events:** `people.employee.created`, `leave.request.created`,
+`leave.request.approved`, `attendance.checkin.completed`
+
+---
+
+### Module 2: CRM (Standard & Custom Developer Engine)
+
+Combines out-of-the-box pipeline tracking with a visual and code-level
+customization engine.
+
+**1. Generic CRM (Ready-to-Use):**
+- Accounts and contacts hierarchy with primary contact tags.
+- Lead lifecycle tracking with source attribution and qualification scores.
+- Deals across multi-stage visual Kanban funnels with win probabilities and
+  expected close dates.
+- Omnichannel interaction timeline logging calls, emails, notes, tasks, and
+  messaging.
+
+**2. Custom CRM (Developer & Visual Builder Mode):**
+- **Dynamic Entity Definitions:** Define custom business objects beyond
+  standard leads (e.g., contracts, subscriptions, vendors).
+- **Drag-and-Drop Form Builder:** Add custom fields (text, number, select,
+  date, formula, lookup) and define multi-column form layouts and
+  validation rules.
+- **Code Hooks & Scripting:** Sandboxed execution triggers (`beforeInsert`,
+  `afterChange`) for advanced calculations and third-party webhook
+  dispatches.
+
+**Core Tables:**
+```sql
+-- Generic CRM
+crm_accounts(id, org_id, name, industry, website, owner_id, created_at, updated_at)
+crm_contacts(id, org_id, account_id, full_name, email, phone, title,
+             is_primary, created_at)
+crm_leads(id, org_id, full_name, company, email, phone, source, status,
+          qualification_score, owner_id, created_at)
+crm_pipelines(id, org_id, name, is_default, stages jsonb, created_at)
+crm_deals(id, org_id, account_id, pipeline_id, title, value, currency,
+          stage, status, expected_close, owner_id, created_at)
+crm_activities(id, org_id, entity_type, entity_id, type, body, due_at,
+               done, actor_id, created_at)
+
+-- Custom CRM (Developer Mode)
+crm_entity_definitions(id, org_id, name, label, description,
+                        layout_schema jsonb, code_hooks jsonb, is_system,
+                        created_at)
+crm_field_definitions(id, org_id, entity_id, name, label, type,
+                       is_required, default_value jsonb, options jsonb,
+                       validation_rules jsonb, formula_expression text,
+                       display_order, created_at)
+crm_custom_records(id, org_id, entity_id, data jsonb, created_by,
+                    created_at, updated_at)
+-- Indexing: GIN index applied on crm_custom_records(data)
+```
+**Directory:** `src/app/(dashboard)/crm/`, `src/modules/crm/`,
+`src/db/schema/crm.ts`
+
+**Emitted Events:** `crm.lead.converted`, `crm.deal.won`
+
+---
+
+### Module 3: Self-Serve Analytics (Metabase-Inspired)
+
+A self-serve business intelligence workspace operating strictly on
+read-only analytical views to ensure non-blocking transactional
+performance.
+
+- **Visual "Ask a Question" Builder:** Select any entity, filter
+  conditions, group dimensions, and select aggregate operations (Sum,
+  Average, Count, Distinct) without writing SQL.
+- **Native SQL Editor:** Monaco-based editor supporting parameterized
+  variables (`{{start_date}}`), autocomplete, and schema inspection.
+- **Visualizations & Dashboards:** Dynamic tables, multi-series lines, bar
+  charts, funnels, and KPI trends placed on a draggable, resizable canvas
+  with top-level shared date and department filters.
+- **Automated Pulses:** Scheduled cron-based digests and threshold alerts
+  dispatched via email (Resend) or in-app notifications.
+
+**Core Tables:**
+```sql
+analytics_questions(id, org_id, title, description, query_type,
+                     query_payload jsonb, raw_sql text,
+                     display_settings jsonb, created_by, created_at,
+                     updated_at)
+analytics_dashboards(id, org_id, title, description, parameters jsonb,
+                      is_favorite, created_by, created_at, updated_at)
+analytics_dashboard_cards(id, org_id, dashboard_id, question_id,
+                           layout jsonb, parameter_mappings jsonb,
+                           display_order)
+analytics_subscriptions(id, org_id, dashboard_id, question_id, channel,
+                         recipient_ids jsonb, cron_schedule,
+                         condition_rule jsonb, is_active, created_at)
+```
+**Directory:** `src/app/(dashboard)/analytics/`, `src/modules/analytics/`,
+`src/db/schema/analytics.ts`
+
+---
+
+### Module 4: Recruitment & Interview Automation
+
+End-to-end talent acquisition loop structured across 7 functional pillars:
+
+1. **JD Maker** — Structured job description builder utilizing Groq LLaMA
+   to generate role responsibilities, required skills, and grading
+   criteria.
+2. **Resume Collector** — Multi-channel CV intake via drag-and-drop file
+   upload, public candidate submission forms, and bulk PDF/DOCX import.
+3. **Resume-to-JD Matcher (AI + ATS)** — Groq extracts skills, parses
+   career history, and scores candidate-to-job relevance (0–100%) with a
+   breakdown of matches and gaps.
+4. **Custom ATS** — Kanban-style candidate pipelines with configurable
+   stages per job, stage-gate actions, and candidate activity histories.
+5. **Calendar Checker** — Direct OAuth sync with interviewers' Google
+   Calendars, running real-time availability checks against working hours
+   and busy slots to prevent double-booking.
+6. **Form-Like Slot Fixing Link** — Public, lightweight booking page
+   (`/schedule/[token]`) allowing candidates to pick an interviewer's open
+   slot, automatically generating a Google Meet link and calendar entry
+   upon confirmation.
+7. **WhatsApp Integration (With Real-User Safety Gate)** — Dispatches
+   interview links and status notifications via WhatsApp. **Safety Gate:**
+   messages trigger only after candidate phone verification or explicit
+   recruiter action, blocking unauthorized dispatch or spam loops.
+
+**Core Tables:**
+```sql
+jobs(id, org_id, title, department_id, description, skills_required jsonb,
+     min_experience_years, status, custom_stages jsonb, hiring_manager_id,
+     created_at, updated_at)
+candidates(id, org_id, full_name, email, phone, is_phone_verified,
+           resume_file_id, parsed_skills jsonb, parsed_experience jsonb,
+           raw_resume_text text, created_at)
+applications(id, org_id, job_id, candidate_id, current_stage,
+             match_score numeric, match_summary jsonb, notes text,
+             created_at, updated_at)
+interviewer_calendars(id, org_id, user_id, provider, access_token,
+                       refresh_token, token_expiry, working_hours jsonb,
+                       created_at)
+interview_booking_links(id, org_id, application_id, interviewer_id, token,
+                         duration_minutes, is_used, expires_at, created_at)
+interviews(id, org_id, application_id, interviewer_id, scheduled_at,
+           duration_minutes, meet_link, calendar_event_id, status,
+           feedback_notes, feedback_rating, created_at)
+whatsapp_messages(id, org_id, candidate_id, template_name, recipient_phone,
+                   payload jsonb, status, error_message, sent_at, created_at)
+```
+**Directory:** `src/app/(dashboard)/recruitment/`,
+`src/app/schedule/[token]/`, `src/modules/recruitment/`,
+`src/db/schema/recruitment.ts`
+
+**Emitted Events:** `recruitment.candidate.shortlisted`,
+`recruitment.interview.scheduled`, `recruitment.candidate.hired`
+
+---
+
+### Module 5: Helpdesk (Round-Robin Support Engine)
+
+Ticketing hub for internal IT, HR queries, and workplace operations
+featuring automated load distribution.
+
+- **Round-Robin Assignment Engine:** Automatically routes incoming tickets
+  sequentially among assigned department category handlers using
+  row-level transactional locking.
+- **Presence & Shift Awareness:** Automatically skips agents marked away,
+  on leave, or off-shift without breaking rotation order.
+- **SLA & Escalation Matrices:** Priority countdown timers (Urgent, High,
+  Medium, Low) flagging overdue items to department leads.
+
+**Core Tables:**
+```sql
+helpdesk_categories(id, org_id, name, department_id,
+                     last_assigned_user_id references users(id), created_at)
+helpdesk_category_handlers(id, org_id, category_id, user_id, is_available,
+                            order_index)
+helpdesk_tickets(id, org_id, ticket_number, category_id, raised_by,
+                  assigned_to references users(id), subject, description,
+                  priority, status, created_at, resolved_at)
+helpdesk_comments(id, org_id, ticket_id, user_id, message, is_internal,
+                   created_at)
+```
+**Directory:** `src/app/(dashboard)/helpdesk/`, `src/modules/helpdesk/`,
+`src/db/schema/helpdesk.ts`
+
+**Emitted Events:** `helpdesk.ticket.created`, `helpdesk.ticket.assigned`,
+`helpdesk.ticket.resolved`
+
+---
+
+### Module 6: Project Tracking
+
+Operational execution layer managing project roadmaps, Kanban task boards,
+milestones, and assignments.
+
+- **Project & Task Hierarchy:** Scoped across
+  Projects → Milestones → Tasks → Subtasks.
+- **Multiple Visual Modes:** Real-time toggling between Kanban boards,
+  list views, and milestone roadmaps.
+- **Cross-Module Linkage:** Directly linkable to CRM Won Deals (client
+  onboarding) or Helpdesk Tickets (escalated issues).
+
+**Core Tables:**
+```sql
+pm_projects(id, org_id, name, description, status,
+            lead_id references users(id), start_date, target_date, created_at)
+pm_milestones(id, org_id, project_id, title, due_date, status)
+pm_tasks(id, org_id, project_id, milestone_id, title, description,
+         priority, status, assignee_id references users(id), due_date,
+         created_at)
+pm_task_comments(id, org_id, task_id, user_id references users(id), body,
+                  created_at)
+```
+**Directory:** `src/app/(dashboard)/projects/`, `src/modules/projects/`,
+`src/db/schema/projects.ts`
+
+**Emitted Events:** `pm.task.assigned`, `pm.project.completed`
+
+---
+
+### Module 7: AI Assistant (Context & Permission Aware)
+
+Copilot running over Groq (LLaMA) that performs operational task
+automation and natural-language data retrieval.
+
+- **Zero Privilege Escalation:** Executes actions strictly through the
+  authenticated user's session context; prohibited from reading across
+  organizational boundaries or bypassing RLS.
+- **Two-Step Mutation Guard:** All read queries execute dynamically, while
+  any destructive mutation (INSERT, UPDATE, DELETE) requires explicit
+  confirmation via an interactive UI modal prior to execution.
+- **Observability:** Every Groq call (intent parsing, JD generation, resume
+  matching) is traced through **Langfuse** — prompt, input/output, latency,
+  and cost logged per `org_id`. `developer` role has read access to traces;
+  other roles do not.
+
+**Directory:** `src/app/(dashboard)/ai/`, `src/modules/ai/`, `src/lib/ai/`
+
+---
+
+## 4. Cross-Module Event Bus Subscriptions
+
+All cross-module business flows are decoupled via the system `events`
+table and background worker drain:
+
+| Source Module | Published Event | Target Module & Automated Reaction |
+|---|---|---|
+| Recruitment | `recruitment.candidate.hired` | HRMS: Provisions draft employee profile and initializes annual leave balances. |
+| Recruitment | `recruitment.candidate.shortlisted` | Recruitment: Generates booking link and prepares candidate communication. |
+| CRM | `crm.deal.won` | Projects: Automatically provisions a customer onboarding project and task checklist. |
+| HRMS | `leave.request.approved` | HRMS: Deducts leave balances and updates daily attendance status. |
+| Helpdesk | `helpdesk.ticket.created` | Helpdesk: Evaluates category handler pool and assigns via round-robin. |
+| Projects | `pm.task.assigned` | Platform: Dispatches email and in-app notifications to assignee. |
+
+---
+
+## 5. Next.js App Router Structure
 
 ```
-index.html            login.html          schedule.html
-css/    tokens.css  base.css  layout.css  components.css
-js/     supabase.js auth.js  router.js  api.js  events.js  event-processor.js
-        notifications.js  search.js  audit.js  ai.js  ui.js  config.js
-views/  dashboard.js  me/  inbox.js  approvals.js  onboarding.js
-        employees/  attendance/  leave/  people/  documents/  finance/
-        helpdesk/  announcements/  audit/            (HRMS/People)
-        recruitment/                                 (Recruitment & Interviews)
-        crm/                                         (CRM — partners, sales, leads,
-                                                      opportunities, field-sales, pjp,
-                                                      prospects, events, exports, reports)
-        reports/                                     (→ folds into Analytics)
-        ai/  settings/  admin/
-api/    parse-resume.js  match.js  screen-job.js  extract-candidate.js
-        schedule.js  google-auth.js  ai-query.js  bulk-import.js  reports.js
-        create-org.js  send-notification.js  event-processor.js
-lib/    supabaseServer.js  googleMeet.js
-supabase/migrations/*.sql   supabase/seed.sql
+├── drizzle/                          # Migration SQL output files
+├── src/
+│   ├── app/                          # Next.js App Router
+│   │   ├── (auth)/                   # Login, register, password reset, invites
+│   │   ├── (dashboard)/              # Authenticated workspace
+│   │   │   ├── hrms/                 # Module 1: HRMS
+│   │   │   ├── crm/                  # Module 2: CRM & Developer Mode
+│   │   │   ├── analytics/            # Module 3: Metabase Analytics
+│   │   │   ├── recruitment/          # Module 4: Recruitment & ATS
+│   │   │   ├── helpdesk/             # Module 5: Helpdesk & Round-Robin
+│   │   │   ├── projects/             # Module 6: Project Tracking
+│   │   │   ├── ai/                   # Module 7: AI Assistant Copilot
+│   │   │   └── settings/             # Company settings & members
+│   │   ├── schedule/[token]/         # Module 4: Public booking portal
+│   │   ├── api/                      # Webhooks (Google, Resend, WhatsApp)
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components/                   # shadcn/ui and shared UI components
+│   ├── db/
+│   │   ├── index.ts                  # Drizzle ORM client instance
+│   │   └── schema/                   # Modular schema definitions
+│   │       ├── platform.ts           # Module 0
+│   │       ├── hrms.ts               # Module 1
+│   │       ├── crm.ts                # Module 2
+│   │       ├── analytics.ts          # Module 3
+│   │       ├── recruitment.ts        # Module 4
+│   │       ├── helpdesk.ts           # Module 5
+│   │       ├── projects.ts           # Module 6
+│   │       └── index.ts              # Aggregated schema export
+│   ├── lib/
+│   │   ├── auth/                     # Supabase SSR session helpers
+│   │   ├── events/                   # Event publisher & subscribers
+│   │   ├── groq.ts                   # Groq LLaMA client
+│   │   └── google-calendar.ts        # Google Calendar API integration
+│   ├── modules/                      # Domain-specific Server Actions & services
+│   └── types/                        # Global TypeScript interfaces
+├── drizzle.config.ts
+├── package.json
+└── tsconfig.json
 ```
 
-New modules add a `views/<module>/` folder, a migration, and (if needed) `api/`
-endpoints — never a new tenancy model.
+---
+
+## 6. Coding & Development Standards
+
+- **Server Actions for Mutations:** Mutations run via Server Actions
+  validating payloads through Zod schemas.
+- **Uniform Action Responses:** Every action must return a consistent
+  typed structure:
+  ```typescript
+  type ActionResponse<T> =
+    | { success: true; data: T }
+    | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+  ```
+- **Naming Conventions:**
+  - Database tables and columns: `snake_case`
+  - TypeScript variables and functions: `camelCase`
+  - React Components and Types: `PascalCase`
+  - File paths: `kebab-case`
+  - Event Types: `module.entity.action`
 
 ---
 
-## 10. Design System
-
-Tokens in `css/tokens.css` (colors, spacing 4px base, typography, radius, shadow,
-dark mode via `[data-theme="dark"]`). Components in `css/components.css` (button,
-input, table, modal, toast, card, badge, empty-state, skeleton). Accent
-`--color-accent: #2563EB`. **Compose classes; don't inline token strings.**
-
----
-
-## 11. AI Integration (Groq)
-
-- **CV↔JD matching** (built): resume/JD → Groq structured parse → score +
-  breakdown stored on `applications`. Keep prompts that work; restructure only
-  surrounding code.
-- **AI Assistant** (permission-aware): natural-language query → Groq intent JSON
-  → executed through the **same `anon`+RLS Supabase client** as the UI. Mutations
-  require a confirmation dialog. Never `service_role`.
-
----
-
-## 12. Conventions
-
-- Tables/columns `snake_case`; JS files `kebab-case`; JS functions `camelCase`;
-  CSS classes `kebab-case`; events `module.entity.action`.
-- `const` by default, `let` when reassigned, never `var`; `async/await`; early
-  returns; every Supabase call checks `error`.
-- Git: branch `feature/…`|`fix/…`|`chore/…`; commits imperative and short.
-
----
-
-## 13. Alignment Status (code vs. this document)
-
-This file is the target. The code is being brought onto it in phases. (An
-earlier version pointed at an approved plan `enchanted-sleeping-lemon.md` for
-full detail; that file is not in the repo or anywhere on the working machine, so
-this section is the status record.)
-
-- **Phase 0 (this file)** — canonical definition + requirements. ✅
-- **Phase 1** — unify tenancy: recruitment tables migrated `client_id → org_id`;
-  `memberships` folded into `users`; `clients` dropped;
-  `auth_accessible_client_ids()` removed; the `roleMap` shim deleted;
-  `invitations` canonicalized to `org_id`. ✅ Credits/`credit_ledger` kept
-  (org-scoped). Org resolution consolidated: `auth_org_id()` is the single
-  source of truth and `auth_user_org_ids()` now delegates to it. ✅
-- **Phase 2** — password-reset flow added (`login.html` + `PASSWORD_RECOVERY`
-  in `js/auth.js`). ✅ Module-boundary enforcement is folded into Phases 4/5
-  (the two remaining direct cross-module reads — the AI assistant's RLS-scoped
-  queries per §11, and `views/reports/*` — resolve as Analytics is built).
-- **Phase 3** — design-system cleanup: reference palette + per-module accents,
-  SVG icons (no emoji), festival banner revised, inline-style unwind. ✅
-- **Phase 4** — CRM: **built, front + back.** 🟡 The canonical CRM line lives on
-  branch `claude/gstack-skill-install-chnb41` (the RTcompu distribution model),
-  now the source of truth; an earlier parallel line (`rtcompu-crm-work`, PR #95)
-  was retired into it. The live DB carries
-  `crm_contacts/leads/opportunities/pipeline_stages/activities` plus
-  `crm_partner_details` (`crm_accounts` is now a backward-compatibility **view**
-  over it, not a table — the accounts→partner-details merge landed), a
-  field-sales layer (`crm_visits/calls`, `crm_pjp_*` journey plans,
-  `crm_report_imports/rows`) and `crm_*` RPCs incl. materialized views
-  (`crm_sales_facts`, `crm_field_facts`). `views/crm/` is built:
-  `index` (hub), `leads`, `sales`, `partners`/`partner-detail`, `events`,
-  `field-sales` (Distribution), `pjp`, `visit-form`, `prospects`,
-  `opportunities`, `exports`, and `reports` (report import). Notes:
-  - **Report import** (`views/crm/reports.js`): upload Tally activation/sales
-    CSV/XLSX → `crm_report_rows`, matched to partners by Site ID. Rows are
-    de-duplicated by whole-row content — a stored `content_hash`
-    (`md5(data::text)`) + the `crm_insert_report_rows` (security-invoker) RPC
-    skip rows already present, so re-uploading a file adds nothing. Export is a
-    single dialog: pick report type + optional date range.
-  - **Sales tab** (`views/crm/sales.js`): in-card filters update independently —
-    the grain toggle redraws only the time-series charts, the dimension toggle
-    only the ranking chart; the Range presets are the one global refilter.
-  - **Migration gap — resolved, and the original diagnosis was wrong.** This
-    previously read: the branch's migrations reference
-    `crm_report_imports`/`crm_report_rows` but never create them, so add a
-    create-table migration early in the history. Do **not** do that — it would
-    add a duplicate definition. Nothing was missing from the real history;
-    both tables are created in applied migration `20260803114500`. The actual
-    problem was that the repo's migrations were not the migrations that built
-    the database. See "Migration history" below.
-  - **Post-import refresh**: `crm_sales_facts` needs `crm_refresh_sales_facts()`
-    (service-role) to reflect newly imported rows in Sales analytics; not called
-    from the anon UI. Follow-up: an admin/edge refresh trigger.
-  - Schema diverges from §6.4's proposal (opportunities vs deals; PJP/visits/
-    report-imports not in the doc). Reconcile §6.4 with the real schema.
-- **Phase 5** — build Analytics as a real module (retire `views/reports/*`).
-  Not started in the UI, but the backend is partly there already: the live DB
-  has `analytics_dashboards`, `analytics_questions` and `analytics_alerts`
-  (applied migrations `20260905072504` and `20260905134934`). Check what those
-  tables already support before designing the module.
-
-### Migration history
-
-`supabase/migrations/` and the live database used to hold two unrelated
-lineages. The repo carried 41 hand-authored files stamped with synthetic round
-timestamps (`20260723000000`); the database recorded 105 applied migrations
-stamped with real clock times (`20260730193855`). Exactly one version appeared
-in both. The repo's history therefore could not rebuild the database — 23 of 55
-live tables had no create-table statement anywhere in it, including the whole
-CRM core. The likely cause (inferred from the timestamp shapes, not proven) is
-that migrations were applied through the Supabase `apply_migration` tool, which
-stamps its own timestamps, while `.sql` files were written into the repo
-separately and never reconciled.
-
-Resolved on branch `claude/migrations-from-db`: all applied migrations were
-exported from `supabase_migrations.schema_migrations` (where Supabase stores the
-SQL of everything it applied) and are now the repo's history, verified
-byte-for-byte against `md5(statements)` computed in the database.
-
-**The rule this establishes: `supabase/migrations/` must stay byte-identical to
-what the database recorded, plus clearly-marked reconstruction migrations for
-objects that were created outside the migration system.** Every reconstruction
-file says so in a header comment; there is currently exactly one
-(`20260803090049_crm_telecaller_names.sql`). Practically:
-
-- Apply DDL with the Supabase `apply_migration` tool, then save the file under
-  the exact version it recorded — check `schema_migrations` rather than guessing
-  a timestamp, because the tool picks its own.
-- Keep the applied SQL and the file identical. Either apply the SQL with its
-  comments included, or keep files comment-free and put the rationale in the
-  commit message. A commented file applied in uncommented form is drift.
-- Never hand-author a migration file with an invented timestamp. That is exactly
-  what produced the split lineage.
-
-Triage of the 41 superseded files against the live schema found 38 already
-landed. The one genuine gap was the noticeboard: `posts` had RLS enabled with
-only a `DELETE` policy, so `views/dashboard.js` could neither read nor write it.
-Fixed in `20260915163455_restore_posts_rls_policies.sql`. `audit_logs` and
-`events` still have no INSERT policy; that is deliberate — both are written by
-service-role and `SECURITY DEFINER` paths that bypass RLS.
-
-**Verified by replay.** The history was replayed onto an empty database (a
-throwaway local Supabase stack, since branching needs the Pro plan) and the
-resulting schema compared against production's catalogue.
-
-The raw export did **not** replay. It failed at `20260811153118_security_hardening`
-with `function public.crm_telecaller_names() does not exist` — that function was
-created in production outside the migration system, so nothing in the recorded
-history creates it. This is why the reconstruction-migration exception above
-exists. With `20260803090049_crm_telecaller_names.sql` in place, all 107
-migrations apply cleanly to an empty database.
-
-The structural diff against production then showed **0 objects that production
-has and the replay does not build**. It builds two that production no longer
-has, both created by migrations and dropped by none, so production removed them
-by hand:
-
-- `zzz_crm_accounts_backup` — the safety copy taken during the accounts merge;
-  deliberate cleanup.
-- `analytics_run_as` — created by `20260905134934_analytics_alerts`. **Worth a
-  look**: production is missing a function its own migration creates, and the
-  name suggests it may have been removed on purpose for security. Decide whether
-  the migration should still create it.
-
-Scope of that check: it compares objects by name — tables, columns, indexes,
-policies, functions, views, matviews. A function whose *body* drifted from its
-migration would pass it, and grants/privileges are not compared. A clean diff is
-strong evidence, not proof of identical behaviour.
-
----
-
-Tenancy is unified: `org_id` is the only tenant key. Do not reintroduce
-`client_id`/`memberships`; new work targets `org_id`.
-
----
-
-## 14. What NOT to Build
+## 7. What NOT to Build
 
 | Item | Reason |
-|------|--------|
-| Agency/reseller multi-client tier | Explicitly collapsed to one-org-per-company. |
-| Payroll | Compliance minefield. Not until paying customers demand it. |
-| Visual workflow builder | Predefined event recipes only. |
-| Custom role-permission UI | Four fixed roles are enough. |
-| Native mobile app | PWA first. |
-| Microservices / Elasticsearch | Monolith + Postgres FTS until a named scaling trigger. |
-| React / Next.js migration | Stay vanilla JS unless the owner asks. |
+|---|---|
+| Multi-Tier Agency Hierarchy | Single organization tenancy only. |
+| Client-Side DB Mutations | Browser components cannot mutate tables directly; all mutations go through Server Actions. |
+| Standalone Microservices | Maintain a single full-stack deployable monolith. |
+| Complex Unbounded Visual Workflow Builders | Predefined asynchronous event recipes only. |
