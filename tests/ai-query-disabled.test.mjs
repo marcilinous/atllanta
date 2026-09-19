@@ -17,7 +17,7 @@ let tmp, handler, originalFetch;
 
 before(async () => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'atllanta-ai-'));
-  fs.mkdirSync(path.join(tmp, 'api'));
+  fs.mkdirSync(path.join(tmp, 'server', 'legacy'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'lib'));
   fs.writeFileSync(path.join(tmp, 'lib', 'supabaseServer.js'), `
     const S = globalThis.__aiTest;
@@ -32,7 +32,7 @@ before(async () => {
     }
     export const SUPABASE_URL = 'https://stub.supabase.co';
   `);
-  fs.copyFileSync(path.join(ROOT, 'api', 'ai-query.js'), path.join(tmp, 'api', 'ai-query.js'));
+  fs.copyFileSync(path.join(ROOT, 'server/legacy', 'ai-query.js'), path.join(tmp, 'server', 'legacy', 'ai-query.js'));
 
   // Store the original fetch
   originalFetch = globalThis.fetch;
@@ -43,7 +43,7 @@ before(async () => {
     return Promise.reject(new Error('fetch should not be called'));
   };
 
-  handler = (await import(pathToFileURL(path.join(tmp, 'api', 'ai-query.js')).href)).default;
+  handler = (await import(pathToFileURL(path.join(tmp, 'server', 'legacy', 'ai-query.js')).href)).default;
 });
 
 after(() => {

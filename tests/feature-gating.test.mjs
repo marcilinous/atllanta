@@ -9,7 +9,7 @@
 // node_modules, and this needs no browser. app-shell.spec.js still covers the
 // rendered UI under Playwright.
 //
-// js/features.js imports js/supabase.js, which pulls supabase-js from a CDN and
+// public/js/features.js imports public/js/supabase.js, which pulls supabase-js from a CDN and
 // reads window.ATLLANTA_CONFIG, so it cannot be imported in Node as-is. We copy
 // features.js next to a stub supabase.js and import that; the logic under test
 // is untouched.
@@ -22,7 +22,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SRC = path.join(HERE, '..', 'js', 'features.js');
+const SRC = path.join(HERE, '..', 'public/js', 'features.js');
 
 let F, tmp;
 

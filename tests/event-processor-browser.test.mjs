@@ -59,7 +59,7 @@ beforeEach(() => { S.calls = []; S.queue = []; S.firstTime = true; S.failTable =
 // the interval must not leak between tests), run one poll, then stop it.
 async function runOnce(event) {
   const file = path.join(tmp, `event-processor-${++loads}.js`);
-  fs.copyFileSync(path.join(ROOT, 'js', 'event-processor.js'), file);
+  fs.copyFileSync(path.join(ROOT, 'public/js', 'event-processor.js'), file);
   const P = await import(pathToFileURL(file).href);
   S.queue = [event];
   P.startEventProcessor();

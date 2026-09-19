@@ -2,7 +2,7 @@
 // events and audit_logs have no INSERT policy, so a direct insert is
 // rejected by RLS and the row is silently lost.  Run: node --test tests/
 //
-// js/events.js and js/audit.js import ./supabase.js (CDN + window) and
+// public/js/events.js and public/js/audit.js import ./supabase.js (CDN + window) and
 // ./auth.js, so both are copied next to stubs and imported from there.
 
 import { test, describe, before, after, beforeEach } from 'node:test';
@@ -32,7 +32,7 @@ before(async () => {
     export function getOrg() { return { id: 'org-1' }; }
   `);
   for (const f of ['events.js', 'audit.js']) {
-    fs.copyFileSync(path.join(ROOT, 'js', f), path.join(tmp, f));
+    fs.copyFileSync(path.join(ROOT, 'public/js', f), path.join(tmp, f));
   }
   stub = await import(pathToFileURL(path.join(tmp, 'supabase.js')).href);
   events = await import(pathToFileURL(path.join(tmp, 'events.js')).href);
