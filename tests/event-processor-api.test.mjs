@@ -16,7 +16,7 @@ let tmp, handler;
 
 before(async () => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'atllanta-api-'));
-  fs.mkdirSync(path.join(tmp, 'api'));
+  fs.mkdirSync(path.join(tmp, 'server', 'legacy'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'lib'));
   fs.writeFileSync(path.join(tmp, 'lib', 'supabaseServer.js'), `
     const S = globalThis.__apiTest;
@@ -55,8 +55,8 @@ before(async () => {
     }
     export const SUPABASE_URL = 'https://stub.supabase.co';
   `);
-  fs.copyFileSync(path.join(ROOT, 'api', 'event-processor.js'), path.join(tmp, 'api', 'event-processor.js'));
-  handler = (await import(pathToFileURL(path.join(tmp, 'api', 'event-processor.js')).href)).default;
+  fs.copyFileSync(path.join(ROOT, 'server/legacy', 'event-processor.js'), path.join(tmp, 'server', 'legacy', 'event-processor.js'));
+  handler = (await import(pathToFileURL(path.join(tmp, 'server', 'legacy', 'event-processor.js')).href)).default;
 });
 
 after(() => { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); delete process.env.CRON_SECRET; });

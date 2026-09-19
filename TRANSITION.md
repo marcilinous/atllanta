@@ -33,8 +33,8 @@
 - **Stack target:** see `CLAUDE.md`
 - **Last updated:** 2026-09-18 — baseline verified against the live database and the
   production branch, and all six owner decisions settled; see Decisions & Blockers.
-- **Next unchecked item:** Phase 0 item 3 — scaffold the Next.js (App Router) +
-  TypeScript project per `CLAUDE.md` §5.
+- **Next unchecked item:** merge `claude/phase-0-scaffold` (Phase 0 items 3–5 are
+  built and verified on its preview), then Phase 1 item 1.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -75,10 +75,10 @@ touching production.
 - [x] Tag/branch the current vanilla-JS/Supabase codebase as `legacy-frozen`
 - [x] Confirm which tables in production still use `client_id`/`memberships`
       (recruitment tables per old CLAUDE.md §13) — list them here: **none**
-- [ ] Scaffold new Next.js (App Router) + TypeScript project per CLAUDE.md §5
-- [ ] Set up Drizzle ORM + `drizzle.config.ts` pointed at the **same**
+- [x] Scaffold new Next.js (App Router) + TypeScript project per CLAUDE.md §5
+- [x] Set up Drizzle ORM + `drizzle.config.ts` pointed at the **same**
       Supabase Postgres instance (shared DB during transition)
-- [ ] Set up Tailwind + shadcn/ui base theme
+- [x] Set up Tailwind + shadcn/ui base theme
 
 **Notes:**
 - 2026-09-18 — Item 2 (`client_id`/`memberships` audit) is **already satisfied**:
@@ -96,6 +96,22 @@ touching production.
 - 2026-09-18 — After the freeze the legacy app still receives security fixes and the
   v1.3.0 AI screens (owner decision 2). Plan those as legacy releases (`vX.Y.Z`),
   not as transition phases.
+- 2026-09-18 — Items 3–5 built on branch `claude/phase-0-scaffold` (not yet merged).
+  Next.js owns the deployment; the legacy app is served unchanged from `public/`,
+  and all 12 legacy endpoints sit behind one catch-all route. **Vercel counts 2
+  functions** (`/health` + the catch-all) against a budget of 10 — the owner's
+  instruction is to stay well under the Hobby cap of 12. Drizzle reads the shared
+  database (read-only, no migrations); the preview's `/health` shows the live
+  counts, 5 organisations and 67 users. Tailwind/shadcn alias `public/css/tokens.css`
+  directly; button, input, card, table, dialog and badge were measured equal to the
+  legacy classes in light and dark. `DATABASE_URL` (transaction pooler, 6543) is set
+  in Vercel for Production and Preview. 115/115 unit tests, 22/22 browser checks.
+- 2026-09-18 — Gotcha: a `DATABASE_URL` pasted with quotes, a `psql` prefix or an
+  unencoded `@` in the password fails as `ERR_INVALID_URL`; paste the bare URI and
+  percent-encode the password.
+- 2026-09-18 — Open for Phase 2: a Next page does not yet read the legacy theme
+  choice (`data-theme`), and the two session stores (localStorage vs cookies) still
+  need reconciling before the first real screen ships.
 
 ---
 

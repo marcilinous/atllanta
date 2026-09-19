@@ -1,10 +1,10 @@
-// js/version.js turns /version.json into the label shown in the account menu.
+// public/js/version.js turns /version.json into the label shown in the account menu.
 // A missing or odd file must hide the label, never break the page.
 // Run: node --test tests/
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadVersionLabel } from '../js/version.js';
+import { loadVersionLabel } from '../public/js/version.js';
 
 const json = (body, status = 200) => async (url, init) => {
   json.last = { url, init };
