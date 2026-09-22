@@ -35,10 +35,11 @@
 - **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
   (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
   Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 2 item 1 (Auth & Server Action pipeline).
-  Phase 1 is done end to end; the tenancy fixes items 1 and 2 turned up shipped
-  as legacy **v1.2.2** and **v1.2.3**. Read the Phase 2 note about the two
-  session stores and the legacy theme before starting.
+- **Next unchecked item:** Phase 2 item 1 (Supabase SSR cookie auth) —
+  **blocked on the owner** by the 2026-09-23 entry in Decisions & Blockers: one
+  shared session in cookies, a bridge, or two sign-ins. Phase 1 is done end to
+  end; the tenancy fixes items 1 and 2 turned up shipped as legacy **v1.2.2**
+  and **v1.2.3**.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -401,6 +402,37 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-23 — Open question: one session, or two? (blocks Phase 2)
+
+Both Phase 2 blockers are the same problem: the legacy app keeps per-user state
+in **localStorage**, which a server-rendered page cannot read.
+
+- **Session:** `public/js/supabase.js` uses the default supabase-js client, so
+  the session lives in localStorage under `sb-*`. `@supabase/ssr` (Phase 2 item
+  1) reads it from **cookies**. As things stand, signing in on a legacy screen
+  leaves a Next.js route signed out, and the reverse.
+- **Theme:** `atllanta-theme` in localStorage, applied by an inline script in
+  `index.html`, `login.html`, `privacy.html` and friends. A Next page can only
+  read it after hydration, so it would paint the wrong theme first.
+
+Three ways out, owner's call before Phase 2 item 1 starts:
+
+- **A. One session in cookies (recommended).** Give the legacy supabase-js
+  client a custom storage adapter that writes the cookie `@supabase/ssr` reads,
+  and mirror the theme into a `theme` cookie. Both stacks then share one sign-in
+  and one theme, and a Next page renders correctly on the first paint. Cost: a
+  small, deliberate change to frozen legacy files (`public/js/supabase.js`, the
+  inline theme scripts), and everyone is signed out once at the cutover.
+- **B. Bridge only.** Leave localStorage as the source of truth; have the legacy
+  app copy the session and theme into cookies after sign-in and on refresh. Less
+  invasive, but two copies of the truth that can drift, and a Next page still
+  sees nothing until the legacy app has run at least once.
+- **C. Separate sign-ins per stack.** No legacy change; users sign in twice
+  during the transition. Cheapest to build, worst to live with.
+
+Until this is answered, Phase 2 item 1 is blocked — everything after it inherits
+whichever shape is chosen.
 
 ### 2026-09-22 — Owner decisions on Phase 1 items 2–3
 
