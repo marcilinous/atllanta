@@ -34,9 +34,9 @@
 - **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
   (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
   Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 1 item 2 (RLS helper + the right policy set per
-  table). Owner decisions are in (Decisions & Blockers, 2026-09-22); the two
-  cross-tenant fixes shipped as legacy **v1.2.2** (#110, tag `v1.2.2`).
+- **Next unchecked item:** Phase 1 item 2 — prepared as legacy **v1.2.3** (#111);
+  waiting on the owner to apply its migration. The two cross-tenant fixes shipped
+  as legacy **v1.2.2** (#110, tag `v1.2.2`).
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -138,6 +138,14 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   teams→departments, audit_logs/notifications→users) and `trial_started_at`'s
   `now()` default. Declarations only — nothing pushed or migrated. 115/115 unit
   tests, typecheck and build clean; still 2 Vercel functions.
+- 2026-09-23 — Item 2 prepared as legacy **v1.2.3** (#111), since it changes the
+  live app: `organizations` had **no UPDATE policy at all** (an admin renaming the
+  org or changing its logo was silently denied — verified, 0 rows matched), and
+  `invitations` had one catch-all policy any member could write through, including
+  an `admin`-role invitation. `users_update`'s WITH CHECK now also ties the row to
+  the caller's org. Verified in a rolled-back transaction against production.
+  **The item stays unchecked until the migration is applied** (the agent's
+  permission check blocks production DDL that drops a policy).
 - 2026-09-22 — Owner decisions taken (Decisions & Blockers, 2026-09-22): item 2
   reworded to "the right policy set per table"; the two cross-tenant findings go
   out as legacy v1.2.2 (#110); item 3 runs on a local Supabase (free). Items 4 and 5
