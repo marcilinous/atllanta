@@ -28,18 +28,19 @@
 
 ## Current State
 
-- **Version:** `v0.0.0` — transition not yet started
-- **Active phase:** Phase 0 (Baseline & Scaffold)
+- **Version:** `v0.0.0` — Phase 0 done; `v0.1.0` lands when Phase 1 is complete
+- **Active phase:** Phase 1 (Platform Module)
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-18 — baseline verified against the live database and the
-  production branch, and all six owner decisions settled; see Decisions & Blockers.
-- **Next unchecked item:** merge `claude/phase-0-scaffold` (Phase 0 items 3–5 are
-  built and verified on its preview), then Phase 1 item 1.
+- **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
+  (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
+  Phase 1 item 1 verified against the live database.
+- **Next unchecked item:** Phase 1 item 2 (RLS helper + policy set) — **blocked on
+  the owner** by the 2026-09-22 entry in Decisions & Blockers; read it first.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.0** live since
-2026-09-18), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.1** live since
+2026-09-22), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -120,7 +121,7 @@ touching production.
 **Goal:** Identity, org, RLS helper, events, audit, notifications, files —
 all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 
-- [ ] `src/db/schema/platform.ts`: `organizations`, `users`, `departments`,
+- [x] `src/db/schema/platform.ts`: `organizations`, `users`, `departments`,
       `teams`, `invitations`, `audit_logs`, `events`, `notifications`, `files`
 - [ ] `auth_org_id()` RLS helper + standard 4-policy set applied to every
       platform table
@@ -129,7 +130,15 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 - [ ] Event publisher (`src/lib/events/`) + drain worker stubbed
 
 **Notes:**
-_(none yet)_
+- 2026-09-22 — Item 1 done. `src/db/schema/platform.ts` (hand-written in Phase 0)
+  re-verified read-only against the live database: all 10 tables and every
+  column, type, nullability and default match. Added the 14 live foreign keys as
+  Drizzle `.references()` (9 `org_id → organizations`, plus users→departments/teams,
+  teams→departments, audit_logs/notifications→users) and `trial_started_at`'s
+  `now()` default. Declarations only — nothing pushed or migrated. 115/115 unit
+  tests, typecheck and build clean; still 2 Vercel functions.
+- 2026-09-22 — Items 2 and 3 are **blocked on the owner** — see Decisions & Blockers
+  (2026-09-22). Items 4 and 5 are code-only and don't depend on them.
 
 ---
 
@@ -343,6 +352,47 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-22 — Phase 1 items 2–3 vs the live database (owner's call)
+
+Checked read-only before touching RLS. `auth_org_id()` already exists exactly as
+CLAUDE.md §1 describes (security definer, `search_path` locked), and all 10
+platform tables have RLS on. But the item's "standard 4-policy set on every
+platform table" does not match what is live, and mostly for good reasons:
+
+| Table | Live policies | Read |
+|---|---|---|
+| `departments`, `teams`, `feature_access` | full 4, admin-gated writes | matches |
+| `audit_logs`, `events` | SELECT only | deliberate — append-only trail / publisher-written; adding UPDATE/DELETE would let users rewrite the audit trail |
+| `organizations` | SELECT own org | deliberate — orgs are created server-side |
+| `notifications` | SELECT/UPDATE own, INSERT in org, no DELETE | plausible |
+| `files` | no UPDATE; DELETE own uploads | plausible |
+| `invitations` | one ALL policy for any org member | nothing reads `invitations.role` today (invites write `users` directly), so low risk, but writes should be admin-only |
+| `users` | no DELETE; see finding 1 | **fix needed** |
+
+**Proposal:** reword item 2 to "the right policy set per table" (the table above is
+the audit) instead of four policies everywhere.
+
+**Two live cross-tenant findings** (legacy app, allowed under freeze decision 2 as
+security fixes; not fixed — they change production RLS/code and need approval):
+
+1. **Org admin can move themselves into another org.** `users_update` allows
+   `id = auth.uid() OR is_org_admin()` and its WITH CHECK never constrains
+   `org_id`; `users_guard_admin_fields` resets `org_id`/`role` for members but
+   returns early for admins. So any tenant's owner/admin can set their own
+   `org_id` to another tenant's id and keep their role there. Fix: WITH CHECK
+   `org_id = auth_org_id()` (or the trigger freezes `org_id` for everyone but
+   service_role).
+2. **Invite pulls a user out of another org.** `server/legacy/create-org.js`
+   `handleInvite` checks membership only in the inviter's org, then upserts
+   `users` by id with the service key — overwriting `org_id` of an account that
+   belongs to a different org (including that org's owner). Fix: refuse when the
+   auth user already has a `users` row in another org.
+
+**Item 3 (two-org isolation test)** needs a place to run: against production it
+would create auth users and rows in the live database. Options: a Supabase branch
+(paid), a local Supabase via the CLI, or tightly scoped fixture orgs in production
+cleaned up after. Owner's call.
 
 ### 2026-09-18 — Verified baseline (read before planning any phase)
 
