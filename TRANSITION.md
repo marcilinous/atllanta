@@ -36,11 +36,11 @@
   Phase 1 item 1 verified against the live database.
 - **Next unchecked item:** Phase 1 item 2 (RLS helper + the right policy set per
   table). Owner decisions are in (Decisions & Blockers, 2026-09-22); the two
-  cross-tenant fixes ship as legacy **v1.2.2** (#110).
+  cross-tenant fixes shipped as legacy **v1.2.2** (#110, tag `v1.2.2`).
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.1** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.2** live since
 2026-09-22), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
