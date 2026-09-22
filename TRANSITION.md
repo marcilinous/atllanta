@@ -34,9 +34,10 @@
 - **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
   (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
   Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 1 item 3 (two-org isolation test) — runs on a
-  local Supabase per the owner's decision; needs Docker Desktop running. Items 1
-  and 2 are done; their fixes shipped as legacy **v1.2.2** and **v1.2.3**.
+- **Next unchecked item:** Phase 1 item 3 (two-org isolation test) — the last
+  one in this phase. Runs on a local Supabase per the owner's decision; needs
+  Docker Desktop running. Items 1, 2, 4 and 5 are done; the tenancy fixes items 1
+  and 2 turned up shipped as legacy **v1.2.2** and **v1.2.3**.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -127,8 +128,8 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 - [x] `auth_org_id()` RLS helper + the right policy set per platform table
       (reworded 2026-09-22, owner decision — see Decisions & Blockers)
 - [ ] Two-org isolation test passing on every platform table (CLAUDE.md §1)
-- [ ] Server Action base pattern (`ActionResponse<T>` type) implemented
-- [ ] Event publisher (`src/lib/events/`) + drain worker stubbed
+- [x] Server Action base pattern (`ActionResponse<T>` type) implemented
+- [x] Event publisher (`src/lib/events/`) + drain worker stubbed
 
 **Notes:**
 - 2026-09-22 — Item 1 done. `src/db/schema/platform.ts` (hand-written in Phase 0)
@@ -138,6 +139,24 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   teams→departments, audit_logs/notifications→users) and `trial_started_at`'s
   `now()` default. Declarations only — nothing pushed or migrated. 115/115 unit
   tests, typecheck and build clean; still 2 Vercel functions.
+- 2026-09-23 — Items 4 and 5 done, code-only, nothing wired to a route yet.
+  `src/lib/actions.ts`: `ActionResponse<T>` exactly as CLAUDE.md §6 defines it,
+  with `ok`/`fail`, an `action(schema, handler)` wrapper that turns Zod issues
+  into `fieldErrors`, and `ActionError` for messages the user should see —
+  anything else thrown is logged and returned as one generic message, so a
+  connection string or SQL never reaches a browser. Added `zod` (§6 requires it;
+  it was missing). `src/lib/events/publish.ts` publishes through the
+  `publish_event` security-definer RPC (the events table has no INSERT policy,
+  so a direct insert is refused) and `drain.ts` claims/resolves through
+  `claim_events`/`resolve_event`; the subscriber registry is deliberately empty
+  and nothing calls the drain — the legacy cron still drains production, and two
+  drains would double-handle the same rows. The Supabase client is injected:
+  Phase 2 owns the per-request one. `allowImportingTsExtensions` added to
+  tsconfig so the .mjs tests can import the .ts sources directly (Node 24 strips
+  types), which is why these have real behaviour tests, not static checks.
+  133/133 unit tests, typecheck, build and lint clean; still 2 Vercel functions.
+- 2026-09-23 — Item 3 remains the only open item in this phase: it needs Docker
+  Desktop running for the local Supabase, which the owner starts.
 - 2026-09-23 — Item 2 prepared as legacy **v1.2.3** (#111), since it changes the
   live app: `organizations` had **no UPDATE policy at all** (an admin renaming the
   org or changing its logo was silently denied — verified, 0 rows matched), and
