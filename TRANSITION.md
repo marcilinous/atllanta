@@ -28,16 +28,17 @@
 
 ## Current State
 
-- **Version:** `v0.0.0` — Phase 0 done; `v0.1.0` lands when Phase 1 is complete
-- **Active phase:** Phase 1 (Platform Module)
+- **Version:** `v0.1.0` — Phase 1 complete (platform schema, policies, Server
+  Action pattern, event bus stub, two-org isolation test)
+- **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
 - **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
   (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
   Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 1 item 3 (two-org isolation test) — the last
-  one in this phase. Runs on a local Supabase per the owner's decision; needs
-  Docker Desktop running. Items 1, 2, 4 and 5 are done; the tenancy fixes items 1
-  and 2 turned up shipped as legacy **v1.2.2** and **v1.2.3**.
+- **Next unchecked item:** Phase 2 item 1 (Auth & Server Action pipeline).
+  Phase 1 is done end to end; the tenancy fixes items 1 and 2 turned up shipped
+  as legacy **v1.2.2** and **v1.2.3**. Read the Phase 2 note about the two
+  session stores and the legacy theme before starting.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -57,7 +58,7 @@ vanilla-JS/Supabase-direct code no longer runs in production.
 
 | Version | Phase completed | Status |
 |---|---|---|
-| v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ☐ |
+| v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ✅ 2026-09-23 |
 | v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ☐ |
 | v0.3.0 | Phase 3 — Roles, custom roles, module enablement | ☐ |
 | v0.4.0 | Phase 4 — HRMS migrated | ☐ |
@@ -127,7 +128,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
       `teams`, `invitations`, `audit_logs`, `events`, `notifications`, `files`
 - [x] `auth_org_id()` RLS helper + the right policy set per platform table
       (reworded 2026-09-22, owner decision — see Decisions & Blockers)
-- [ ] Two-org isolation test passing on every platform table (CLAUDE.md §1)
+- [x] Two-org isolation test passing on every platform table (CLAUDE.md §1)
 - [x] Server Action base pattern (`ActionResponse<T>` type) implemented
 - [x] Event publisher (`src/lib/events/`) + drain worker stubbed
 
@@ -139,6 +140,23 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   teams→departments, audit_logs/notifications→users) and `trial_started_at`'s
   `now()` default. Declarations only — nothing pushed or migrated. 115/115 unit
   tests, typecheck and build clean; still 2 Vercel functions.
+- 2026-09-23 — Item 3 done, on a **local** Supabase (owner decision: nothing
+  paid, never production). `npm run test:isolation` creates two organisations
+  with their own admin and member, then asserts as each signed-in user that the
+  other organisation is invisible on all ten platform tables, that notifications
+  are per-user, that inserts/updates into the other org are refused, that an
+  admin can still rename their own org (v1.2.3) but cannot change `org_id`
+  (v1.2.2), and that `publish_event`/`claim_events` are org-scoped. Everything
+  runs in one transaction that always rolls back.
+  Two supporting pieces: `supabase/local/platform-schema.sql` reproduces the live
+  platform schema, helpers, trigger, RPCs and policies (the live schema predates
+  this repo's migrations, so the three migration files cannot build a database
+  from empty; local migrations and seed are disabled in `supabase/config.toml`),
+  and `supabase/tests/platform_tenant_isolation.test.sql` holds the assertions in
+  the same style as `ai_usage_quotas.test.sql`.
+  Verified not vacuous: weakening `users_select` to `using (true)` makes it fail
+  with "users leaked 1 row(s) of the other organisation" and exit 1.
+  **Phase 1 is complete — v0.1.0.**
 - 2026-09-23 — Items 4 and 5 done, code-only, nothing wired to a route yet.
   `src/lib/actions.ts`: `ActionResponse<T>` exactly as CLAUDE.md §6 defines it,
   with `ok`/`fail`, an `action(schema, handler)` wrapper that turns Zod issues
