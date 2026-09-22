@@ -2,6 +2,13 @@ import sb from '../../js/supabase.js';
 import { getOrg, getMembership } from '../../js/auth.js';
 import { esc } from '../../js/ui.js';
 
+// org_id is assigned by Atllanta and never shown to users.
+function withoutOrgId(values) {
+  if (!values || typeof values !== 'object') return values;
+  const { org_id, ...rest } = values;
+  return rest;
+}
+
 export default async function auditLog(container) {
   const org = getOrg();
   const membership = getMembership();
@@ -84,7 +91,7 @@ export default async function auditLog(container) {
         <td><span class="badge badge-neutral">${esc(l.module)}</span></td>
         <td style="font-size:var(--text-sm)">${esc(l.entity_type)}</td>
         <td><span class="badge badge-${actionColors[l.action] || 'neutral'}"><span class="badge-dot"></span>${esc(l.action)}</span></td>
-        <td style="max-width:200px;font-size:var(--text-xs);color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis">${l.new_values ? esc(JSON.stringify(l.new_values).slice(0, 80)) : '—'}</td>
+        <td style="max-width:200px;font-size:var(--text-xs);color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis">${l.new_values ? esc(JSON.stringify(withoutOrgId(l.new_values)).slice(0, 80)) : '—'}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
 

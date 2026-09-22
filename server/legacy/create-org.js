@@ -86,6 +86,22 @@ async function handleInvite(req, res, db, user) {
   const authUser = await findOrCreateUser(db, email);
   if (authUser.error) return res.status(500).json({ error: authUser.error });
 
+  // org_id is assigned once, by Atllanta: an account that already belongs to an
+  // organisation is never moved by an invite. The message for another org is
+  // deliberately generic so the invite form can't reveal who is registered where.
+  const { data: current, error: lookupErr } = await db
+    .from("users")
+    .select("org_id")
+    .eq("id", authUser.id)
+    .maybeSingle();
+  if (lookupErr) return res.status(500).json({ error: lookupErr.message });
+  if (current?.org_id === me.org_id) {
+    return res.status(409).json({ error: "This email is already a member" });
+  }
+  if (current?.org_id) {
+    return res.status(409).json({ error: "This email can't be invited to your organisation" });
+  }
+
   const { error: insertErr } = await db.from("users").upsert(
     {
       id: authUser.id,
