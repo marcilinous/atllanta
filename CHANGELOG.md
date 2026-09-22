@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.3 — 2026-09-23
+
+### What changed
+- Organisation settings save again: renaming your organisation and changing its logo were silently refused by the database. Only owners and admins can make those changes, as the screen already said.
+- Only owners and admins can create invitations now. A member could previously add one, including one that granted admin access.
+
+### Admins need to
+- Nothing.
+
 ## v1.2.2 — 2026-09-22
 
 ### What changed
