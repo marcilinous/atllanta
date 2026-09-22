@@ -34,8 +34,9 @@
 - **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
   (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
   Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 1 item 2 (RLS helper + policy set) — **blocked on
-  the owner** by the 2026-09-22 entry in Decisions & Blockers; read it first.
+- **Next unchecked item:** Phase 1 item 2 (RLS helper + the right policy set per
+  table). Owner decisions are in (Decisions & Blockers, 2026-09-22); the two
+  cross-tenant fixes ship as legacy **v1.2.2** (#110).
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -123,8 +124,8 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 
 - [x] `src/db/schema/platform.ts`: `organizations`, `users`, `departments`,
       `teams`, `invitations`, `audit_logs`, `events`, `notifications`, `files`
-- [ ] `auth_org_id()` RLS helper + standard 4-policy set applied to every
-      platform table
+- [ ] `auth_org_id()` RLS helper + the right policy set per platform table
+      (reworded 2026-09-22, owner decision — see Decisions & Blockers)
 - [ ] Two-org isolation test passing on every platform table (CLAUDE.md §1)
 - [ ] Server Action base pattern (`ActionResponse<T>` type) implemented
 - [ ] Event publisher (`src/lib/events/`) + drain worker stubbed
@@ -137,8 +138,10 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   teams→departments, audit_logs/notifications→users) and `trial_started_at`'s
   `now()` default. Declarations only — nothing pushed or migrated. 115/115 unit
   tests, typecheck and build clean; still 2 Vercel functions.
-- 2026-09-22 — Items 2 and 3 are **blocked on the owner** — see Decisions & Blockers
-  (2026-09-22). Items 4 and 5 are code-only and don't depend on them.
+- 2026-09-22 — Owner decisions taken (Decisions & Blockers, 2026-09-22): item 2
+  reworded to "the right policy set per table"; the two cross-tenant findings go
+  out as legacy v1.2.2 (#110); item 3 runs on a local Supabase (free). Items 4 and 5
+  are code-only and don't depend on any of this.
 
 ---
 
@@ -352,6 +355,23 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-22 — Owner decisions on Phase 1 items 2–3
+
+1. **Item 2 reworded** to "the right policy set per table" — the audit table in
+   the entry below is the target, not four policies everywhere.
+2. **`org_id` is assigned by Atllanta.** No user can change it — owners and admins
+   included — and the UI never shows it. **An invite must not touch an account
+   that belongs to another organisation.** Both findings below ship as legacy
+   release **v1.2.2** (PR #110): the users trigger rejects any `org_id` change by a
+   signed-in caller, the invite refuses accounts already in an org (generic
+   message), and the audit log strips `org_id` from its Details column. The
+   trigger migration must be applied to production by the owner (the agent's
+   permission check blocks production DDL); it was verified in a rolled-back
+   transaction first.
+3. **Nothing paid at this stage.** Item 3's isolation test runs on a **local
+   Supabase** (Supabase CLI + Docker Desktop, both free), never on production and
+   not on a paid branch.
 
 ### 2026-09-22 — Phase 1 items 2–3 vs the live database (owner's call)
 
