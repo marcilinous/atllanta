@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.2 — 2026-09-22
+
+### What changed
+- Security: a person's organisation can no longer be changed from inside the app, by anyone, including owners and admins. Atllanta assigns it; before this fix an owner or admin could move their own account into another organisation.
+- Security: inviting an email that already belongs to another organisation is now refused instead of moving that person into yours. The message doesn't say which organisation the email belongs to.
+- The audit log no longer shows internal organisation identifiers in its Details column.
+
+### Admins need to
+- Nothing. If you invite someone who already has an account with another organisation, they need a different email address for yours.
+
 ## v1.2.1 — 2026-09-19
 
 ### What changed
