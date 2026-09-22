@@ -34,14 +34,14 @@
 - **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
   (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
   Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 1 item 2 — prepared as legacy **v1.2.3** (#111);
-  waiting on the owner to apply its migration. The two cross-tenant fixes shipped
-  as legacy **v1.2.2** (#110, tag `v1.2.2`).
+- **Next unchecked item:** Phase 1 item 3 (two-org isolation test) — runs on a
+  local Supabase per the owner's decision; needs Docker Desktop running. Items 1
+  and 2 are done; their fixes shipped as legacy **v1.2.2** and **v1.2.3**.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.2** live since
-2026-09-22), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.3** live since
+2026-09-23), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -124,7 +124,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 
 - [x] `src/db/schema/platform.ts`: `organizations`, `users`, `departments`,
       `teams`, `invitations`, `audit_logs`, `events`, `notifications`, `files`
-- [ ] `auth_org_id()` RLS helper + the right policy set per platform table
+- [x] `auth_org_id()` RLS helper + the right policy set per platform table
       (reworded 2026-09-22, owner decision — see Decisions & Blockers)
 - [ ] Two-org isolation test passing on every platform table (CLAUDE.md §1)
 - [ ] Server Action base pattern (`ActionResponse<T>` type) implemented
@@ -144,8 +144,9 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   `invitations` had one catch-all policy any member could write through, including
   an `admin`-role invitation. `users_update`'s WITH CHECK now also ties the row to
   the caller's org. Verified in a rolled-back transaction against production.
-  **The item stays unchecked until the migration is applied** (the agent's
-  permission check blocks production DDL that drops a policy).
+  Applied to production 2026-09-22 (SQL editor, no version row recorded — the
+  file carries the applied time `20260922185720`), shipped and tagged `v1.2.3`,
+  live site verified. **Item 2 done.**
 - 2026-09-22 — Owner decisions taken (Decisions & Blockers, 2026-09-22): item 2
   reworded to "the right policy set per table"; the two cross-tenant findings go
   out as legacy v1.2.2 (#110); item 3 runs on a local Supabase (free). Items 4 and 5
