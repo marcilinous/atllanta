@@ -1,4 +1,5 @@
--- v1.2.3 / Phase 1 item 2: the right policy set per platform table.
+-- v1.2.3 / Phase 1 item 2 (applied to production 20260922185720Z via the SQL editor;
+-- Supabase recorded no version row, so this file carries the applied time): the right policy set per platform table.
 --
 -- 1. organizations had no UPDATE policy at all, so an admin renaming the org or
 --    uploading a logo (settings/org.js, onboarding.js) was silently denied by
