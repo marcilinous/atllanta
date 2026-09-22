@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.1 — 2026-09-19
+
+### What changed
+- Behind the scenes, Atllanta now runs on a new foundation (Next.js) that future screens will be built on. Every screen, link, sign-in and AI feature works exactly as before; nothing looks or behaves differently.
+- Returning visitors get a fresh copy of the app on their next visit, so nobody keeps a stale cached version.
+
+### Admins need to
+- Nothing.
+
 ## v1.2.0 — 2026-09-17
 
 ### What changed

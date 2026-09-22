@@ -19,7 +19,7 @@ test('VERSION is MAJOR.MINOR.PATCH', () => {
 test('package.json and version.json carry the same version as VERSION', () => {
   const v = read('VERSION').trim();
   assert.equal(JSON.parse(read('package.json')).version, v);
-  assert.deepEqual(JSON.parse(read('version.json')), { version: v });
+  assert.deepEqual(JSON.parse(read('public/version.json')), { version: v });
 });
 
 test('CHANGELOG.md starts with the entry for VERSION', () => {

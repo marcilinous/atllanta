@@ -5,7 +5,7 @@
 // GET  ?action=status   → returns connection status
 // POST { action: "disconnect" } → removes stored tokens
 
-import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { supabaseAdmin, SUPABASE_URL } from "../../lib/supabaseServer.js";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",

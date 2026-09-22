@@ -1,4 +1,4 @@
-import { supabaseAdmin, SUPABASE_URL } from "../lib/supabaseServer.js";
+import { supabaseAdmin, SUPABASE_URL } from "../../lib/supabaseServer.js";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {

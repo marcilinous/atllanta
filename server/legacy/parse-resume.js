@@ -8,7 +8,7 @@
 // Body: { description: "...", job_id?: "..." }
 // Returns: { parsed_skills: { must_have, nice_to_have, ... } }
 
-import { resolveCaller, runAI } from "../lib/aiGateway.js";
+import { resolveCaller, runAI } from "../../lib/aiGateway.js";
 
 function getExtension(filename) {
   const dot = filename.lastIndexOf(".");

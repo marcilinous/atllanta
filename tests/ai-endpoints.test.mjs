@@ -16,7 +16,7 @@ const handlers = {};
 
 before(async () => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'atllanta-ep-'));
-  fs.mkdirSync(path.join(tmp, 'api'));
+  fs.mkdirSync(path.join(tmp, 'server', 'legacy'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'lib'));
   fs.writeFileSync(path.join(tmp, 'lib', 'supabaseServer.js'), `
     const S = globalThis.__ep;
@@ -50,8 +50,8 @@ before(async () => {
     }
   `);
   for (const f of ['extract-candidate', 'parse-resume', 'match', 'screen-job']) {
-    fs.copyFileSync(path.join(ROOT, 'api', `${f}.js`), path.join(tmp, 'api', `${f}.js`));
-    handlers[f] = (await import(pathToFileURL(path.join(tmp, 'api', `${f}.js`)).href)).default;
+    fs.copyFileSync(path.join(ROOT, 'server/legacy', `${f}.js`), path.join(tmp, 'server', 'legacy', `${f}.js`));
+    handlers[f] = (await import(pathToFileURL(path.join(tmp, 'server', 'legacy', `${f}.js`)).href)).default;
   }
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
   process.env.GROQ_API_KEY = 'groq-key';

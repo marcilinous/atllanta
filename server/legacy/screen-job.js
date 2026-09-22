@@ -5,7 +5,7 @@
 // method=python → keyword + TF-IDF algorithmic scoring (free)
 // Returns: { results: [{ application_id, candidate_name, score, error? }], tokens_used, processed, remaining, method }
 
-import { resolveCaller, runAI } from "../lib/aiGateway.js";
+import { resolveCaller, runAI } from "../../lib/aiGateway.js";
 
 const AI_BATCH_LIMIT = 50;
 

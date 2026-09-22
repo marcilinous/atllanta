@@ -4,8 +4,14 @@
 **without reading the codebase**: read this file (≈5 minutes), then the one module
 file you need. Everything else stays unread until a task actually requires it.
 
-**Authority order.** `CLAUDE.md` (what the product must be) → `DESIGN.md` (how it must
-look) → this pack (where things are and how to work) → the code. When code and a
+**Two stacks, one repo (from 2026-09-18).** Atllanta is migrating to Next.js +
+TypeScript + Drizzle + Server Actions. `TRANSITION.md` holds the phase plan and the
+current position — **read it first every session**. Production still runs the legacy
+vanilla-JS app until Phase 8 retires it, and this pack describes that live app.
+
+**Authority order.** For new-stack work: `CLAUDE.md` (the target) → `TRANSITION.md`
+(what to build next) → `DESIGN.md`. For work on the live app:
+`docs/legacy/CLAUDE-legacy.md` → `DESIGN.md` → this pack → the code. When code and a
 higher file disagree, the higher file is the target and the code is the debt — say so
 rather than quietly following the code.
 
@@ -143,6 +149,11 @@ When you finish a piece of work, before you commit:
 users and never affects the bundle.
 
 ## 8. Current state (keep this section accurate)
+
+- **Stack transition started 2026-09-18.** Target stack and module design:
+  `CLAUDE.md`. Phase ladder, verified baseline and open owner decisions:
+  `TRANSITION.md`. Legacy rules: `docs/legacy/CLAUDE-legacy.md`. The two version
+  lines are independent — legacy ships `vX.Y.Z`, the new stack climbs `v0.x`.
 
 - **Live version:** v1.1.0 in production; **v1.2.0** (AI gateway, recruitment AI on
   token quotas) is merged-pending — PR #104, awaiting the owner's merge and promotion.

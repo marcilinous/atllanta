@@ -1,4 +1,4 @@
-// The bulk resume upload loop (views/recruitment/jobs.js) parses each file for
+// The bulk resume upload loop (public/views/recruitment/jobs.js) parses each file for
 // free via /api/parse-resume, then spends an AI call on /api/extract-candidate.
 // A 502 (Groq outage) or 503 (usage check unavailable) used to fall through the
 // old `quotaHit` flag, which only latched on 429 — so a large upload during an
@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE = fs.readFileSync(path.join(ROOT, 'views/recruitment/jobs.js'), 'utf8');
+const SOURCE = fs.readFileSync(path.join(ROOT, 'public/views/recruitment/jobs.js'), 'utf8');
 
 // Isolate the bulk upload loop so assertions can't accidentally match
 // unrelated code elsewhere in the file.

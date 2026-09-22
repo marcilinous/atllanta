@@ -1,4 +1,4 @@
-// sw.js must fetch /version.json from the network (never Cache Storage), and
+// public/sw.js must fetch /version.json from the network (never Cache Storage), and
 // its cache name must follow the release version so each release purges old
 // caches.  Run: node --test tests/
 
@@ -10,7 +10,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+const SOURCE = fs.readFileSync(path.join(ROOT, 'public/sw.js'), 'utf8');
 
 // Load sw.js in a sandbox with a fake service-worker global, and return a
 // function that dispatches one fetch event and reports what happened.
