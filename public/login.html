@@ -288,7 +288,12 @@
 
 <script>
   const t = localStorage.getItem('atllanta-theme');
-  if (t) document.documentElement.setAttribute('data-theme', t);
+  if (t) {
+    document.documentElement.setAttribute('data-theme', t);
+    // Mirrored into a cookie so a server-rendered page paints the right theme
+    // on the first frame instead of after hydration (TRANSITION.md 2026-09-23).
+    document.cookie = 'atllanta-theme=' + t + ';path=/;max-age=31536000;samesite=lax';
+  }
 </script>
 <script src="/js/config.js"></script>
 <script type="module">
