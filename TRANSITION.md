@@ -455,11 +455,14 @@ Three ways out, owner's call before Phase 2 item 1 starts:
 Until this is answered, Phase 2 item 1 is blocked — everything after it inherits
 whichever shape is chosen.
 
-**Resolved 2026-09-23 — option A.** Both stacks now share one session and one
-theme through cookies. The cost named above stands: `public/js/supabase.js` and
-the inline theme scripts in five frozen legacy pages were changed deliberately,
-and everyone is signed out once at the cutover, because the session moves from
-localStorage to a cookie.
+**Owner decision 2026-09-23: A — one session in cookies.** Both stacks share one
+sign-in and one theme, and a Next page renders correctly on first paint.
+Accepted costs: a deliberate change to frozen legacy files
+(`public/js/supabase.js` and the inline theme scripts in five pages), and
+everyone is signed out once when it ships, because the session moves from
+localStorage to a cookie. That sign-out is why the cutover goes out **as a
+legacy release** (`vX.Y.Z`) rather than silently — users notice being logged
+out.
 
 ### 2026-09-22 — Owner decisions on Phase 1 items 2–3
 
