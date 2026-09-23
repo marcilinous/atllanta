@@ -197,7 +197,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 — no direct Supabase client mutation from the browser anywhere in new code.
 
 - [x] Supabase SSR cookie auth wired in `(auth)/`
-- [ ] Zod schemas + Drizzle transactions for all Phase 1 mutations
+- [x] Zod schemas + Drizzle transactions for all Phase 1 mutations
 - [ ] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
       handler) — carried over from old CLAUDE.md §8.1 as an open item
 - [ ] Confirm `service_role` key is not reachable from any client bundle or
@@ -227,6 +227,25 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   checkout with `TS2304: Cannot find name 'LayoutProps'` — tsconfig includes
   `.next/types`, which only a build generates. Now `next typegen && tsc
   --noEmit`, verified by deleting `.next/types` and running it cold.
+- 2026-09-23 — Item 2 done as the mutation *path*, since Phase 1 left no
+  mutations to wrap (see Decisions & Blockers). `src/db/transaction.ts` gives
+  `withTransaction`, `src/lib/platform/schemas.ts` the Zod input schemas, and
+  `src/lib/platform/actions.ts` two reference mutations —
+  `renameOrganization` and `createDepartment` — that run
+  validate -> transact (row + audit row) -> commit -> publish.
+- 2026-09-23 — The mutations treat RLS as the authorisation boundary: an
+  `orgId` from the client is never checked in TypeScript, the write is simply
+  attempted and an empty `.returning()` is reported as "not found or no
+  access", which deliberately does not say which.
+- 2026-09-23 — `EventClient.rpc` now returns `PromiseLike`, not `Promise`.
+  supabase-js returns a `PostgrestFilterBuilder`, which is thenable but has no
+  `catch`/`finally`, so the old signature rejected the real client. The module
+  only awaits the result, so nothing else changes.
+- 2026-09-23 — **Known gap:** an event lost between commit and publish is not
+  recovered by anything today. The drain worker claims from the events table,
+  so an event that was never published is invisible to it; only the audit row
+  records that the change happened. Worth a reconciler before a module depends
+  on event delivery.
 
 ---
 
@@ -423,6 +442,29 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-23 — Phase 2 item 2: what "all Phase 1 mutations" means
+
+Item 2 reads "Zod schemas + Drizzle transactions for all Phase 1 mutations",
+but Phase 1 produced **no mutations** — it delivered the Server Action *pattern*
+(`src/lib/actions.ts`) and the event publisher, and nothing in `src/` or `app/`
+writes to the database. The item had an empty set to operate on.
+
+**Owner decision: build the mutation path.** The helper, the schemas, and
+reference mutations that prove validate -> transact -> audit -> commit ->
+publish end to end. Module 0's full write surface (create/rename org, invite,
+accept, departments, teams) waits for the screens that consume it, rather than
+guessing shapes now.
+
+**Owner decision: events publish after the transaction commits.** `publishEvent`
+goes through the `publish_event` security-definer RPC — the events table has no
+INSERT policy, and the RPC stamps `auth.uid()` — so it runs on a different
+connection from Drizzle and a transaction cannot roll back an event it already
+published. The order is validate -> transact (row + audit row) -> commit ->
+publish. If the process dies between commit and publish, an event is **lost, not
+invented**; the drain worker reconciles. The alternative — an INSERT policy so
+Drizzle writes events inside the transaction — was rejected because it gives up
+the RPC's actor stamping, which Phase 1's RLS design depends on.
 
 ### 2026-09-23 — Resolved: one session, in cookies (option A)
 

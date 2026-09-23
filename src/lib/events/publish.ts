@@ -10,10 +10,14 @@ import { ok, fail } from "../actions.ts";
 import type { ActionResponse } from "../actions.ts";
 
 export interface EventClient {
+  // PromiseLike, not Promise: supabase-js returns a PostgrestFilterBuilder,
+  // which is thenable but has no catch/finally. This function only ever awaits
+  // the result, so a thenable is all it needs — declaring Promise would reject
+  // the real client while accepting nothing this module actually uses.
   rpc(
     fn: string,
     args: Record<string, unknown>
-  ): Promise<{ data: unknown; error: { message: string } | null }>;
+  ): PromiseLike<{ data: unknown; error: { message: string } | null }>;
 }
 
 export interface PublishEventInput {
