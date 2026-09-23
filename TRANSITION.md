@@ -32,14 +32,13 @@
   Action pattern, event bus stub, two-org isolation test)
 - **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-22 — Phase 0 shipped to production inside legacy v1.2.1
-  (#106, tag `v1.2.1`): Next.js now hosts atllanta.vercel.app, users see no change.
-  Phase 1 item 1 verified against the live database.
-- **Next unchecked item:** Phase 2 item 1 (Supabase SSR cookie auth) —
-  **blocked on the owner** by the 2026-09-23 entry in Decisions & Blockers: one
-  shared session in cookies, a bridge, or two sign-ins. Phase 1 is done end to
-  end; the tenancy fixes items 1 and 2 turned up shipped as legacy **v1.2.2**
-  and **v1.2.3**.
+- **Last updated:** 2026-09-23 — Phase 2 item 1 done: one shared session in
+  cookies (option A). The legacy client now writes the session `@supabase/ssr`
+  reads, `proxy.ts` refreshes it on every request, and the root layout paints
+  the legacy theme on the first server-rendered frame.
+- **Next unchecked item:** Phase 2 item 2 (Zod schemas + Drizzle transactions
+  for all Phase 1 mutations). Phase 1 is done end to end; the tenancy fixes
+  items 1 and 2 turned up shipped as legacy **v1.2.2** and **v1.2.3**.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -197,7 +196,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 **Goal:** Login, session, and the mutation path are fully on Server Actions
 — no direct Supabase client mutation from the browser anywhere in new code.
 
-- [ ] Supabase SSR cookie auth wired in `(auth)/`
+- [x] Supabase SSR cookie auth wired in `(auth)/`
 - [ ] Zod schemas + Drizzle transactions for all Phase 1 mutations
 - [ ] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
       handler) — carried over from old CLAUDE.md §8.1 as an open item
@@ -205,7 +204,29 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
       public route
 
 **Notes:**
-_(none yet)_
+- 2026-09-23 — Item 1 done, option A. `public/js/supabase.js` swaps supabase-js
+  for `@supabase/ssr`'s `createBrowserClient`, so the legacy app writes the
+  session to the cookie the new stack reads; `src/lib/supabase/server.ts` is the
+  per-request client (anon key + the caller's token, never the service key);
+  `proxy.ts` refreshes the token on every request. The five legacy pages also
+  mirror `atllanta-theme` into a cookie and `app/layout.tsx` reads it, which
+  closes the Phase 0 note about a Next page not seeing the legacy theme.
+  `app/(auth)/session/` is a wiring check, not a finished screen — the real
+  login/register/reset screens belong to the later `(auth)` work.
+- 2026-09-23 — `@supabase/ssr` is pinned **exactly** at 0.12.7 in package.json
+  to match the CDN pin in `public/js/supabase.js`: both stacks must write the
+  cookie the same way, so these two versions move together or not at all.
+- 2026-09-23 — Gotcha: the file is `proxy.ts`, not `middleware.ts`. Next 16.3.5
+  deprecates the `middleware` convention and warns at build time; the export is
+  `export default async function proxy(request)`.
+- 2026-09-23 — Consequence to watch: the root layout reads a cookie, so every
+  route is now server-rendered on demand (`ƒ`). `/` and `/_not-found` were
+  static before. If a static page is wanted later, move the cookie read into a
+  nested layout rather than the root.
+- 2026-09-23 — `npm run typecheck` was `tsc --noEmit`, which fails on a fresh
+  checkout with `TS2304: Cannot find name 'LayoutProps'` — tsconfig includes
+  `.next/types`, which only a build generates. Now `next typegen && tsc
+  --noEmit`, verified by deleting `.next/types` and running it cold.
 
 ---
 
@@ -403,7 +424,7 @@ _(none yet)_
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
 
-### 2026-09-23 — Open question: one session, or two? (blocks Phase 2)
+### 2026-09-23 — Resolved: one session, in cookies (option A)
 
 Both Phase 2 blockers are the same problem: the legacy app keeps per-user state
 in **localStorage**, which a server-rendered page cannot read.
@@ -433,6 +454,12 @@ Three ways out, owner's call before Phase 2 item 1 starts:
 
 Until this is answered, Phase 2 item 1 is blocked — everything after it inherits
 whichever shape is chosen.
+
+**Resolved 2026-09-23 — option A.** Both stacks now share one session and one
+theme through cookies. The cost named above stands: `public/js/supabase.js` and
+the inline theme scripts in five frozen legacy pages were changed deliberately,
+and everyone is signed out once at the cutover, because the session moves from
+localStorage to a cookie.
 
 ### 2026-09-22 — Owner decisions on Phase 1 items 2–3
 
