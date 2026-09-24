@@ -21,7 +21,7 @@ for, what they hold, and what they spent. Largest module by screen count.
 | `attendance` | `views/attendance/dashboard.js` | team attendance overview |
 | `attendance/checkin` | `views/attendance/checkin.js` | check in/out (geofence aware) |
 | `attendance/regularize` | `views/attendance/regularize.js` | raise/approve corrections |
-| `attendance/report` | `views/attendance/report.js` | range report → `api/reports.js?type=attendance` |
+| `attendance/report` | `views/attendance/report.js` | range report, queried directly under RLS |
 | `leave` | `views/leave/apply.js` | apply for leave |
 | `leave/approvals` | `views/leave/approvals.js` | manager/HR queue |
 | `leave/balances` | `views/leave/balances.js` | balances per type per year |
@@ -85,5 +85,5 @@ month → notify manager.
   adding to it.
 - Attendance and leave are the two flows where tenants differ most; check
   `work_schedules` and `leave_types` before assuming a rule is global.
-- Reports for this module are served by `api/reports.js` (GET, `type=attendance|leave|…`),
-  which resolves the caller's `org_id` with the service role — keep the org filter.
+- Reports query Supabase directly from the browser, under RLS. The old service-role
+  `api/reports.js` was removed in v1.2.4: it had no org filter at all.

@@ -79,8 +79,6 @@ endpoint means merging or replacing an existing one.
 | `api/event-processor.js` | drains the event queue; also the daily cron target |
 | `api/create-org.js` | team administration: invite a member |
 | `api/bulk-import.js` | bulk row import (employees and similar) |
-| `api/reports.js` | server-side report queries (attendance, leave, hiring…) |
-| `api/send-notification.js` | send a notification/email via Resend |
 | `api/ai-query.js` | **disabled (503)** until the assistant returns in v1.4.0 |
 
 Every function: ESM, `export default async function handler(req, res)`, service-role
