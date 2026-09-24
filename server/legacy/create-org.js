@@ -58,10 +58,13 @@ export default async function handler(req, res) {
 async function handleInvite(req, res, db, user) {
   const { data: me } = await db
     .from("users")
-    .select("org_id, role")
+    .select("org_id, role, status")
     .eq("id", user.id)
     .single();
 
+  if (me?.status === "exited") {
+    return res.status(403).json({ error: "Your account is no longer active" });
+  }
   if (!me?.org_id || !["owner", "admin"].includes(me.role)) {
     return res.status(403).json({ error: "Insufficient permissions" });
   }

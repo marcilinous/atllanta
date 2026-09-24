@@ -29,13 +29,16 @@ export default async function handler(req, res) {
 
   const { data: membership } = await sb
     .from("users")
-    .select("org_id, role")
+    .select("org_id, role, status")
     .eq("id", user.id)
     .limit(1)
     .single();
 
   if (!membership?.org_id) {
     return res.status(403).json({ error: "No organization found" });
+  }
+  if (membership.status === "exited") {
+    return res.status(403).json({ error: "Your account is no longer active" });
   }
   if (!["owner", "admin"].includes(membership.role)) {
     return res.status(403).json({ error: "Admin access required" });

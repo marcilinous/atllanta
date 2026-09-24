@@ -23,12 +23,14 @@ before(async () => {
     function chain(table) {
       const ops = [];
       const c = {};
-      for (const m of ['select','insert','update','upsert','eq','in','lt','gte','order','limit','single','maybeSingle']) {
+      for (const m of ['select','insert','update','upsert','eq','neq','in','lt','gte','order','limit','single','maybeSingle']) {
         c[m] = (...a) => { ops.push([m, ...a]); return c; };
       }
       c.then = (resolve) => {
         S.calls.push({ table, ops });
         const names = ops.map(o => o[0]);
+        // The pre-v1.2.5 dedup lookup (earlier approved events for one request): none here.
+        if (table === 'events' && names[0] === 'select' && names.includes('neq')) return resolve({ data: [], error: null });
         if (table === 'events' && names[0] === 'select') return resolve({ data: S.pending, error: null });
         if (table === 'events' && names[0] === 'update' && names.includes('select')) {
           return resolve({ data: S.claimWins ? [{ id: 'ev-1' }] : [], error: null });
@@ -38,6 +40,14 @@ before(async () => {
         }
         if (table === 'leave_types' && names[0] === 'select') {
           return resolve({ data: [{ id: 'lt-1', annual_quota: 12 }], error: null });
+        }
+        if (table === 'leave_requests' && names[0] === 'select') {
+          return resolve({ data: S.leaveRequest || null, error: null });
+        }
+        if (table === 'users' && names[0] === 'select') {
+          const idOp = ops.find(o => o[0] === 'eq' && o[1] === 'id');
+          if (idOp) return resolve({ data: (S.usersById || {})[idOp[2]] || null, error: null });
+          return resolve({ data: S.orgUsers || [], error: null });
         }
         return resolve({ data: null, error: null });
       };
@@ -63,6 +73,15 @@ after(() => { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); delete 
 
 beforeEach(() => {
   S.calls = []; S.pending = []; S.claimWins = true; S.firstTime = true; S.failCompletion = false; S.rpcErrors = {};
+  // Recipes now reload rows scoped to org_id instead of trusting the
+  // payload, so the stub needs fixture rows for the events these tests
+  // exercise. `leave.request.approved` reads the leave_requests row for
+  // 'lr-1' (must be status "approved" for the recipe to proceed); the
+  // `people.employee.created` and tenant-scoping tests read the users row
+  // for employee 'u-1'.
+  S.leaveRequest = { id: 'lr-1', user_id: 'u-2', leave_type_id: 'lt-1', days: 2, start_date: '2026-01-01', end_date: '2026-01-01', status: 'approved' };
+  S.usersById = { 'u-1': { id: 'u-1', full_name: 'New Employee', reporting_manager_id: null } };
+  S.orgUsers = [];
   process.env.CRON_SECRET = 'test-secret';
   delete process.env.RESEND_API_KEY;   // recipes must never reach Resend from a test
 });
@@ -136,9 +155,13 @@ describe('claiming', () => {
 });
 
 describe('replay safety', () => {
-  const approvedEvent = { id: 'ev-1', event_type: 'leave.request.approved', attempts: 0,
+  // Real event rows carry org_id as a column (stamped by publish_event and
+  // forwarded as event.org_id); the fixtures below now set it at the top
+  // level rather than only inside payload, matching the org-scoped
+  // contract the recipes reload rows under.
+  const approvedEvent = { id: 'ev-1', org_id: 'org-1', event_type: 'leave.request.approved', attempts: 0,
     payload: { leave_request_id: 'lr-1', user_id: 'u-2', org_id: 'org-1', days: '2', leave_type_id: 'lt-1' } };
-  const createdEvent = { id: 'ev-1', event_type: 'people.employee.created', attempts: 0,
+  const createdEvent = { id: 'ev-1', org_id: 'org-1', event_type: 'people.employee.created', attempts: 0,
     payload: { employee_id: 'u-1', org_id: 'org-1' } };
 
   test('leave.request.approved claims the side effect and applies usage atomically, once', async () => {
@@ -148,7 +171,11 @@ describe('replay safety', () => {
     const claimAt = S.calls.findIndex(c => c.rpc === 'claim_side_effect');
     const applyAt = S.calls.findIndex(c => c.rpc === 'apply_leave_usage');
     assert.ok(claimAt !== -1, 'expected claim_side_effect to be called');
-    assert.deepEqual(S.calls[claimAt].args, { p_event_id: 'ev-1', p_effect_key: 'leave_used' });
+    // Changed: dedup is now PER REQUEST, not per event — the effect key is
+    // derived from the leave_requests row id (lr-1) instead of the fixed
+    // literal "leave_used", so a fresh fake event for the same request
+    // can't deduct usage twice (see event-recipes-org-scope.test.mjs).
+    assert.deepEqual(S.calls[claimAt].args, { p_event_id: 'ev-1', p_effect_key: 'leave_used:lr-1' });
     assert.ok(applyAt !== -1, 'expected apply_leave_usage to be called');
     assert.ok(claimAt < applyAt, 'claim must happen before applying usage');
     assert.deepEqual(S.calls[applyAt].args, {
