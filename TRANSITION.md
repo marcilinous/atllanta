@@ -36,10 +36,12 @@
   verified server-side at `/auth/confirm`, because item 1's cookie client forces
   PKCE and broke the old client-side link. Also fixed an item 1 miss —
   `public/login.html` still kept its own localStorage session.
-- **Next unchecked item:** Phase 2 item 4 (confirm `service_role` is not
-  reachable from any client bundle or public route). Items 1 and 3 ship
-  together with a Supabase email-template change — see Decisions & Blockers,
-  2026-09-24.
+- **Next unchecked item:** Phase 2 item 4 — audited 2026-09-24, still open.
+  The key is in no client bundle, but three legacy routes acted across orgs
+  with it (hotfix **v1.2.4**, PR #112, awaiting the owner's merge) and this
+  branch's Drizzle connection bypasses RLS. Three blockers before `v0.2.0` —
+  see Decisions & Blockers, 2026-09-24 (item 4). Items 1 and 3 ship together
+  with a Supabase email-template change (Decisions & Blockers, 2026-09-24).
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -279,6 +281,36 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   `PASSWORD_RECOVERY` redirect in `js/auth.js` — with the new email template
   no reset link reaches the browser client any more.
 - 2026-09-24 — 147/147 unit tests, typecheck, build and lint (0 errors) clean.
+- 2026-09-24 — Item 4, client half: **passes.** 0 hits for the key (by name,
+  by the JWT role claim in all three base64 alignments, and `sb_secret_`)
+  across 133 browser-fetchable files — `.next/static`, `public/`, prerendered
+  output. `public/js/config.js` is committed and holds only the URL and anon
+  key; nothing writes env into `public/`. `next.config.mjs` inlines nothing,
+  no `NEXT_PUBLIC_*` var on Vercel carries a secret, and no response echoes
+  the key. The exact-value comparison did not run: there is no local env file.
+- 2026-09-24 — Item 4, route half: **fails**, so the item stays open. Of the
+  legacy endpoints running as the service role, `/api/reports` and
+  `/api/send-notification` acted across organisations and
+  `/api/google-auth`'s OAuth callback could be driven cross-account. All three
+  are fixed in legacy **v1.2.4** (PR #112): the first two removed (nothing
+  called them), the third bound to the browser that started it. The
+  `create-org` invite finding was already fixed in production by v1.2.2 —
+  the audit read this branch, which does not have that fix (below).
+- 2026-09-24 — **Correction to the item 2 notes above.** They say the
+  mutations "treat RLS as the authorisation boundary". They do not: Drizzle
+  connects with `DATABASE_URL`, the pooler logs in as `postgres`, and
+  `postgres` has `rolbypassrls` and owns every table checked, none with
+  `FORCE ROW LEVEL SECURITY` (verified with read-only queries). So RLS never
+  applies to `renameOrganization`/`createDepartment`, and their code comments
+  are wrong too. Not reachable today — nothing calls either action — but
+  blocking for any screen built on them.
+- 2026-09-24 — Gotcha: the legacy `docs/context/people.md` said of
+  `/api/reports` "keep the org filter". It never had one. Treat a doc's
+  description of a security property as a claim to check, not a fact.
+- 2026-09-24 — Gotcha: Vercel keeps runtime logs ~1h on this plan and the
+  30-day request query needs Observability Plus (402), so "is anything
+  calling this endpoint?" cannot be answered from logs. Whether the removed
+  endpoints were ever misused is unknown.
 
 ---
 
@@ -475,6 +507,37 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-24 — Phase 2 item 4: what blocks `v0.2.0` (owner's call)
+
+The `service_role` audit (Phase 2 notes, 2026-09-24) passed on the client and
+failed on the routes. The owner chose to hotfix production first: **legacy
+v1.2.4, PR #112**, open against `claude/gstack-skill-install-chnb41`. After it
+merges: tag `v1.2.4`, and if Google Calendar connect is in use set
+`GOOGLE_OAUTH_REDIRECT_URI` to `https://atllanta.vercel.app/api/google-auth?action=callback`
+in Vercel and on the Google OAuth client (unset today; the fallback is the
+per-deployment `VERCEL_URL`).
+
+Three blockers remain before this phase can ship:
+
+1. **This branch is missing production's security fixes.** v1.2.2 and v1.2.3
+   (6 commits) were made on release branches off production and never came
+   back here; v1.2.4 will be a seventh. Shipping this branch as-is would undo
+   them. Production has to be merged into `claude/phase-2-auth` — owner's
+   call, since it is a merge.
+2. **Drizzle must run under RLS.** Each `withTransaction` needs to act as the
+   caller — `set local role authenticated` plus the caller's claims in
+   `request.jwt.claims`, inside the transaction — or the actions must check
+   membership themselves. Recommendation: the first, so RLS stays the single
+   boundary the Phase 1 policies were written for. Needs a design pass.
+3. **Two audit findings not yet fixed**: the event-processor recipes trust
+   ids inside an event's payload rather than checking they belong to the
+   event's org, and three legacy handlers (`bulk-import`, `create-org`,
+   `google-auth`) skip the `status = 'exited'` check that `resolveCaller` does. Neither is exploitable without a valid session
+   in some org; both belong in a follow-up legacy release.
+
+Item 4 is ticked when blockers 1 and 2 are done and PR #112 is merged; item 3
+of this list can follow in its own release.
 
 ### 2026-09-24 — Phase 2 item 3: reset link verified on the server (owner's call)
 
