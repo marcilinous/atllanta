@@ -32,21 +32,19 @@
   Action pattern, event bus stub, two-org isolation test)
 - **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-24 — Phase 2 item 3 done: the reset link is
-  verified server-side at `/auth/confirm`, because item 1's cookie client forces
-  PKCE and broke the old client-side link. Also fixed an item 1 miss —
-  `public/login.html` still kept its own localStorage session.
-- **Next unchecked item:** Phase 2 item 4 — audited 2026-09-24, still open.
-  The key is in no client bundle, but three legacy routes acted across orgs
-  with it (hotfix **v1.2.4**, PR #112, awaiting the owner's merge) and this
-  branch's Drizzle connection bypasses RLS. Three blockers before `v0.2.0` —
-  see Decisions & Blockers, 2026-09-24 (item 4). Items 1 and 3 ship together
-  with a Supabase email-template change (Decisions & Blockers, 2026-09-24).
+- **Last updated:** 2026-09-25 — all four Phase 2 items done. Item 4's
+  audit led to legacy **v1.2.4** and **v1.2.5** (both live), Drizzle now runs
+  under RLS, and production was merged into this branch (`95563c4`).
+- **Next:** tag `v0.2.0` once sign-in, sign-out and password reset have been
+  exercised end to end in a browser — never done since item 1, and the
+  `login.html` miss shows why it matters. Items 1 and 3 ship to production
+  together with a Supabase email-template change (Decisions & Blockers,
+  2026-09-24, item 3). Phase 3 starts after `v0.2.0`.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.3** live since
-2026-09-23), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.5** live since
+2026-09-25), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -203,7 +201,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 - [x] Zod schemas + Drizzle transactions for all Phase 1 mutations
 - [x] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
       handler) — carried over from old CLAUDE.md §8.1 as an open item
-- [ ] Confirm `service_role` key is not reachable from any client bundle or
+- [x] Confirm `service_role` key is not reachable from any client bundle or
       public route
 
 **Notes:**
@@ -327,6 +325,17 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   none` restores 5. `departments` has no rows yet, so department scoping was
   not exercised — only organisations. 154/154 unit tests, typecheck, build,
   lint (0 errors) clean.
+- 2026-09-25 — **Item 4 done.** v1.2.4 (PR #112) and v1.2.5 (PR #113) are
+  merged and live: `atllanta.vercel.app/version.json` reports 1.2.5 and both
+  removed endpoints answer 404. Production was merged into this branch as
+  `95563c4` — the tree matched a dry run verified beforehand (no conflicts,
+  194/194 unit tests, typecheck, build, lint clean), so this branch now
+  carries v1.2.2–v1.2.5 and shipping it no longer undoes them.
+- 2026-09-25 — Gotcha: merging to the production branch does **not** deploy
+  to production here. Both merge deployments built `READY` with `target:
+  null` and production stayed on v1.2.3 until the owner promoted the v1.2.5
+  deployment by hand (v1.2.3 itself had been promoted, source `redeploy`).
+  After a release merge, check `/version.json` before calling it live.
 - 2026-09-24 — Known wart: if the audit insert itself fails, Postgres aborts
   the transaction and the role restore in `asOwner`'s `finally` fails too, so
   the *logged* error is "transaction aborted" rather than the insert error.
@@ -544,7 +553,7 @@ Three blockers remain before this phase can ship:
    (6 commits) were made on release branches off production and never came
    back here; v1.2.4 will be a seventh. Shipping this branch as-is would undo
    them. Production has to be merged into `claude/phase-2-auth` — owner's
-   call, since it is a merge.
+   call, since it is a merge. **Done 2026-09-25 by the owner** (`95563c4`).
 2. **Drizzle must run under RLS.** Each `withTransaction` needs to act as the
    caller — `set local role authenticated` plus the caller's claims in
    `request.jwt.claims`, inside the transaction — or the actions must check
@@ -556,9 +565,18 @@ Three blockers remain before this phase can ship:
    event's org, and three legacy handlers (`bulk-import`, `create-org`,
    `google-auth`) skip the `status = 'exited'` check that `resolveCaller` does. Neither is exploitable without a valid session
    in some org; both belong in a follow-up legacy release.
+   **Done in v1.2.5, live 2026-09-25.** Correction: the event-processor
+   finding was understated above. `publish_event` lets any member publish
+   any event, and the processor runs as the service role, so a member could
+   write to another org's attendance and leave balances, or apply a leave
+   approval no manager made. Recipes now reload every row scoped to the
+   event's org and act only on what it says; leave usage dedupes per request.
 
 Item 4 is ticked when blockers 1 and 2 are done and PR #112 is merged; item 3
-of this list can follow in its own release.
+of this list can follow in its own release. **All three resolved; item 4
+ticked 2026-09-25.** Open follow-ups: in-org `leave_balances` policies (the
+browser processor runs under a member's own RLS), and department RLS
+scoping, unexercised because `departments` has no rows yet.
 
 ### 2026-09-24 — Phase 2 item 3: reset link verified on the server (owner's call)
 
