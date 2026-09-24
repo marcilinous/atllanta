@@ -89,7 +89,7 @@ Modules never read each other's tables. They publish events and react.
 | Concern | Where | Notes |
 |---|---|---|
 | Auth | `js/auth.js`, `login.html`, `reset-password.html` | email/password + Google OAuth; `SIGNED_OUT` and `PASSWORD_RECOVERY` handled |
-| Notifications | `js/notifications.js`, `api/send-notification.js`, `notifications` table | in-app + email (Resend); realtime subscription for the unread badge |
+| Notifications | `js/notifications.js`, `notifications` table | in-app, plus email (Resend) from the event processor; realtime subscription for the unread badge |
 | Audit | `js/audit.js` → `log_audit(...)` definer RPC → `audit_logs` | append-only; `entity_id` is NOT NULL — passing null makes the call fail silently |
 | Files | Supabase Storage + `files` table | `entity_type`/`entity_id` link a file to any row |
 | Global search | `js/search.js` | Postgres FTS (`tsvector` + GIN) on `users`, `candidates`, `jobs` |

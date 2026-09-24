@@ -22,7 +22,7 @@ test('every legacy endpoint is reachable through the catch-all', () => {
   }
 });
 
-test('the dispatch table has exactly 12 entries whose keys match server/legacy exactly', () => {
+test('the dispatch table has exactly 10 entries whose keys match server/legacy exactly', () => {
   const route = fs.readFileSync(path.join(ROOT, 'pages/api/[...legacy].js'), 'utf8');
   const block = route.match(/const handlers = \{([\s\S]*?)\n\};/);
   assert.ok(block, 'could not find the handlers table in pages/api/[...legacy].js');
@@ -30,7 +30,7 @@ test('the dispatch table has exactly 12 entries whose keys match server/legacy e
   const files = fs.readdirSync(path.join(ROOT, 'server/legacy'))
     .filter((f) => f.endsWith('.js'))
     .map((f) => f.replace(/\.js$/, ''));
-  assert.equal(keys.length, 12, `expected exactly 12 dispatch entries, found ${keys.length}`);
+  assert.equal(keys.length, 10, `expected exactly 10 dispatch entries, found ${keys.length}`);
   assert.deepEqual([...keys].sort(), [...files].sort(),
     'dispatch table keys must exactly match the file names in server/legacy/ — ' +
     'deleting an endpoint from only one of the two places must fail this test');

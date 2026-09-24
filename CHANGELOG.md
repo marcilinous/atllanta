@@ -5,6 +5,46 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.5 — 2026-09-25
+
+### What changed
+- Security: automatic follow-ups (leave approvals, attendance, expense and hiring notifications) now act only on records in your own organisation, and only on what the record actually says. Before, a crafted request could make them update another organisation's attendance or leave balances, or treat a leave request as approved before a manager approved it.
+- Leave days are deducted once per approved request, never again for the same request.
+- Notification emails no longer render text from records as formatting.
+- People who have left an organisation can no longer invite users, bulk-import, or connect Google Calendar with a still-valid session.
+
+### Admins need to
+- Nothing.
+
+## v1.2.4 — 2026-09-24
+
+### What changed
+- Security: a server report endpoint returned attendance, leave and hiring data from every organisation, not just yours, to any signed-in owner, admin or manager who called it directly. Nothing in the app used it; it has been removed. The Reports screens were never affected — they read through the database's access rules.
+- Security: a server notification endpoint let any owner or admin send an email with their own content to any address, and a notification to any user in any organisation. Nothing in the app used it; it has been removed. Automatic notifications are unchanged.
+- Security: connecting Google Calendar is now tied to the browser that started it. Before, someone could send you a Google consent link that, once approved, attached your calendar to their account. Your session token is also no longer placed in the link to Google.
+
+### Admins need to
+- If Google Calendar connect is in use: set `GOOGLE_OAUTH_REDIRECT_URI` to `https://atllanta.vercel.app/api/google-auth?action=callback` in Vercel (Production) and register the same URL in the Google Cloud OAuth client. The connection now has to return to the same site it started on.
+
+## v1.2.3 — 2026-09-23
+
+### What changed
+- Organisation settings save again: renaming your organisation and changing its logo were silently refused by the database. Only owners and admins can make those changes, as the screen already said.
+- Only owners and admins can create invitations now. A member could previously add one, including one that granted admin access.
+
+### Admins need to
+- Nothing.
+
+## v1.2.2 — 2026-09-22
+
+### What changed
+- Security: a person's organisation can no longer be changed from inside the app, by anyone, including owners and admins. Atllanta assigns it; before this fix an owner or admin could move their own account into another organisation.
+- Security: inviting an email that already belongs to another organisation is now refused instead of moving that person into yours. The message doesn't say which organisation the email belongs to.
+- The audit log no longer shows internal organisation identifiers in its Details column.
+
+### Admins need to
+- Nothing. If you invite someone who already has an account with another organisation, they need a different email address for yours.
+
 ## v1.2.1 — 2026-09-19
 
 ### What changed
