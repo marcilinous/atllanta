@@ -32,13 +32,14 @@
   Action pattern, event bus stub, two-org isolation test)
 - **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-23 — Phase 2 item 1 done: one shared session in
-  cookies (option A). The legacy client now writes the session `@supabase/ssr`
-  reads, `proxy.ts` refreshes it on every request, and the root layout paints
-  the legacy theme on the first server-rendered frame.
-- **Next unchecked item:** Phase 2 item 2 (Zod schemas + Drizzle transactions
-  for all Phase 1 mutations). Phase 1 is done end to end; the tenancy fixes
-  items 1 and 2 turned up shipped as legacy **v1.2.2** and **v1.2.3**.
+- **Last updated:** 2026-09-24 — Phase 2 item 3 done: the reset link is
+  verified server-side at `/auth/confirm`, because item 1's cookie client forces
+  PKCE and broke the old client-side link. Also fixed an item 1 miss —
+  `public/login.html` still kept its own localStorage session.
+- **Next unchecked item:** Phase 2 item 4 (confirm `service_role` is not
+  reachable from any client bundle or public route). Items 1 and 3 ship
+  together with a Supabase email-template change — see Decisions & Blockers,
+  2026-09-24.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -198,7 +199,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 
 - [x] Supabase SSR cookie auth wired in `(auth)/`
 - [x] Zod schemas + Drizzle transactions for all Phase 1 mutations
-- [ ] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
+- [x] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
       handler) — carried over from old CLAUDE.md §8.1 as an open item
 - [ ] Confirm `service_role` key is not reachable from any client bundle or
       public route
@@ -246,6 +247,38 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   so an event that was never published is invisible to it; only the audit row
   records that the change happened. Worth a reconciler before a module depends
   on event delivery.
+- 2026-09-24 — Item 3: the flow §8.1 asked for already existed in the legacy
+  app (`login.html` + `js/auth.js` + `reset-password.html`), but item 1 broke
+  it on this branch. `createBrowserClient` hard-sets `flowType: "pkce"` after
+  spreading the caller's options, so it cannot be turned back to implicit. A
+  PKCE reset link arrives as `?code=`, not `#type=recovery`, so `login.html`'s
+  hash check never matched; `PASSWORD_RECOVERY` fires in a `setTimeout(0)`
+  that races `getSession()`'s redirect to `/`; and the code verifier lives only
+  in the requesting browser, so a link opened on another device failed.
+  Production was never affected — it still runs the plain implicit client.
+- 2026-09-24 — Item 3 done as server-side verification (owner's call, see
+  Decisions & Blockers). `/auth/confirm` renders a button; the Server Action
+  `verifyRecovery` (`src/lib/auth/`) calls `verifyOtp({ type: "recovery",
+  token_hash })`, which writes the recovery session into the shared cookie, and
+  the browser moves to the legacy `/reset-password` page to set the password.
+  The GET is deliberately side-effect free: mail scanners (Outlook Safe Links)
+  prefetch links and would burn a one-time token verified on load.
+- 2026-09-24 — Gotcha: `action()` catches every throw, including the
+  `NEXT_REDIRECT` that `redirect()` uses, so an action wrapped in it must
+  return where to go and let the client navigate.
+- 2026-09-24 — **Item 1 miss, fixed:** `public/login.html` still built its own
+  supabase-js client, so a sign-in wrote localStorage while every other page
+  read the cookie — `/login` and `/` would have bounced a signed-in user back
+  and forth, and Google sign-in's PKCE verifier went to the wrong store. It now
+  imports `/js/supabase.js`. `tests/shared-session.test.mjs` fails if any file
+  in `public/` other than that one creates a Supabase client (checked: it names
+  `login.html` with the fix reverted). Sign-in was never exercised end to end
+  in a browser after item 1; do that before `v0.2.0`.
+- 2026-09-24 — Now dead code, remove once items 1 and 3 have shipped:
+  `login.html`'s recovery view and `#type=recovery` check, and the
+  `PASSWORD_RECOVERY` redirect in `js/auth.js` — with the new email template
+  no reset link reaches the browser client any more.
+- 2026-09-24 — 147/147 unit tests, typecheck, build and lint (0 errors) clean.
 
 ---
 
@@ -442,6 +475,27 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-24 — Phase 2 item 3: reset link verified on the server (owner's call)
+
+Item 1's cookie client forces PKCE, which broke the client-side reset link (see
+Phase 2 notes). Two fixes were offered: patch `login.html` to wait for the
+`?code=` exchange — no dashboard change, but a link still only works in the
+browser that asked for it — or verify the token on the server. **The owner chose
+server-side verification**, Supabase's documented SSR pattern: it works on any
+device and has no race.
+
+**Ship-together step (owner, Supabase dashboard):** when items 1 and 3 go to
+production, and not before, set Authentication → Emails → *Reset Password* to
+link to
+
+```
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
+```
+
+and confirm Site URL is `https://atllanta.vercel.app`. Changing it earlier breaks
+reset in production, whose client still expects the old link; shipping the code
+without it leaves reset broken, because the default template sends a PKCE link.
 
 ### 2026-09-23 — Phase 2 item 2: what "all Phase 1 mutations" means
 
