@@ -297,10 +297,10 @@
 </script>
 <script src="/js/config.js"></script>
 <script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-const cfg = window.ATLLANTA_CONFIG;
-const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+// The shared cookie client (TRANSITION.md, Phase 2 item 1). This page used to
+// build its own supabase-js client, which kept the session in localStorage —
+// every other page reads the cookie, so a sign-in here was invisible to them.
+import sb from '/js/supabase.js';
 
 const loginForm = document.getElementById('login-form');
 const signupSection = document.getElementById('signup-section');
