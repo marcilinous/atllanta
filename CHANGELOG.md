@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.4 — 2026-09-24
+
+### What changed
+- Security: a server report endpoint returned attendance, leave and hiring data from every organisation, not just yours, to any signed-in owner, admin or manager who called it directly. Nothing in the app used it; it has been removed. The Reports screens were never affected — they read through the database's access rules.
+- Security: a server notification endpoint let any owner or admin send an email with their own content to any address, and a notification to any user in any organisation. Nothing in the app used it; it has been removed. Automatic notifications are unchanged.
+- Security: connecting Google Calendar is now tied to the browser that started it. Before, someone could send you a Google consent link that, once approved, attached your calendar to their account. Your session token is also no longer placed in the link to Google.
+
+### Admins need to
+- If Google Calendar connect is in use: set `GOOGLE_OAUTH_REDIRECT_URI` to `https://atllanta.vercel.app/api/google-auth?action=callback` in Vercel (Production) and register the same URL in the Google Cloud OAuth client. The connection now has to return to the same site it started on.
+
 ## v1.2.3 — 2026-09-23
 
 ### What changed
