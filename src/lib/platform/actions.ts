@@ -2,7 +2,7 @@
 
 import { action, ActionError } from "../actions";
 import { withTransaction } from "../../db/transaction";
-import { organizations, departments, auditLogs } from "../../db/schema/platform";
+import { organizations, departments } from "../../db/schema/platform";
 import { eq } from "drizzle-orm";
 import { getSessionUser, getSupabaseServerClient } from "../supabase/server";
 import { publishEvent } from "../events/publish";
@@ -14,12 +14,14 @@ export const renameOrganization = action(renameOrganizationSchema, async (input)
     throw new ActionError("You must be signed in to do that.");
   }
 
-  const updated = await withTransaction(async (tx) => {
+  const updated = await withTransaction(sessionUser, async (tx, audit) => {
     // orgId comes from the client and is never trusted as authorisation on
     // its own — RLS is what decides whether this row is visible to this
     // caller. If it filters the update out, `.returning()` comes back empty
     // and that looks identical to "doesn't exist", which is the point: we
-    // don't leak which one it was.
+    // don't leak which one it was. RLS applies here because withTransaction
+    // runs this transaction as the caller (role `authenticated`), see
+    // src/db/as-caller.ts.
     const rows = await tx
       .update(organizations)
       .set({ name: input.name, updatedAt: new Date() })
@@ -32,9 +34,8 @@ export const renameOrganization = action(renameOrganizationSchema, async (input)
 
     const org = rows[0];
 
-    await tx.insert(auditLogs).values({
+    await audit({
       orgId: org.id,
-      userId: sessionUser.id,
       module: "platform",
       entityType: "organization",
       entityId: org.id,
@@ -70,7 +71,7 @@ export const createDepartment = action(createDepartmentSchema, async (input) => 
     throw new ActionError("You must be signed in to do that.");
   }
 
-  const department = await withTransaction(async (tx) => {
+  const department = await withTransaction(sessionUser, async (tx, audit) => {
     // Same rule as renameOrganization: no app-level "does this user belong
     // to this org" check here. If RLS's WITH CHECK rejects the insert,
     // Postgres itself refuses it; the empty-rows branch below is only a
@@ -95,9 +96,8 @@ export const createDepartment = action(createDepartmentSchema, async (input) => 
 
     const dept = rows[0];
 
-    await tx.insert(auditLogs).values({
+    await audit({
       orgId: dept.orgId,
-      userId: sessionUser.id,
       module: "platform",
       entityType: "department",
       entityId: dept.id,

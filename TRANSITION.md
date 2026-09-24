@@ -311,6 +311,26 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   30-day request query needs Observability Plus (402), so "is anything
   calling this endpoint?" cannot be answered from logs. Whether the removed
   endpoints were ever misused is unknown.
+- 2026-09-24 — **Drizzle now runs under RLS** (blocker 2 below). The first
+  statements of every `withTransaction` are a transaction-local
+  `request.jwt.claims = {sub, role: "authenticated"}` and `set local role
+  authenticated` (`src/db/as-caller.ts`); the caller is the server-verified
+  session user and its id reaches Postgres only as a bound parameter.
+  `withTransaction(caller, fn)` hands `fn` an `audit()` helper, the only way
+  to write `audit_logs`: it steps out of the role for that one insert and
+  stamps `userId` from the caller. Nothing is session-level — the pooler
+  reuses connections. The same pattern already existed in
+  `20260905134934_analytics_alerts.sql`.
+- 2026-09-24 — Proven with a read-only, rolled-back probe on production:
+  as `postgres` 5 organisations visible; after the switch, `current_user` is
+  `authenticated`, `auth.uid()` is set and 1 is visible; `set local role
+  none` restores 5. `departments` has no rows yet, so department scoping was
+  not exercised — only organisations. 154/154 unit tests, typecheck, build,
+  lint (0 errors) clean.
+- 2026-09-24 — Known wart: if the audit insert itself fails, Postgres aborts
+  the transaction and the role restore in `asOwner`'s `finally` fails too, so
+  the *logged* error is "transaction aborted" rather than the insert error.
+  The outcome is still a rollback and a generic message.
 
 ---
 
@@ -530,6 +550,7 @@ Three blockers remain before this phase can ship:
    `request.jwt.claims`, inside the transaction — or the actions must check
    membership themselves. Recommendation: the first, so RLS stays the single
    boundary the Phase 1 policies were written for. Needs a design pass.
+   **Done 2026-09-24, the first way** — see Phase 2 notes.
 3. **Two audit findings not yet fixed**: the event-processor recipes trust
    ids inside an event's payload rather than checking they belong to the
    event's org, and three legacy handlers (`bulk-import`, `create-org`,
