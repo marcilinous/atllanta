@@ -64,12 +64,13 @@ beforeEach(() => {
   S.created = [];
   S.upserts = [];
   S.callerRole = 'admin';
+  S.callerStatus = 'active';
   S.emailMember = null;
   S.existingRow = null;
   const has = (ops, ...want) => ops.some(o => want.every((w, i) => o[i] === w));
   S.tables = {
     users: (ops) => {
-      if (has(ops, 'eq', 'id', 'caller-id')) return { data: { org_id: 'org-1', role: S.callerRole }, error: null };
+      if (has(ops, 'eq', 'id', 'caller-id')) return { data: { org_id: 'org-1', role: S.callerRole, status: S.callerStatus }, error: null };
       if (has(ops, 'eq', 'email')) return { data: S.emailMember, error: null };
       if (has(ops, 'upsert')) return { data: null, error: null };
       return { data: S.existingRow, error: null };
@@ -132,5 +133,13 @@ describe('invite across organisations', () => {
     const r = res(); await handler(invite('new@a.com'), r);
     assert.equal(r.statusCode, 403);
     assert.equal(S.upserts.length, 0);
+  });
+
+  test('an exited caller cannot invite, even an owner/admin', async () => {
+    S.callerStatus = 'exited';
+    const r = res(); await handler(invite('new@a.com'), r);
+    assert.deepEqual([r.statusCode, r.body], [403, { error: 'Your account is no longer active' }]);
+    assert.equal(S.upserts.length, 0);
+    assert.equal(S.created.length, 0);
   });
 });

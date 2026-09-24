@@ -93,6 +93,12 @@ export default async function handler(req, res) {
     const user = await getUserFromToken(token);
     if (!user?.id) return res.status(401).json({ error: "Invalid session" });
 
+    const db = supabaseAdmin();
+    const { data: profile } = await db.from("users").select("status").eq("id", user.id).maybeSingle();
+    if (!profile || profile.status === "exited") {
+      return res.status(403).json({ error: "Your account is no longer active" });
+    }
+
     const nonce = crypto.randomBytes(32).toString("base64url");
     const exp = Date.now() + 10 * 60 * 1000;
     const key = deriveStateKey(clientSecret);
@@ -149,6 +155,12 @@ export default async function handler(req, res) {
 
     // Successful verification – clear the one-time cookie and continue
     res.setHeader("Set-Cookie", clearCookie);
+
+    const dbCheck = supabaseAdmin();
+    const { data: profile } = await dbCheck.from("users").select("status").eq("id", payload.uid).maybeSingle();
+    if (!profile || profile.status === "exited") {
+      return res.status(403).json({ error: "Your account is no longer active" });
+    }
 
     const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",

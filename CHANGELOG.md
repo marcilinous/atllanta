@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.5 — 2026-09-25
+
+### What changed
+- Security: automatic follow-ups (leave approvals, attendance, expense and hiring notifications) now act only on records in your own organisation, and only on what the record actually says. Before, a crafted request could make them update another organisation's attendance or leave balances, or treat a leave request as approved before a manager approved it.
+- Leave days are deducted once per approved request, never again for the same request.
+- Notification emails no longer render text from records as formatting.
+- People who have left an organisation can no longer invite users, bulk-import, or connect Google Calendar with a still-valid session.
+
+### Admins need to
+- Nothing.
+
 ## v1.2.4 — 2026-09-24
 
 ### What changed

@@ -24,12 +24,23 @@ before(async () => {
     export const SUPABASE_URL = 'https://stub.supabase.co';
     export function supabaseAdmin() {
       return {
-        from: (t) => ({
-          upsert: (row) => {
-            globalThis.__ga.upserts.push(row);
-            return Promise.resolve({ data: null, error: null });
+        from: (t) => {
+          if (t === 'users') {
+            const S = globalThis.__ga;
+            const chain = {
+              select: () => chain,
+              eq: () => chain,
+              maybeSingle: () => Promise.resolve({ data: { status: S.status ?? 'active' }, error: null }),
+            };
+            return chain;
           }
-        })
+          return {
+            upsert: (row) => {
+              globalThis.__ga.upserts.push(row);
+              return Promise.resolve({ data: null, error: null });
+            }
+          };
+        }
       };
     }
   `);
@@ -87,6 +98,7 @@ beforeEach(() => {
   S.upserts = [];
   S.tokenCalls = [];
   S.tokenValid = true;
+  S.status = 'active';
 });
 
 function res() {
@@ -243,5 +255,35 @@ describe('google oauth state binding', () => {
     assert.strictEqual(verifyState('', key), null);
     assert.strictEqual(verifyState('abc', key), null);
     assert.strictEqual(verifyState('a.b.c', key), null);
+  });
+});
+
+describe('exited users are refused access', () => {
+  test('url refuses an exited user with 403 and sets no cookie', async () => {
+    S.status = 'exited';
+    const r = res();
+    await handler(urlReq('real-bearer-jwt'), r);
+    assert.strictEqual(r.statusCode, 403);
+    assert.deepEqual(r.body, { error: 'Your account is no longer active' });
+    assert.strictEqual(r.headers['Set-Cookie'], undefined);
+  });
+
+  test('callback refuses an exited user with 403 and never calls Google or upserts tokens', async () => {
+    // Get a valid state & cookie while still active.
+    const r1 = res();
+    await handler(urlReq('real-bearer-jwt'), r1);
+    const parsed = new URL(r1.body.url);
+    const state = parsed.searchParams.get('state');
+    const cookieVal = cookieFromSetHeader(r1);
+
+    // The account exits before the callback lands.
+    S.status = 'exited';
+    const r2 = res();
+    await handler(callbackReq(state, 'atllanta_goauth=' + cookieVal), r2);
+
+    assert.strictEqual(r2.statusCode, 403);
+    assert.deepEqual(r2.body, { error: 'Your account is no longer active' });
+    assert.strictEqual(S.upserts.length, 0);
+    assert.strictEqual(S.tokenCalls.length, 0);
   });
 });
