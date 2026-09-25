@@ -5,6 +5,14 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.3.1 — 2026-09-25
+
+### What changed
+- Security: the public status page no longer shows how many organisations and users Atllanta has in total. It now only says whether the database is reachable.
+
+### Admins need to
+- Nothing.
+
 ## v1.3.0 — 2026-09-25
 
 ### What changed
