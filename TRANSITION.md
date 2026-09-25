@@ -35,9 +35,11 @@
 - **Last updated:** 2026-09-25 — all four Phase 2 items done. Item 4's
   audit led to legacy **v1.2.4** and **v1.2.5** (both live), Drizzle now runs
   under RLS, and production was merged into this branch (`95563c4`).
-- **Next:** tag `v0.2.0` once sign-in, sign-out and password reset have been
-  exercised end to end in a browser — never done since item 1, and the
-  `login.html` miss shows why it matters. Items 1 and 3 ship to production
+- **Next:** the 2026-09-25 browser test passed for sign-in, the shared
+  session and sign-out (Phase 2 notes). Still unexercised in a browser: the
+  password-reset flow with a real recovery link — needs a throwaway test user
+  (the test account was a real RTcompu user, so no reset was run on it).
+  Tag `v0.2.0` after that, or on the owner's call without it. Items 1 and 3 ship to production
   together with a Supabase email-template change (Decisions & Blockers,
   2026-09-24, item 3). Phase 3 starts after `v0.2.0`.
 
@@ -336,6 +338,31 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   null` and production stayed on v1.2.3 until the owner promoted the v1.2.5
   deployment by hand (v1.2.3 itself had been promoted, source `redeploy`).
   After a release merge, check `/version.json` before calling it live.
+- 2026-09-25 — **Browser test** (production build via `next start` on
+  localhost against the shared Supabase project, owner signing in by hand):
+  sign-in lands on `/` and survives a reload — no `/login` bounce; the session
+  is the `sb-<ref>-auth-token` cookie with localStorage empty; the Next page
+  `/session` shows the same user; sign-out returns to `/login`, clears the
+  cookie, and `/` then redirects to `/login`. Signed out: `/auth/confirm`
+  refuses a missing token, shows only a button for a fake one (GET does
+  nothing) and refuses it after Continue; `/reset-password` explains an
+  expired link; `/login` loads only `/js/supabase.js` → `@supabase/ssr`.
+- 2026-09-25 — One unreproduced read: straight after sign-out, `/session`
+  once still showed the user in the browser. Re-fetched it showed signed
+  out; the browser held no cookies; curl with no cookie always gets "Signed
+  out" and the page is `Cache-Control: no-store`. Most likely the browser
+  restoring its earlier copy — the server never served identity without a
+  cookie. Watch for it in the ship-time check.
+- 2026-09-25 — Legacy bug found, not caused by Phase 2 and live in
+  production: `public/views/dashboard.js:174` selects
+  `events` with `actor:actor_id(full_name, email)` and PostgREST answers 400
+  on every dashboard load, so the recent-activity feed never shows. Fix in a
+  legacy release.
+- 2026-09-25 — Gotchas: `next dev` started in the background on this Windows
+  box fails every app page with 500 (Turbopack's PostCSS worker exits
+  `0xc0000142`); `next build && next start` works. And `next dev` appends a
+  `nextjs-agent-rules` block to `CLAUDE.md` on every start — reverted, not
+  committed; owner's call whether to keep it.
 - 2026-09-24 — Known wart: if the audit insert itself fails, Postgres aborts
   the transaction and the role restore in `asOwner`'s `finally` fails too, so
   the *logged* error is "transaction aborted" rather than the insert error.
