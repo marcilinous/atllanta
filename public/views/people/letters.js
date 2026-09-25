@@ -57,12 +57,26 @@ export default async function lettersView(container) {
   async function loadGenerated() {
     const { data, error } = await sb
       .from('events')
-      .select('*, actor:actor_id(full_name)')
+      .select('*')
       .eq('event_type', 'people.letter.generated')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) { toast(error.message, 'error'); return []; }
-    return data || [];
+    const rows = data || [];
+
+    const ids = [...new Set(rows.map(r => r.actor_id).filter(id => id != null))];
+    let actorById = new Map();
+    if (ids.length) {
+      // Do NOT reuse loadUsers() here: it filters status=active, which would
+      // blank out the name of anyone who generated a letter and has since left.
+      const { data: actors } = await sb.from('users').select('id, full_name').in('id', ids);
+      if (actors) actorById = new Map(actors.map(a => [a.id, a]));
+    }
+
+    return rows.map(r => {
+      const actor = actorById.get(r.actor_id);
+      return actor ? { ...r, actor: { full_name: actor.full_name } } : r;
+    });
   }
 
   async function showGenerateModal(tmpl) {

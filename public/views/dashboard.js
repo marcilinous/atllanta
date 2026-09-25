@@ -171,13 +171,14 @@ export default async function dashboard(container) {
   const [attResult, postsResult, eventsResult, membersResult, leavesResult, annResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
     sb.from('posts').select('*').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(30),
-    sb.from('events').select('*, actor:actor_id(full_name, email)').order('created_at', { ascending: false }).limit(15),
+    sb.from('events').select('*').eq('org_id', org.id).order('created_at', { ascending: false }).limit(15),
     sb.from('users').select('user_id:id, full_name, email, role').eq('org_id', org.id),
     sb.from('holidays').select('*').eq('year', today.getFullYear()).order('date', { ascending: true }),
     sb.from('announcements').select('*, author:author_id(full_name)').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(5),
   ]);
 
   const allMembers = membersResult.data || [];
+  const memberById = new Map(allMembers.map(m => [m.user_id, m]));
 
   // Attendance status pill
   const attEl = document.getElementById('att-status');
@@ -374,10 +375,11 @@ export default async function dashboard(container) {
       content = `${action} ${entity}`.trim();
     }
 
+    const actor = memberById.get(ev.actor_id);
     feedItems.push({
       id: ev.id,
       type: 'event',
-      author: ev.actor?.full_name || ev.actor?.email || 'System',
+      author: actor?.full_name || actor?.email || 'System',
       authorId: ev.actor_id,
       content,
       icon,
