@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.2.6 — 2026-09-25
+
+### What changed
+- The dashboard's activity feed shows recent activity again. Its query had been refused by the database on every visit, so only posts and announcements appeared.
+- The People → Letters list of generated letters loads again, with the name of whoever generated each one — including people who have since left.
+
+### Admins need to
+- Nothing.
+
 ## v1.2.5 — 2026-09-25
 
 ### What changed
