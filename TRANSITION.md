@@ -28,18 +28,25 @@
 
 ## Current State
 
-- **Version:** `v0.0.0` — transition not yet started
-- **Active phase:** Phase 0 (Baseline & Scaffold)
+- **Version:** `v0.1.0` — Phase 1 complete (platform schema, policies, Server
+  Action pattern, event bus stub, two-org isolation test)
+- **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-18 — baseline verified against the live database and the
-  production branch, and all six owner decisions settled; see Decisions & Blockers.
-- **Next unchecked item:** merge `claude/phase-0-scaffold` (Phase 0 items 3–5 are
-  built and verified on its preview), then Phase 1 item 1.
+- **Last updated:** 2026-09-25 — all four Phase 2 items done. Item 4's
+  audit led to legacy **v1.2.4** and **v1.2.5** (both live), Drizzle now runs
+  under RLS, and production was merged into this branch (`95563c4`).
+- **Next:** the 2026-09-25 browser test passed for sign-in, the shared
+  session and sign-out (Phase 2 notes). Still unexercised in a browser: the
+  password-reset flow with a real recovery link — needs a throwaway test user
+  (the test account was a real RTcompu user, so no reset was run on it).
+  Tag `v0.2.0` after that, or on the owner's call without it. Items 1 and 3 ship to production
+  together with a Supabase email-template change (Decisions & Blockers,
+  2026-09-24, item 3). Phase 3 starts after `v0.2.0`.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.0** live since
-2026-09-18), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.6** live since
+2026-09-25), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -54,7 +61,7 @@ vanilla-JS/Supabase-direct code no longer runs in production.
 
 | Version | Phase completed | Status |
 |---|---|---|
-| v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ☐ |
+| v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ✅ 2026-09-23 |
 | v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ☐ |
 | v0.3.0 | Phase 3 — Roles, custom roles, module enablement | ☐ |
 | v0.4.0 | Phase 4 — HRMS migrated | ☐ |
@@ -120,16 +127,70 @@ touching production.
 **Goal:** Identity, org, RLS helper, events, audit, notifications, files —
 all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 
-- [ ] `src/db/schema/platform.ts`: `organizations`, `users`, `departments`,
+- [x] `src/db/schema/platform.ts`: `organizations`, `users`, `departments`,
       `teams`, `invitations`, `audit_logs`, `events`, `notifications`, `files`
-- [ ] `auth_org_id()` RLS helper + standard 4-policy set applied to every
-      platform table
-- [ ] Two-org isolation test passing on every platform table (CLAUDE.md §1)
-- [ ] Server Action base pattern (`ActionResponse<T>` type) implemented
-- [ ] Event publisher (`src/lib/events/`) + drain worker stubbed
+- [x] `auth_org_id()` RLS helper + the right policy set per platform table
+      (reworded 2026-09-22, owner decision — see Decisions & Blockers)
+- [x] Two-org isolation test passing on every platform table (CLAUDE.md §1)
+- [x] Server Action base pattern (`ActionResponse<T>` type) implemented
+- [x] Event publisher (`src/lib/events/`) + drain worker stubbed
 
 **Notes:**
-_(none yet)_
+- 2026-09-22 — Item 1 done. `src/db/schema/platform.ts` (hand-written in Phase 0)
+  re-verified read-only against the live database: all 10 tables and every
+  column, type, nullability and default match. Added the 14 live foreign keys as
+  Drizzle `.references()` (9 `org_id → organizations`, plus users→departments/teams,
+  teams→departments, audit_logs/notifications→users) and `trial_started_at`'s
+  `now()` default. Declarations only — nothing pushed or migrated. 115/115 unit
+  tests, typecheck and build clean; still 2 Vercel functions.
+- 2026-09-23 — Item 3 done, on a **local** Supabase (owner decision: nothing
+  paid, never production). `npm run test:isolation` creates two organisations
+  with their own admin and member, then asserts as each signed-in user that the
+  other organisation is invisible on all ten platform tables, that notifications
+  are per-user, that inserts/updates into the other org are refused, that an
+  admin can still rename their own org (v1.2.3) but cannot change `org_id`
+  (v1.2.2), and that `publish_event`/`claim_events` are org-scoped. Everything
+  runs in one transaction that always rolls back.
+  Two supporting pieces: `supabase/local/platform-schema.sql` reproduces the live
+  platform schema, helpers, trigger, RPCs and policies (the live schema predates
+  this repo's migrations, so the three migration files cannot build a database
+  from empty; local migrations and seed are disabled in `supabase/config.toml`),
+  and `supabase/tests/platform_tenant_isolation.test.sql` holds the assertions in
+  the same style as `ai_usage_quotas.test.sql`.
+  Verified not vacuous: weakening `users_select` to `using (true)` makes it fail
+  with "users leaked 1 row(s) of the other organisation" and exit 1.
+  **Phase 1 is complete — v0.1.0.**
+- 2026-09-23 — Items 4 and 5 done, code-only, nothing wired to a route yet.
+  `src/lib/actions.ts`: `ActionResponse<T>` exactly as CLAUDE.md §6 defines it,
+  with `ok`/`fail`, an `action(schema, handler)` wrapper that turns Zod issues
+  into `fieldErrors`, and `ActionError` for messages the user should see —
+  anything else thrown is logged and returned as one generic message, so a
+  connection string or SQL never reaches a browser. Added `zod` (§6 requires it;
+  it was missing). `src/lib/events/publish.ts` publishes through the
+  `publish_event` security-definer RPC (the events table has no INSERT policy,
+  so a direct insert is refused) and `drain.ts` claims/resolves through
+  `claim_events`/`resolve_event`; the subscriber registry is deliberately empty
+  and nothing calls the drain — the legacy cron still drains production, and two
+  drains would double-handle the same rows. The Supabase client is injected:
+  Phase 2 owns the per-request one. `allowImportingTsExtensions` added to
+  tsconfig so the .mjs tests can import the .ts sources directly (Node 24 strips
+  types), which is why these have real behaviour tests, not static checks.
+  133/133 unit tests, typecheck, build and lint clean; still 2 Vercel functions.
+- 2026-09-23 — Item 3 remains the only open item in this phase: it needs Docker
+  Desktop running for the local Supabase, which the owner starts.
+- 2026-09-23 — Item 2 prepared as legacy **v1.2.3** (#111), since it changes the
+  live app: `organizations` had **no UPDATE policy at all** (an admin renaming the
+  org or changing its logo was silently denied — verified, 0 rows matched), and
+  `invitations` had one catch-all policy any member could write through, including
+  an `admin`-role invitation. `users_update`'s WITH CHECK now also ties the row to
+  the caller's org. Verified in a rolled-back transaction against production.
+  Applied to production 2026-09-22 (SQL editor, no version row recorded — the
+  file carries the applied time `20260922185720`), shipped and tagged `v1.2.3`,
+  live site verified. **Item 2 done.**
+- 2026-09-22 — Owner decisions taken (Decisions & Blockers, 2026-09-22): item 2
+  reworded to "the right policy set per table"; the two cross-tenant findings go
+  out as legacy v1.2.2 (#110); item 3 runs on a local Supabase (free). Items 4 and 5
+  are code-only and don't depend on any of this.
 
 ---
 
@@ -138,15 +199,179 @@ _(none yet)_
 **Goal:** Login, session, and the mutation path are fully on Server Actions
 — no direct Supabase client mutation from the browser anywhere in new code.
 
-- [ ] Supabase SSR cookie auth wired in `(auth)/`
-- [ ] Zod schemas + Drizzle transactions for all Phase 1 mutations
-- [ ] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
+- [x] Supabase SSR cookie auth wired in `(auth)/`
+- [x] Zod schemas + Drizzle transactions for all Phase 1 mutations
+- [x] Password-reset flow (`resetPasswordForEmail` + `PASSWORD_RECOVERY`
       handler) — carried over from old CLAUDE.md §8.1 as an open item
-- [ ] Confirm `service_role` key is not reachable from any client bundle or
+- [x] Confirm `service_role` key is not reachable from any client bundle or
       public route
 
 **Notes:**
-_(none yet)_
+- 2026-09-23 — Item 1 done, option A. `public/js/supabase.js` swaps supabase-js
+  for `@supabase/ssr`'s `createBrowserClient`, so the legacy app writes the
+  session to the cookie the new stack reads; `src/lib/supabase/server.ts` is the
+  per-request client (anon key + the caller's token, never the service key);
+  `proxy.ts` refreshes the token on every request. The five legacy pages also
+  mirror `atllanta-theme` into a cookie and `app/layout.tsx` reads it, which
+  closes the Phase 0 note about a Next page not seeing the legacy theme.
+  `app/(auth)/session/` is a wiring check, not a finished screen — the real
+  login/register/reset screens belong to the later `(auth)` work.
+- 2026-09-23 — `@supabase/ssr` is pinned **exactly** at 0.12.7 in package.json
+  to match the CDN pin in `public/js/supabase.js`: both stacks must write the
+  cookie the same way, so these two versions move together or not at all.
+- 2026-09-23 — Gotcha: the file is `proxy.ts`, not `middleware.ts`. Next 16.3.5
+  deprecates the `middleware` convention and warns at build time; the export is
+  `export default async function proxy(request)`.
+- 2026-09-23 — Consequence to watch: the root layout reads a cookie, so every
+  route is now server-rendered on demand (`ƒ`). `/` and `/_not-found` were
+  static before. If a static page is wanted later, move the cookie read into a
+  nested layout rather than the root.
+- 2026-09-23 — `npm run typecheck` was `tsc --noEmit`, which fails on a fresh
+  checkout with `TS2304: Cannot find name 'LayoutProps'` — tsconfig includes
+  `.next/types`, which only a build generates. Now `next typegen && tsc
+  --noEmit`, verified by deleting `.next/types` and running it cold.
+- 2026-09-23 — Item 2 done as the mutation *path*, since Phase 1 left no
+  mutations to wrap (see Decisions & Blockers). `src/db/transaction.ts` gives
+  `withTransaction`, `src/lib/platform/schemas.ts` the Zod input schemas, and
+  `src/lib/platform/actions.ts` two reference mutations —
+  `renameOrganization` and `createDepartment` — that run
+  validate -> transact (row + audit row) -> commit -> publish.
+- 2026-09-23 — The mutations treat RLS as the authorisation boundary: an
+  `orgId` from the client is never checked in TypeScript, the write is simply
+  attempted and an empty `.returning()` is reported as "not found or no
+  access", which deliberately does not say which.
+- 2026-09-23 — `EventClient.rpc` now returns `PromiseLike`, not `Promise`.
+  supabase-js returns a `PostgrestFilterBuilder`, which is thenable but has no
+  `catch`/`finally`, so the old signature rejected the real client. The module
+  only awaits the result, so nothing else changes.
+- 2026-09-23 — **Known gap:** an event lost between commit and publish is not
+  recovered by anything today. The drain worker claims from the events table,
+  so an event that was never published is invisible to it; only the audit row
+  records that the change happened. Worth a reconciler before a module depends
+  on event delivery.
+- 2026-09-24 — Item 3: the flow §8.1 asked for already existed in the legacy
+  app (`login.html` + `js/auth.js` + `reset-password.html`), but item 1 broke
+  it on this branch. `createBrowserClient` hard-sets `flowType: "pkce"` after
+  spreading the caller's options, so it cannot be turned back to implicit. A
+  PKCE reset link arrives as `?code=`, not `#type=recovery`, so `login.html`'s
+  hash check never matched; `PASSWORD_RECOVERY` fires in a `setTimeout(0)`
+  that races `getSession()`'s redirect to `/`; and the code verifier lives only
+  in the requesting browser, so a link opened on another device failed.
+  Production was never affected — it still runs the plain implicit client.
+- 2026-09-24 — Item 3 done as server-side verification (owner's call, see
+  Decisions & Blockers). `/auth/confirm` renders a button; the Server Action
+  `verifyRecovery` (`src/lib/auth/`) calls `verifyOtp({ type: "recovery",
+  token_hash })`, which writes the recovery session into the shared cookie, and
+  the browser moves to the legacy `/reset-password` page to set the password.
+  The GET is deliberately side-effect free: mail scanners (Outlook Safe Links)
+  prefetch links and would burn a one-time token verified on load.
+- 2026-09-24 — Gotcha: `action()` catches every throw, including the
+  `NEXT_REDIRECT` that `redirect()` uses, so an action wrapped in it must
+  return where to go and let the client navigate.
+- 2026-09-24 — **Item 1 miss, fixed:** `public/login.html` still built its own
+  supabase-js client, so a sign-in wrote localStorage while every other page
+  read the cookie — `/login` and `/` would have bounced a signed-in user back
+  and forth, and Google sign-in's PKCE verifier went to the wrong store. It now
+  imports `/js/supabase.js`. `tests/shared-session.test.mjs` fails if any file
+  in `public/` other than that one creates a Supabase client (checked: it names
+  `login.html` with the fix reverted). Sign-in was never exercised end to end
+  in a browser after item 1; do that before `v0.2.0`.
+- 2026-09-24 — Now dead code, remove once items 1 and 3 have shipped:
+  `login.html`'s recovery view and `#type=recovery` check, and the
+  `PASSWORD_RECOVERY` redirect in `js/auth.js` — with the new email template
+  no reset link reaches the browser client any more.
+- 2026-09-24 — 147/147 unit tests, typecheck, build and lint (0 errors) clean.
+- 2026-09-24 — Item 4, client half: **passes.** 0 hits for the key (by name,
+  by the JWT role claim in all three base64 alignments, and `sb_secret_`)
+  across 133 browser-fetchable files — `.next/static`, `public/`, prerendered
+  output. `public/js/config.js` is committed and holds only the URL and anon
+  key; nothing writes env into `public/`. `next.config.mjs` inlines nothing,
+  no `NEXT_PUBLIC_*` var on Vercel carries a secret, and no response echoes
+  the key. The exact-value comparison did not run: there is no local env file.
+- 2026-09-24 — Item 4, route half: **fails**, so the item stays open. Of the
+  legacy endpoints running as the service role, `/api/reports` and
+  `/api/send-notification` acted across organisations and
+  `/api/google-auth`'s OAuth callback could be driven cross-account. All three
+  are fixed in legacy **v1.2.4** (PR #112): the first two removed (nothing
+  called them), the third bound to the browser that started it. The
+  `create-org` invite finding was already fixed in production by v1.2.2 —
+  the audit read this branch, which does not have that fix (below).
+- 2026-09-24 — **Correction to the item 2 notes above.** They say the
+  mutations "treat RLS as the authorisation boundary". They do not: Drizzle
+  connects with `DATABASE_URL`, the pooler logs in as `postgres`, and
+  `postgres` has `rolbypassrls` and owns every table checked, none with
+  `FORCE ROW LEVEL SECURITY` (verified with read-only queries). So RLS never
+  applies to `renameOrganization`/`createDepartment`, and their code comments
+  are wrong too. Not reachable today — nothing calls either action — but
+  blocking for any screen built on them.
+- 2026-09-24 — Gotcha: the legacy `docs/context/people.md` said of
+  `/api/reports` "keep the org filter". It never had one. Treat a doc's
+  description of a security property as a claim to check, not a fact.
+- 2026-09-24 — Gotcha: Vercel keeps runtime logs ~1h on this plan and the
+  30-day request query needs Observability Plus (402), so "is anything
+  calling this endpoint?" cannot be answered from logs. Whether the removed
+  endpoints were ever misused is unknown.
+- 2026-09-24 — **Drizzle now runs under RLS** (blocker 2 below). The first
+  statements of every `withTransaction` are a transaction-local
+  `request.jwt.claims = {sub, role: "authenticated"}` and `set local role
+  authenticated` (`src/db/as-caller.ts`); the caller is the server-verified
+  session user and its id reaches Postgres only as a bound parameter.
+  `withTransaction(caller, fn)` hands `fn` an `audit()` helper, the only way
+  to write `audit_logs`: it steps out of the role for that one insert and
+  stamps `userId` from the caller. Nothing is session-level — the pooler
+  reuses connections. The same pattern already existed in
+  `20260905134934_analytics_alerts.sql`.
+- 2026-09-24 — Proven with a read-only, rolled-back probe on production:
+  as `postgres` 5 organisations visible; after the switch, `current_user` is
+  `authenticated`, `auth.uid()` is set and 1 is visible; `set local role
+  none` restores 5. `departments` has no rows yet, so department scoping was
+  not exercised — only organisations. 154/154 unit tests, typecheck, build,
+  lint (0 errors) clean.
+- 2026-09-25 — **Item 4 done.** v1.2.4 (PR #112) and v1.2.5 (PR #113) are
+  merged and live: `atllanta.vercel.app/version.json` reports 1.2.5 and both
+  removed endpoints answer 404. Production was merged into this branch as
+  `95563c4` — the tree matched a dry run verified beforehand (no conflicts,
+  194/194 unit tests, typecheck, build, lint clean), so this branch now
+  carries v1.2.2–v1.2.5 and shipping it no longer undoes them.
+- 2026-09-25 — Gotcha: merging to the production branch does **not** deploy
+  to production here. Both merge deployments built `READY` with `target:
+  null` and production stayed on v1.2.3 until the owner promoted the v1.2.5
+  deployment by hand (v1.2.3 itself had been promoted, source `redeploy`).
+  After a release merge, check `/version.json` before calling it live.
+- 2026-09-25 — **Browser test** (production build via `next start` on
+  localhost against the shared Supabase project, owner signing in by hand):
+  sign-in lands on `/` and survives a reload — no `/login` bounce; the session
+  is the `sb-<ref>-auth-token` cookie with localStorage empty; the Next page
+  `/session` shows the same user; sign-out returns to `/login`, clears the
+  cookie, and `/` then redirects to `/login`. Signed out: `/auth/confirm`
+  refuses a missing token, shows only a button for a fake one (GET does
+  nothing) and refuses it after Continue; `/reset-password` explains an
+  expired link; `/login` loads only `/js/supabase.js` → `@supabase/ssr`.
+- 2026-09-25 — One unreproduced read: straight after sign-out, `/session`
+  once still showed the user in the browser. Re-fetched it showed signed
+  out; the browser held no cookies; curl with no cookie always gets "Signed
+  out" and the page is `Cache-Control: no-store`. Most likely the browser
+  restoring its earlier copy — the server never served identity without a
+  cookie. Watch for it in the ship-time check.
+- 2026-09-25 — Legacy bug found, not caused by Phase 2 and live in
+  production: `public/views/dashboard.js:174` selects
+  `events` with `actor:actor_id(full_name, email)` and PostgREST answers 400
+  on every dashboard load, so the recent-activity feed never shows. Fix in a
+  legacy release. **Fixed in v1.2.6 (PR #114, live 2026-09-25):** the live
+  schema confirmed `events` has one FK (`org_id`), none on `actor_id`, so
+  the dashboard now names actors from the members it already loads and
+  People → Letters (same bug) looks them up by id. No database change;
+  adding the FK remains an option. This branch takes v1.2.6 with the next
+  production merge.
+- 2026-09-25 — Gotchas: `next dev` started in the background on this Windows
+  box fails every app page with 500 (Turbopack's PostCSS worker exits
+  `0xc0000142`); `next build && next start` works. And `next dev` appends a
+  `nextjs-agent-rules` block to `CLAUDE.md` on every start — reverted, not
+  committed; owner's call whether to keep it.
+- 2026-09-24 — Known wart: if the audit insert itself fails, Postgres aborts
+  the transaction and the role restore in `asOwner`'s `finally` fails too, so
+  the *logged* error is "transaction aborted" rather than the insert error.
+  The outcome is still a rollback and a generic message.
 
 ---
 
@@ -343,6 +568,189 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-24 — Phase 2 item 4: what blocks `v0.2.0` (owner's call)
+
+The `service_role` audit (Phase 2 notes, 2026-09-24) passed on the client and
+failed on the routes. The owner chose to hotfix production first: **legacy
+v1.2.4, PR #112**, open against `claude/gstack-skill-install-chnb41`. After it
+merges: tag `v1.2.4`, and if Google Calendar connect is in use set
+`GOOGLE_OAUTH_REDIRECT_URI` to `https://atllanta.vercel.app/api/google-auth?action=callback`
+in Vercel and on the Google OAuth client (unset today; the fallback is the
+per-deployment `VERCEL_URL`).
+
+Three blockers remain before this phase can ship:
+
+1. **This branch is missing production's security fixes.** v1.2.2 and v1.2.3
+   (6 commits) were made on release branches off production and never came
+   back here; v1.2.4 will be a seventh. Shipping this branch as-is would undo
+   them. Production has to be merged into `claude/phase-2-auth` — owner's
+   call, since it is a merge. **Done 2026-09-25 by the owner** (`95563c4`).
+2. **Drizzle must run under RLS.** Each `withTransaction` needs to act as the
+   caller — `set local role authenticated` plus the caller's claims in
+   `request.jwt.claims`, inside the transaction — or the actions must check
+   membership themselves. Recommendation: the first, so RLS stays the single
+   boundary the Phase 1 policies were written for. Needs a design pass.
+   **Done 2026-09-24, the first way** — see Phase 2 notes.
+3. **Two audit findings not yet fixed**: the event-processor recipes trust
+   ids inside an event's payload rather than checking they belong to the
+   event's org, and three legacy handlers (`bulk-import`, `create-org`,
+   `google-auth`) skip the `status = 'exited'` check that `resolveCaller` does. Neither is exploitable without a valid session
+   in some org; both belong in a follow-up legacy release.
+   **Done in v1.2.5, live 2026-09-25.** Correction: the event-processor
+   finding was understated above. `publish_event` lets any member publish
+   any event, and the processor runs as the service role, so a member could
+   write to another org's attendance and leave balances, or apply a leave
+   approval no manager made. Recipes now reload every row scoped to the
+   event's org and act only on what it says; leave usage dedupes per request.
+
+Item 4 is ticked when blockers 1 and 2 are done and PR #112 is merged; item 3
+of this list can follow in its own release. **All three resolved; item 4
+ticked 2026-09-25.** Open follow-ups: in-org `leave_balances` policies (the
+browser processor runs under a member's own RLS), and department RLS
+scoping, unexercised because `departments` has no rows yet.
+
+### 2026-09-24 — Phase 2 item 3: reset link verified on the server (owner's call)
+
+Item 1's cookie client forces PKCE, which broke the client-side reset link (see
+Phase 2 notes). Two fixes were offered: patch `login.html` to wait for the
+`?code=` exchange — no dashboard change, but a link still only works in the
+browser that asked for it — or verify the token on the server. **The owner chose
+server-side verification**, Supabase's documented SSR pattern: it works on any
+device and has no race.
+
+**Ship-together step (owner, Supabase dashboard):** when items 1 and 3 go to
+production, and not before, set Authentication → Emails → *Reset Password* to
+link to
+
+```
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
+```
+
+and confirm Site URL is `https://atllanta.vercel.app`. Changing it earlier breaks
+reset in production, whose client still expects the old link; shipping the code
+without it leaves reset broken, because the default template sends a PKCE link.
+
+### 2026-09-23 — Phase 2 item 2: what "all Phase 1 mutations" means
+
+Item 2 reads "Zod schemas + Drizzle transactions for all Phase 1 mutations",
+but Phase 1 produced **no mutations** — it delivered the Server Action *pattern*
+(`src/lib/actions.ts`) and the event publisher, and nothing in `src/` or `app/`
+writes to the database. The item had an empty set to operate on.
+
+**Owner decision: build the mutation path.** The helper, the schemas, and
+reference mutations that prove validate -> transact -> audit -> commit ->
+publish end to end. Module 0's full write surface (create/rename org, invite,
+accept, departments, teams) waits for the screens that consume it, rather than
+guessing shapes now.
+
+**Owner decision: events publish after the transaction commits.** `publishEvent`
+goes through the `publish_event` security-definer RPC — the events table has no
+INSERT policy, and the RPC stamps `auth.uid()` — so it runs on a different
+connection from Drizzle and a transaction cannot roll back an event it already
+published. The order is validate -> transact (row + audit row) -> commit ->
+publish. If the process dies between commit and publish, an event is **lost, not
+invented**; the drain worker reconciles. The alternative — an INSERT policy so
+Drizzle writes events inside the transaction — was rejected because it gives up
+the RPC's actor stamping, which Phase 1's RLS design depends on.
+
+### 2026-09-23 — Resolved: one session, in cookies (option A)
+
+Both Phase 2 blockers are the same problem: the legacy app keeps per-user state
+in **localStorage**, which a server-rendered page cannot read.
+
+- **Session:** `public/js/supabase.js` uses the default supabase-js client, so
+  the session lives in localStorage under `sb-*`. `@supabase/ssr` (Phase 2 item
+  1) reads it from **cookies**. As things stand, signing in on a legacy screen
+  leaves a Next.js route signed out, and the reverse.
+- **Theme:** `atllanta-theme` in localStorage, applied by an inline script in
+  `index.html`, `login.html`, `privacy.html` and friends. A Next page can only
+  read it after hydration, so it would paint the wrong theme first.
+
+Three ways out, owner's call before Phase 2 item 1 starts:
+
+- **A. One session in cookies (recommended).** Give the legacy supabase-js
+  client a custom storage adapter that writes the cookie `@supabase/ssr` reads,
+  and mirror the theme into a `theme` cookie. Both stacks then share one sign-in
+  and one theme, and a Next page renders correctly on the first paint. Cost: a
+  small, deliberate change to frozen legacy files (`public/js/supabase.js`, the
+  inline theme scripts), and everyone is signed out once at the cutover.
+- **B. Bridge only.** Leave localStorage as the source of truth; have the legacy
+  app copy the session and theme into cookies after sign-in and on refresh. Less
+  invasive, but two copies of the truth that can drift, and a Next page still
+  sees nothing until the legacy app has run at least once.
+- **C. Separate sign-ins per stack.** No legacy change; users sign in twice
+  during the transition. Cheapest to build, worst to live with.
+
+Until this is answered, Phase 2 item 1 is blocked — everything after it inherits
+whichever shape is chosen.
+
+**Owner decision 2026-09-23: A — one session in cookies.** Both stacks share one
+sign-in and one theme, and a Next page renders correctly on first paint.
+Accepted costs: a deliberate change to frozen legacy files
+(`public/js/supabase.js` and the inline theme scripts in five pages), and
+everyone is signed out once when it ships, because the session moves from
+localStorage to a cookie. That sign-out is why the cutover goes out **as a
+legacy release** (`vX.Y.Z`) rather than silently — users notice being logged
+out.
+
+### 2026-09-22 — Owner decisions on Phase 1 items 2–3
+
+1. **Item 2 reworded** to "the right policy set per table" — the audit table in
+   the entry below is the target, not four policies everywhere.
+2. **`org_id` is assigned by Atllanta.** No user can change it — owners and admins
+   included — and the UI never shows it. **An invite must not touch an account
+   that belongs to another organisation.** Both findings below ship as legacy
+   release **v1.2.2** (PR #110): the users trigger rejects any `org_id` change by a
+   signed-in caller, the invite refuses accounts already in an org (generic
+   message), and the audit log strips `org_id` from its Details column. The
+   trigger migration must be applied to production by the owner (the agent's
+   permission check blocks production DDL); it was verified in a rolled-back
+   transaction first.
+3. **Nothing paid at this stage.** Item 3's isolation test runs on a **local
+   Supabase** (Supabase CLI + Docker Desktop, both free), never on production and
+   not on a paid branch.
+
+### 2026-09-22 — Phase 1 items 2–3 vs the live database (owner's call)
+
+Checked read-only before touching RLS. `auth_org_id()` already exists exactly as
+CLAUDE.md §1 describes (security definer, `search_path` locked), and all 10
+platform tables have RLS on. But the item's "standard 4-policy set on every
+platform table" does not match what is live, and mostly for good reasons:
+
+| Table | Live policies | Read |
+|---|---|---|
+| `departments`, `teams`, `feature_access` | full 4, admin-gated writes | matches |
+| `audit_logs`, `events` | SELECT only | deliberate — append-only trail / publisher-written; adding UPDATE/DELETE would let users rewrite the audit trail |
+| `organizations` | SELECT own org | deliberate — orgs are created server-side |
+| `notifications` | SELECT/UPDATE own, INSERT in org, no DELETE | plausible |
+| `files` | no UPDATE; DELETE own uploads | plausible |
+| `invitations` | one ALL policy for any org member | nothing reads `invitations.role` today (invites write `users` directly), so low risk, but writes should be admin-only |
+| `users` | no DELETE; see finding 1 | **fix needed** |
+
+**Proposal:** reword item 2 to "the right policy set per table" (the table above is
+the audit) instead of four policies everywhere.
+
+**Two live cross-tenant findings** (legacy app, allowed under freeze decision 2 as
+security fixes; not fixed — they change production RLS/code and need approval):
+
+1. **Org admin can move themselves into another org.** `users_update` allows
+   `id = auth.uid() OR is_org_admin()` and its WITH CHECK never constrains
+   `org_id`; `users_guard_admin_fields` resets `org_id`/`role` for members but
+   returns early for admins. So any tenant's owner/admin can set their own
+   `org_id` to another tenant's id and keep their role there. Fix: WITH CHECK
+   `org_id = auth_org_id()` (or the trigger freezes `org_id` for everyone but
+   service_role).
+2. **Invite pulls a user out of another org.** `server/legacy/create-org.js`
+   `handleInvite` checks membership only in the inviter's org, then upserts
+   `users` by id with the service key — overwriting `org_id` of an account that
+   belongs to a different org (including that org's owner). Fix: refuse when the
+   auth user already has a `users` row in another org.
+
+**Item 3 (two-org isolation test)** needs a place to run: against production it
+would create auth users and rows in the live database. Options: a Supabase branch
+(paid), a local Supabase via the CLI, or tightly scoped fixture orgs in production
+cleaned up after. Owner's call.
 
 ### 2026-09-18 — Verified baseline (read before planning any phase)
 

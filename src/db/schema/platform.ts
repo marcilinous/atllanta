@@ -17,6 +17,11 @@
 // AI-quota/webhook tables are out of scope for this file and are not
 // modelled here.
 //
+// Re-verified 2026-09-22 (Phase 1 item 1): every column, type, nullability
+// and default matches the live database, and the 14 foreign keys declared
+// with `.references()` are exactly the live FK constraints. They describe the
+// existing schema only — nothing here is pushed or migrated.
+//
 // Once DATABASE_URL exists, run `npm run db:introspect` to regenerate this
 // file from the live schema and diff the result against what's below before
 // replacing anything.
@@ -49,7 +54,8 @@ export const organizations = pgTable("organizations", {
   creditOverageMode: text("credit_overage_mode").default("soft_bill"),
   creditsIncludedMonthly: integer("credits_included_monthly").default(200),
   commissionPercent: numeric("commission_percent").default("0"),
-  trialStartedAt: timestamp("trial_started_at", { withTimezone: true }),
+  trialStartedAt: timestamp("trial_started_at", { withTimezone: true }).defaultNow(),
+  // Live default is `now() + interval '14 days'`, left to Postgres (see expiresAt).
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   trialCandidateCap: integer("trial_candidate_cap").default(25),
   maxTrialExtensionDays: integer("max_trial_extension_days").default(30),
@@ -60,15 +66,15 @@ export const organizations = pgTable("organizations", {
 export const users = pgTable("users", {
   // References auth.users; no default here (Supabase auth assigns the id).
   id: uuid("id").primaryKey(),
-  orgId: uuid("org_id"),
+  orgId: uuid("org_id").references(() => organizations.id),
   fullName: text("full_name"),
   email: text("email"),
   phone: text("phone"),
   avatarUrl: text("avatar_url"),
   role: text("role").default("member"),
   designation: text("designation"),
-  departmentId: uuid("department_id"),
-  teamId: uuid("team_id"),
+  departmentId: uuid("department_id").references(() => departments.id),
+  teamId: uuid("team_id").references(() => teams.id),
   reportingManagerId: uuid("reporting_manager_id"),
   status: text("status").default("active"),
   dateOfJoining: date("date_of_joining"),
@@ -78,7 +84,9 @@ export const users = pgTable("users", {
 
 export const departments = pgTable("departments", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
   name: text("name").notNull(),
   headId: uuid("head_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -86,8 +94,12 @@ export const departments = pgTable("departments", {
 
 export const teams = pgTable("teams", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
-  departmentId: uuid("department_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
+  departmentId: uuid("department_id")
+    .notNull()
+    .references(() => departments.id),
   name: text("name").notNull(),
   leadId: uuid("lead_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -95,7 +107,9 @@ export const teams = pgTable("teams", {
 
 export const invitations = pgTable("invitations", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
   email: text("email").notNull(),
   role: text("role").notNull().default("member"),
   invitedBy: uuid("invited_by"),
@@ -110,8 +124,10 @@ export const invitations = pgTable("invitations", {
 
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
-  userId: uuid("user_id"),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
+  userId: uuid("user_id").references(() => users.id),
   module: text("module").notNull(),
   entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
@@ -123,7 +139,9 @@ export const auditLogs = pgTable("audit_logs", {
 
 export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
   eventType: text("event_type").notNull(),
   actorId: uuid("actor_id"),
   payload: jsonb("payload").notNull().default({}),
@@ -138,8 +156,12 @@ export const events = pgTable("events", {
 
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
   title: text("title").notNull(),
   body: text("body"),
   module: text("module").notNull(),
@@ -154,7 +176,9 @@ export const notifications = pgTable("notifications", {
 
 export const files = pgTable("files", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
   uploadedBy: uuid("uploaded_by").notNull(),
   fileName: text("file_name").notNull(),
   filePath: text("file_path").notNull(),
@@ -167,7 +191,9 @@ export const files = pgTable("files", {
 
 export const featureAccess = pgTable("feature_access", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
   subjectType: text("subject_type").notNull(), // 'role' | 'user'
   subjectKey: text("subject_key").notNull(),
   featureKey: text("feature_key").notNull(),
