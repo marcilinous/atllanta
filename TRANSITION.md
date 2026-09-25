@@ -45,7 +45,7 @@
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.5** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.6** live since
 2026-09-25), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
@@ -357,7 +357,12 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   production: `public/views/dashboard.js:174` selects
   `events` with `actor:actor_id(full_name, email)` and PostgREST answers 400
   on every dashboard load, so the recent-activity feed never shows. Fix in a
-  legacy release.
+  legacy release. **Fixed in v1.2.6 (PR #114, live 2026-09-25):** the live
+  schema confirmed `events` has one FK (`org_id`), none on `actor_id`, so
+  the dashboard now names actors from the members it already loads and
+  People → Letters (same bug) looks them up by id. No database change;
+  adding the FK remains an option. This branch takes v1.2.6 with the next
+  production merge.
 - 2026-09-25 — Gotchas: `next dev` started in the background on this Windows
   box fails every app page with 500 (Turbopack's PostCSS worker exits
   `0xc0000142`); `next build && next start` works. And `next dev` appends a
