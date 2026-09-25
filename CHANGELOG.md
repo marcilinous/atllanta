@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.3.0 — 2026-09-25
+
+### What changed
+- Everyone is signed out once when this release goes live, and signs back in as usual. Your session now lives in a cookie shared by the whole app, so the new screens being built alongside the current ones see the same signed-in account.
+- Password reset links now work from any device: the link opens a page with a Continue button that confirms the reset on the server, then you choose a new password. A link can no longer be used up by an email scanner opening it first.
+- Your light/dark theme choice now also applies to the new screens from the first moment they load.
+
+### Admins need to
+- Nothing in the app. Before going live, the Atllanta team switches the password-reset email to the new link format — see the release checklist.
+
 ## v1.2.6 — 2026-09-25
 
 ### What changed
