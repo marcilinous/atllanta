@@ -9,13 +9,13 @@
 // constraint (see task-3-report.md for the exact queries and full output).
 // Nothing here was guessed.
 //
-// Scope: only the 10 platform tables this phase's brief calls for
-// (organizations, users, departments, teams, invitations, audit_logs,
-// events, notifications, files, feature_access). Every column that exists
-// on each of those tables today is modelled — later CLAUDE.md additions
-// such as org_modules, roles, role_permissions, custom_role_id, and the
-// AI-quota/webhook tables are out of scope for this file and are not
-// modelled here.
+// Scope: the 10 platform tables from Phase 0's brief (organizations, users,
+// departments, teams, invitations, audit_logs, events, notifications, files,
+// feature_access), plus the Phase 3 Step 1 roles/org_modules tables added
+// below (roles, role_permissions, org_modules, users.custom_role_id) —
+// mirrored from supabase/migrations/20260926063815_roles_and_org_modules.sql, not
+// yet applied to the live database. The AI-quota/webhook tables remain out
+// of scope for this file and are not modelled here.
 //
 // Re-verified 2026-09-22 (Phase 1 item 1): every column, type, nullability
 // and default matches the live database, and the 14 foreign keys declared
@@ -26,6 +26,7 @@
 // file from the live schema and diff the result against what's below before
 // replacing anything.
 import {
+  type AnyPgColumn,
   pgTable,
   uuid,
   text,
@@ -63,6 +64,54 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// Phase 3 Step 1 (supabase/migrations/20260926063815_roles_and_org_modules.sql, not
+// yet applied): per-org custom roles. Five system rows (owner/admin/
+// developer/manager/member) are seeded per org and are immutable; custom
+// (is_system = false) roles are what role_permissions and
+// users.custom_role_id point at.
+export const roles = pgTable("roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  isSystem: boolean("is_system").notNull().default(false),
+  description: text("description"),
+  createdBy: uuid("created_by").references((): AnyPgColumn => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Phase 3 Step 1: per-role module/permission grants for custom (non-system)
+// roles only — system roles get their defaults in code (permissions.ts).
+export const rolePermissions = pgTable("role_permissions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
+  roleId: uuid("role_id")
+    .notNull()
+    .references(() => roles.id),
+  moduleKey: text("module_key").notNull(),
+  permission: text("permission").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Phase 3 Step 1: one row per org per module key (see MODULE_KEYS in
+// src/lib/auth/modules.ts), seeded off for every org. Rows are seeded by
+// seed_org_platform_rows() and never created or removed by users — there is
+// no insert/delete policy, only select and update (is_enabled).
+export const orgModules = pgTable("org_modules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id),
+  moduleKey: text("module_key").notNull(),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  enabledBy: uuid("enabled_by").references(() => users.id),
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+});
+
 export const users = pgTable("users", {
   // References auth.users; no default here (Supabase auth assigns the id).
   id: uuid("id").primaryKey(),
@@ -72,6 +121,11 @@ export const users = pgTable("users", {
   phone: text("phone"),
   avatarUrl: text("avatar_url"),
   role: text("role").default("member"),
+  // Phase 3 Step 1: optional pointer to a custom (non-system) role in the
+  // same org. A user always keeps a base `role` too (see
+  // users_guard_admin_fields()) — the legacy app and RLS only understand
+  // `role` until each module's cutover.
+  customRoleId: uuid("custom_role_id").references((): AnyPgColumn => roles.id),
   designation: text("designation"),
   departmentId: uuid("department_id").references(() => departments.id),
   teamId: uuid("team_id").references(() => teams.id),
