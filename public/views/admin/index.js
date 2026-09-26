@@ -16,6 +16,10 @@ export default async function adminView(container) {
   }
 
   const sections = [
+    // New-stack screens (app/(platform)/settings/): a path, not a hash route,
+    // so the link is a full page load out of the legacy router.
+    { href: '/settings/modules', title: 'Modules & roles', desc: 'Switch modules on, create custom roles, and choose who sees what',
+      icon: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/>' },
     { href: '#/settings/org', title: 'Organization Settings', desc: 'Company name, timezone, currency, and branding',
       icon: '<path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>' },
     { href: '#/settings/users', title: 'User Management', desc: 'Invite members, manage roles and permissions',

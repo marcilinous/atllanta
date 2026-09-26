@@ -8,14 +8,14 @@ was promoted to production.
 ## v1.4.0 — 2026-09-26
 
 ### What changed
-- New for owners and admins: **Settings → Modules & roles** opens three new screens.
+- New for owners and admins: the **Modules & roles** card in the Admin panel (the shield icon in the sidebar) opens three new screens.
   - **Modules** — switch on the modules your organisation uses (People, CRM, Recruitment, Analytics and so on). They all start switched off, and switching them doesn't hide anything yet. A later release will make the switches take effect, and we'll tell you before it does.
   - **Roles** — create custom roles that change what someone may do (view, create, edit, delete, approve) in specific modules. The built-in roles are listed for reference and can't be changed. Assigning a custom role to people comes in a later release.
   - **Feature access** — hide sections of the app from a role or from one person. This is the "Access" screen that went missing, back with the same rules your organisation already had.
 - Pages on the new screens are never served from the app's offline cache, so what you see after a change is always current.
 
 ### Admins need to
-- Open **Settings → Modules & roles → Modules** and switch on every module your organisation uses, before the release that enforces them.
+- Open **Admin → Modules & roles** and switch on every module your organisation uses, before the release that enforces them.
 
 ## v1.3.4 — 2026-09-26
 

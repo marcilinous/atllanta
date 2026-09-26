@@ -190,6 +190,13 @@ describe('static: the gate', () => {
     }
   });
 
+  test('the legacy Admin Panel links to the new screens (the sidebar Settings button is the profile page)', () => {
+    const hub = read('public/views/admin/index.js');
+    assert.match(hub, /href: '\/settings\/modules', title: 'Modules & roles'/);
+    // A path, not a hash route: the new screens live outside the legacy router.
+    assert.doesNotMatch(hub, /#\/settings\/modules/);
+  });
+
   test('the guard refuses exited users and non-admins', () => {
     const guard = read('src/lib/auth/admin.ts');
     assert.match(guard, /import "server-only";/);

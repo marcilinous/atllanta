@@ -493,6 +493,14 @@ to end (CLAUDE.md §3.5).
   `public/sw.js` now leaves `/settings`, `/session`, `/auth`, `/health` and
   any `RSC` request to the network (tests in `service-worker.test.mjs`).
   Every future App Router route needs adding to `NETWORK_ONLY_PREFIXES`.
+- 2026-09-26 — Owner's preview check: "modules not available". The logs
+  showed no request ever reached `/settings/modules`: the entry point was
+  a tab on `#/settings/org`, but the sidebar **Settings** button opens the
+  *profile* page (`#/settings`), and the org page is only reachable from
+  the Admin panel. Fixed by a first **Modules & roles** card on the Admin
+  panel (`public/views/admin/index.js`, a path link, not a hash route); the
+  org-page tab stays. Gotcha: legacy "Settings" means profile; admin
+  configuration lives under the Admin (shield) button.
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits
