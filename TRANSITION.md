@@ -38,9 +38,11 @@
   `/health` no longer shows counts. Tracker now lives on
   `claude/phase-3-roles` (branched from production); `claude/phase-2-auth` is
   fully contained in production and done.
-- **Next:** exercise a real password reset end to end on production — the
-  one Phase 2 flow not yet run in a browser — then tag `v0.2.0`. Phase 3
-  starts after that.
+- **Next:** Phase 3 (Roles, custom roles, module enablement), first
+  unchecked item. `v0.2.0` is tagged on `d279bec` (2026-09-26) after the owner
+  ran a real password reset end to end on production — the last unexercised
+  Phase 2 flow — which also rotated the test account's password. (`v0.1.0`
+  was marked done but never tagged; the first `v0.x` tag is `v0.2.0`.)
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -61,7 +63,7 @@ vanilla-JS/Supabase-direct code no longer runs in production.
 | Version | Phase completed | Status |
 |---|---|---|
 | v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ✅ 2026-09-23 |
-| v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ☐ |
+| v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ✅ 2026-09-26 |
 | v0.3.0 | Phase 3 — Roles, custom roles, module enablement | ☐ |
 | v0.4.0 | Phase 4 — HRMS migrated | ☐ |
 | v0.5.0 | Phase 5 — Recruitment migrated | ☐ |
