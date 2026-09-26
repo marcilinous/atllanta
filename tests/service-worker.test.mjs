@@ -35,9 +35,9 @@ function loadWorker() {
   };
   vm.createContext(sandbox);
   vm.runInContext(SOURCE, sandbox);
-  async function dispatch(url) {
+  async function dispatch(url, headers) {
     let responded = null;
-    handlers.fetch({ request: { url, method: 'GET' }, respondWith: (p) => { responded = p; } });
+    handlers.fetch({ request: { url, method: 'GET', headers }, respondWith: (p) => { responded = p; } });
     return { response: responded ? await responded : null, log };
   }
   return { dispatch, sandbox };
@@ -63,6 +63,38 @@ test('other static files still use the cache', async () => {
   const { dispatch } = loadWorker();
   const { log } = await dispatch('https://atllanta.vercel.app/css/base.css');
   assert.deepEqual(log.cacheMatch, ['https://atllanta.vercel.app/css/base.css']);
+});
+
+// v1.4.0: new-stack (App Router) pages are per-user and must never be served
+// from Cache Storage — neither the page nor the RSC payload router.refresh()
+// fetches. The worker must not call respondWith at all for them.
+for (const url of [
+  'https://atllanta.vercel.app/settings',
+  'https://atllanta.vercel.app/settings/modules',
+  'https://atllanta.vercel.app/settings/roles/7b0e6c1e-0000-4000-8000-000000000000',
+  'https://atllanta.vercel.app/session',
+  'https://atllanta.vercel.app/auth/confirm?token_hash=x&type=recovery',
+  'https://atllanta.vercel.app/health',
+]) {
+  test(`new-stack page bypasses the worker: ${new URL(url).pathname}`, async () => {
+    const { dispatch } = loadWorker();
+    const { response, log } = await dispatch(url);
+    assert.equal(response, null);
+    assert.deepEqual(log.cacheMatch, []);
+  });
+}
+
+test('an RSC request bypasses the worker wherever it points', async () => {
+  const { dispatch } = loadWorker();
+  const { response, log } = await dispatch('https://atllanta.vercel.app/?_rsc=abc', new Headers({ RSC: '1' }));
+  assert.equal(response, null);
+  assert.deepEqual(log.cacheMatch, []);
+});
+
+test('a path that merely starts with a new-stack word is still cached', async () => {
+  const { dispatch } = loadWorker();
+  const { log } = await dispatch('https://atllanta.vercel.app/settings.css');
+  assert.deepEqual(log.cacheMatch, ['https://atllanta.vercel.app/settings.css']);
 });
 
 test('the cache name follows VERSION', () => {

@@ -1,4 +1,6 @@
-const CACHE_NAME = "atllanta-1.3.4";
+const CACHE_NAME = "atllanta-1.4.0";
+// App Router routes (app/): never cached by this worker, see the fetch handler.
+const NETWORK_ONLY_PREFIXES = ["/settings", "/session", "/auth", "/health"];
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -36,6 +38,19 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
 
   if (request.method !== "GET") return;
+
+  // New-stack (Next.js App Router) pages are per-user and server-rendered on
+  // every request, and router.refresh() re-fetches them as RSC payloads. A
+  // cached copy would redraw stale settings after a change, or show the
+  // previous user's page on a shared browser — so the worker stays out of
+  // the way entirely and the browser goes straight to the network.
+  const { pathname } = new URL(request.url);
+  if (
+    NETWORK_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
+    (request.headers && request.headers.get("RSC"))
+  ) {
+    return;
+  }
 
   // The release version must always come from the network; a cached copy
   // would show users the previous version after a release.
