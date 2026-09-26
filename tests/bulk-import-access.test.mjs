@@ -91,4 +91,22 @@ describe('bulk-import access', () => {
     assert.equal(r.body.imported, 1);
     assert.equal(S.inserts.length, 1);
   });
+
+  test('an admin importing a row with role owner fails that row with an explicit error', async () => {
+    const r = res();
+    await handler(importReq([{ full_name: 'A', email: 'a@example.com', role: 'owner' }]), r);
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.body.imported, 0);
+    assert.deepEqual(r.body.errors, [{ row: 1, error: 'Only an owner can import owners' }]);
+    assert.equal(S.inserts.length, 0);
+  });
+
+  test('an owner importing a row with role owner is accepted', async () => {
+    S.callerRole = 'owner';
+    const r = res();
+    await handler(importReq([{ full_name: 'A', email: 'a@example.com', role: 'owner' }]), r);
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.body.imported, 1);
+    assert.equal(S.inserts[0].row.role, 'owner');
+  });
 });

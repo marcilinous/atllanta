@@ -56,6 +56,10 @@ export default async function handler(req, res) {
         errors.push({ row: i + 1, error: "full_name and email required" });
         continue;
       }
+      if (row.role === "owner" && membership.role !== "owner") {
+        errors.push({ row: i + 1, error: "Only an owner can import owners" });
+        continue;
+      }
       const { error } = await sb.from("invitations").insert({
         org_id: orgId,
         full_name: row.full_name,

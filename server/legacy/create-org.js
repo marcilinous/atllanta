@@ -74,6 +74,9 @@ async function handleInvite(req, res, db, user) {
 
   const allowedRoles = ["owner", "admin", "manager", "member"];
   if (!allowedRoles.includes(role)) return res.status(400).json({ error: "Invalid role" });
+  if (role === "owner" && me.role !== "owner") {
+    return res.status(403).json({ error: "Only an owner can invite another owner" });
+  }
 
   const email = rawEmail.trim().toLowerCase();
 
