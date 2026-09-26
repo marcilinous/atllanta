@@ -32,24 +32,24 @@
   Action pattern, event bus stub, two-org isolation test)
 - **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-26 — **Phase 3 Steps 0, 1 and 2 are live** as
-  legacy **v1.3.2–v1.3.4** (production `aaeb9b6`): only owners grant or
-  remove `owner`; the `roles` / `role_permissions` / `org_modules` tables
-  exist with every module **off** and nothing enforcing them; and
+- **Last updated:** 2026-09-26 — **Phase 3 Steps 0, 1, 2 and 4 are live**
+  as legacy **v1.3.2–v1.4.0** (production `705e23c`, PR #121): only owners
+  grant or remove `owner`; the `roles` / `role_permissions` / `org_modules`
+  tables exist with every module **off** and nothing enforcing them;
   `src/lib/auth/permissions.ts` resolves what a user may do (not yet called
-  by any screen). Phase 2 is live as v1.3.0 + v1.3.1 and tagged `v0.2.0`.
-- **Next:** Phase 3 **Step 4 is built** as legacy **v1.4.0** on branch
-  `claude/phase-3-step4-admin` (off production `aaeb9b6`), waiting for the
-  owner to review, merge and promote it — see Phase 3 notes, 2026-09-26.
-  Once it is live and org admins have been told to switch their modules on:
-  **Step 5** (drain the `platform.module.*` / `platform.role.*` events the
-  Step 4 actions already publish), then **Step 3** (enforcement). Plan:
+  by any screen); and owners/admins can switch modules, manage custom roles
+  and edit feature access from **Admin → Modules & roles** (the first real
+  new-stack screens). Phase 2 is live as v1.3.0 + v1.3.1, tagged `v0.2.0`.
+- **Next:** Phase 3 **Step 5** — drain the `platform.module.*` /
+  `platform.role.*` events the Step 4 actions already publish — then
+  **Step 3** (enforcement), which waits until org admins have been told to
+  switch their modules on. Plan:
   `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md` (order
-  0 → 1 → 2 → 4 → 5 → 3).
+  0 → 1 → 2 → 4 → 5 → 3). Start from a branch off the production branch.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.3.4** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.0** live since
 2026-09-26), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
@@ -501,6 +501,14 @@ to end (CLAUDE.md §3.5).
   panel (`public/views/admin/index.js`, a path link, not a hash route); the
   org-page tab stays. Gotcha: legacy "Settings" means profile; admin
   configuration lives under the Admin (shield) button.
+- 2026-09-26 — **Step 4 shipped.** The owner checked the preview signed in
+  ("working fine"), merged PR #121 (`705e23c`) and promoted production
+  deployment `dpl_FXUncPLwNjkNAA93fJfE36XcYm3z`, built from the production
+  branch. Verified live: `/version.json` 1.4.0; `/settings/modules` signed
+  out redirects to `/login`; the Admin panel script carries the Modules &
+  roles link; `sw.js` is on cache `atllanta-1.4.0`. Rollback target: v1.3.4
+  (`aaeb9b6`) — no database change, so a redeploy is the whole rollback.
+  Tag `v1.4.0` on `705e23c` is the owner's to push.
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits
