@@ -32,21 +32,25 @@
   Action pattern, event bus stub, two-org isolation test)
 - **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-25 — all four Phase 2 items done. Item 4's
-  audit led to legacy **v1.2.4** and **v1.2.5** (both live), Drizzle now runs
-  under RLS, and production was merged into this branch (`95563c4`).
-- **Next:** the 2026-09-25 browser test passed for sign-in, the shared
-  session and sign-out (Phase 2 notes). Still unexercised in a browser: the
-  password-reset flow with a real recovery link — needs a throwaway test user
-  (the test account was a real RTcompu user, so no reset was run on it).
-  Tag `v0.2.0` after that, or on the owner's call without it. Items 1 and 3 ship to production
-  together with a Supabase email-template change (Decisions & Blockers,
-  2026-09-24, item 3). Phase 3 starts after `v0.2.0`.
+- **Last updated:** 2026-09-26 — **Phase 3 Steps 0, 1 and 2 are live** as
+  legacy **v1.3.2–v1.3.4** (production `aaeb9b6`): only owners grant or
+  remove `owner`; the `roles` / `role_permissions` / `org_modules` tables
+  exist with every module **off** and nothing enforcing them; and
+  `src/lib/auth/permissions.ts` resolves what a user may do (not yet called
+  by any screen). Phase 2 is live as v1.3.0 + v1.3.1 and tagged `v0.2.0`.
+- **Next:** Phase 3 **Step 4 is built** as legacy **v1.4.0** on branch
+  `claude/phase-3-step4-admin` (off production `aaeb9b6`), waiting for the
+  owner to review, merge and promote it — see Phase 3 notes, 2026-09-26.
+  Once it is live and org admins have been told to switch their modules on:
+  **Step 5** (drain the `platform.module.*` / `platform.role.*` events the
+  Step 4 actions already publish), then **Step 3** (enforcement). Plan:
+  `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md` (order
+  0 → 1 → 2 → 4 → 5 → 3).
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.6** live since
-2026-09-25), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.3.4** live since
+2026-09-26), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -62,7 +66,7 @@ vanilla-JS/Supabase-direct code no longer runs in production.
 | Version | Phase completed | Status |
 |---|---|---|
 | v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ✅ 2026-09-23 |
-| v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ☐ |
+| v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ✅ 2026-09-26 |
 | v0.3.0 | Phase 3 — Roles, custom roles, module enablement | ☐ |
 | v0.4.0 | Phase 4 — HRMS migrated | ☐ |
 | v0.5.0 | Phase 5 — Recruitment migrated | ☐ |
@@ -368,6 +372,33 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   `0xc0000142`); `next build && next start` works. And `next dev` appends a
   `nextjs-agent-rules` block to `CLAUDE.md` on every start — reverted, not
   committed; owner's call whether to keep it.
+- 2026-09-26 — **Shipped.** PR #115 (v1.3.0, Phase 2) and #116 (v1.3.1,
+  `/health` without counts) merged; the owner promoted deployment
+  `dpl_2ubJo2eF1qNMwDAssmSc4bHpF8E5` (`d279bec`) and switched the Supabase
+  Reset Password template to `/auth/confirm?token_hash=…&type=recovery`.
+  Production smoke test: `/version.json` 1.3.1; `/session` "Supabase
+  configured: Yes"; `/auth/confirm` refuses a missing token and shows only
+  Continue for one; `/api/reports` 404; `/health` "Database: reachable", no
+  counts; `/js/supabase.js` serves `@supabase/ssr@0.12.7`. Every user was
+  signed out once, as planned. Rollback target: v1.2.6,
+  `dpl_GX4Sow39YCfzzxgpVCRk4jgzyGvx` (`f6896c1`) — plus reverting the
+  template.
+- 2026-09-26 — `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  were missing on Vercel (the new stack would have failed `/auth/confirm`);
+  added 2026-09-25 for production + preview, plain type so the build
+  inlines them. Values are the public ones from `public/js/config.js`; the
+  key was checked to be the `anon` role before writing.
+- 2026-09-26 — Gotcha: a **stacked PR merges into its base branch, not
+  production**. #118 (v1.3.3, based on `claude/release-1.3.2`) merged there,
+  the deployment promoted to production was built from that branch
+  (`6c14b63`), and the production branch was left at v1.3.2 — the next
+  release would have rolled v1.3.3 back. Fixed by #119 (merge
+  `claude/release-1.3.2` into production; tree verified identical to live).
+  Rule: retarget a stacked PR to the production branch before merging it,
+  and promote only deployments built from the production branch.
+- 2026-09-26 — Gotcha: the connected Vercel integration cannot promote —
+  `request_promote` returns 422 and `deploymentRollback` returns 403 — so
+  promotion stays a manual dashboard step for the owner.
 - 2026-09-24 — Known wart: if the audit insert itself fails, Postgres aborts
   the transaction and the role restore in `asOwner`'s `finally` fails too, so
   the *logged* error is "transaction aborted" rather than the insert error.
@@ -380,11 +411,11 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 **Goal:** `org_modules`, `roles`, `role_permissions` live and enforced end
 to end (CLAUDE.md §3.5).
 
-- [ ] `org_modules` table + admin toggle UI (all modules default `false`
+- [x] `org_modules` table + admin toggle UI (all modules default `false`
       on org creation)
-- [ ] System roles seeded per org: `owner`, `admin`, `developer`, `manager`,
+- [x] System roles seeded per org: `owner`, `admin`, `developer`, `manager`,
       `member`
-- [ ] Custom role creation UI (admin-only) writing to `roles` +
+- [x] Custom role creation UI (admin-only) writing to `roles` +
       `role_permissions`
 - [ ] `src/lib/auth/permissions.ts` — resolves system role defaults, then
       custom-role overrides; used by every Server Action and by the AI
@@ -393,7 +424,96 @@ to end (CLAUDE.md §3.5).
       events emitted and drained correctly
 
 **Notes:**
-_(none yet)_
+- 2026-09-26 — Plan and owner decisions: see Decisions & Blockers,
+  2026-09-26 (Phase 3 plan), and the plan document. Steps ship as their own
+  legacy releases, each verified before the next.
+- 2026-09-26 — **Step 0 (v1.3.2):** `users_guard_admin_fields()` now refuses
+  a self role change, granting/removing `owner` unless the caller is an
+  owner (update and insert), and demoting the last owner; `create-org` and
+  `bulk-import` refuse the same through the service key. Migration
+  `20260926055357`, verified in a rolled-back transaction on production
+  (9 scenarios) before applying.
+- 2026-09-26 — **Step 1 (v1.3.3):** migration `20260926063815` — `roles`
+  (5 immutable system roles per org, 25 rows), `role_permissions` (custom
+  roles only), `org_modules` (13 keys × 5 orgs = 65 rows, all off), guarded
+  `users.custom_role_id`, `developer` added to `users_role_check`,
+  `module_enabled()`. Verified in a rolled-back transaction (2 checks, 13
+  scenarios) and applied on the owner's direct approval.
+- 2026-09-26 — **Step 2 (v1.3.4):** `src/lib/auth/permissions-core.ts`
+  (pure: `can`, `canSeeFeature`) and `permissions.ts` (server-only:
+  `loadPermissionContext`, `requirePermission`). Defaults mirror the legacy
+  app: every role view/create/edit, manager+ approve, admin/owner delete;
+  a disabled module denies everything; a custom role's grants replace the
+  base role's for the modules it lists. The item above stays unticked until
+  Server Actions and the AI path actually call it.
+- 2026-09-26 — Open for the owner: what `developer` may do (provisionally
+  equal to `member` in `SYSTEM_ROLE_DEFAULTS`).
+- 2026-09-26 — Known gaps, not yet fixed: marking an org's last owner
+  `exited` is not refused; an admin cannot delete a custom role that is
+  assigned to themselves (the guard reads the cascade as a self role
+  change); the two new trigger functions keep the default RPC grant
+  (harmless — Postgres refuses to run trigger functions directly); and the
+  older security-advisor findings in Decisions & Blockers item 7.
+- 2026-09-26 — **Step 4 built (v1.4.0, branch `claude/phase-3-step4-admin`,
+  not yet merged).** Items 1 and 3 ticked on that basis, as Phase 0's
+  were. The first real new-stack screens, under `app/(platform)/settings/`:
+  **Modules** (13 switches), **Roles** (custom roles: create, edit, delete;
+  built-in roles read-only, with their defaults and head counts) and
+  **Feature access** (the deleted legacy `settings/access.js` editor,
+  restored with the same keys, roles and precedence). An owner/admin-only
+  "Modules & roles" tab on the legacy Settings page opens them. No
+  migration: the Step 1 RLS policies already limit every write to
+  `is_org_admin()` in the caller's org.
+- 2026-09-26 — Gate: `src/lib/auth/admin.ts` (`getOrgAdmin` for pages,
+  `requireOrgAdmin` for actions) — an active owner/admin. Deliberately not
+  `requirePermission()`: every module starts off, and that check denies
+  everything in a disabled module, so the screen that switches modules on
+  could never be reached. The org is always the caller's own `users` row,
+  never an input (a test fails if any action reads `input.orgId`). Writes go
+  through `withTransaction` as the caller, then an audit row, then a
+  publish after commit: `platform.module.enabled/disabled`,
+  `platform.role.created/updated`, and `platform.role.deleted` (new; §3.5
+  names no delete event). Nothing consumes them yet — that is Step 5.
+- 2026-09-26 — Verified on production in a transaction that always rolls
+  back (a `DO` block ending in `raise exception`), 18 scenarios with an
+  admin and a member of one org and a second org: an admin toggles their
+  org's module (1 row) but not another org's (0), creates a custom role and
+  its grants, cannot create a system role or a role in another org
+  (42501), cannot edit a system role (0 rows), a duplicate slug is 23505,
+  the feature-rule upsert updates the same row, the audit insert with the
+  rule's id works, delete cascades the grants; a member toggles 0 rows and
+  is refused roles and feature rules (42501), reads their own 13 module rows
+  and none of another org's. Checked afterwards: 0 probe roles, 0 enabled
+  modules, still 14 feature rules. 282/282 unit tests (+26), typecheck,
+  build and lint (0 errors) clean.
+- 2026-09-26 — Found and fixed: the legacy service worker served **every**
+  GET stale-while-revalidate, including Next.js pages and the RSC payloads
+  `router.refresh()` fetches — so a settings page could redraw its old state
+  after a change, and on a shared browser show the previous user's page.
+  `public/sw.js` now leaves `/settings`, `/session`, `/auth`, `/health` and
+  any `RSC` request to the network (tests in `service-worker.test.mjs`).
+  Every future App Router route needs adding to `NETWORK_ONLY_PREFIXES`.
+- 2026-09-26 — Owner's preview check: "modules not available". The logs
+  showed no request ever reached `/settings/modules`: the entry point was
+  a tab on `#/settings/org`, but the sidebar **Settings** button opens the
+  *profile* page (`#/settings`), and the org page is only reachable from
+  the Admin panel. Fixed by a first **Modules & roles** card on the Admin
+  panel (`public/views/admin/index.js`, a path link, not a hash route); the
+  org-page tab stays. Gotcha: legacy "Settings" means profile; admin
+  configuration lives under the Admin (shield) button.
+- 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
+  Drizzle), but the legacy access editor logged with `entity_id = null`,
+  so its audit writes could never have succeeded. The new editor audits
+  with the `feature_access` row's id.
+- 2026-09-26 — Step 4 limits, for the owner: (a) there is **no screen to
+  assign a custom role to a person** yet (`users.custom_role_id`), so a
+  custom role has no effect until one exists — the natural home is the
+  legacy Users screen or a new-stack Members screen; (b) because
+  `role_permissions` stores grants only, a custom role can replace a
+  module's permissions but cannot say "no access" to it; (c) not yet
+  exercised in a signed-in browser — needs the owner signing in against a
+  `next start` build or the preview, as for Phase 2; (d) Vercel's function
+  count after this change is unconfirmed until a preview deploys (was 2).
 
 ---
 
@@ -569,6 +689,46 @@ _(none yet)_
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
 
+### 2026-09-26 — Phase 3 plan and owner decisions
+
+Plan: `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md`, grounded
+in the live schema (no `org_modules`/`roles`/`role_permissions`, module
+gating UI-only, roles hard-coded in ~50 views and every RLS helper). Owner
+decisions:
+
+1. **Existing orgs start with every module off** — the recommended faithful
+   backfill was declined. So the admin toggle screen must be live and org
+   admins told before the gate is enforced; enforcement is its own
+   owner-triggered go-live. Order: 0 → 1 → 2 → 4 → 5 → 3.
+2. **Base system role + custom role**: a custom-role user keeps a system role
+   in `users.role` (what the legacy app and RLS read) and `custom_role_id`
+   adds module permissions on the new stack. Deviates from §3.5's "never
+   both" until the legacy app is gone (Phase 8).
+3. **Admin screens on the new stack** (`app/(platform)/settings/`).
+4. **Module keys split finer** (owner, 2026-09-26): the legacy feature keys
+   `people`, `me`, `inbox`, `documents`, `finance`, `announcements`,
+   `recruitment`, `crm`, `crm_partner`, `analytics`, `helpdesk`, `projects`,
+   `ai`; `dashboard` and `reports` always-on.
+5. **Step 0 ships now**: guard role changes (only an owner grants or removes
+   `owner`, nobody changes their own role, an org always keeps an owner).
+   **Done:** migration `20260926055357_users_role_change_guard` applied
+   2026-09-26 after a rolled-back verification on production (9/9
+   scenarios); server checks + UI in v1.3.2, PR #117. Open follow-up:
+   marking an org's last owner `exited` is not yet refused.
+6. **Step 1 done** (2026-09-26): migration `20260926063815_roles_and_org_modules`
+   applied on the owner's direct approval after a rolled-back verification
+   on production — `roles` (5 immutable system roles per org),
+   `role_permissions` (custom roles only), `org_modules` (13 keys × 5 orgs,
+   all off, not enforced), guarded `users.custom_role_id`, `developer` in
+   `users_role_check`, `module_enabled()`. Code in v1.3.3, PR #118 (stacked
+   on #117). Next: Step 2, `src/lib/auth/permissions.ts`.
+7. **Security advisor follow-ups** (pre-existing, found 2026-09-26): 27
+   `SECURITY DEFINER` functions executable by `anon`, CRM materialized views
+   readable over the API, two functions with a mutable `search_path`, and
+   leaked-password protection off in Supabase Auth. Plus: revoke the default
+   RPC grant on the new trigger functions (harmless — Postgres refuses to run
+   trigger functions directly).
+
 ### 2026-09-24 — Phase 2 item 4: what blocks `v0.2.0` (owner's call)
 
 The `service_role` audit (Phase 2 notes, 2026-09-24) passed on the client and
@@ -618,6 +778,8 @@ Phase 2 notes). Two fixes were offered: patch `login.html` to wait for the
 browser that asked for it — or verify the token on the server. **The owner chose
 server-side verification**, Supabase's documented SSR pattern: it works on any
 device and has no race.
+
+**Done 2026-09-26** — template switched at the v1.3.0/v1.3.1 go-live.
 
 **Ship-together step (owner, Supabase dashboard):** when items 1 and 3 go to
 production, and not before, set Authentication → Emails → *Reset Password* to

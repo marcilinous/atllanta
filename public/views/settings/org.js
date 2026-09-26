@@ -58,6 +58,7 @@ export default async function settingsOrg(container) {
       <button class="tab" data-tab="schedules">Work Schedules</button>
       <button class="tab" data-tab="expenses">Expense Categories</button>
       <button class="tab" data-tab="integrations">Integrations</button>
+      ${isAdmin ? '<button class="tab" data-tab="modules-roles">Modules &amp; roles</button>' : ''}
     </div>
     <div id="settings-content" style="margin-top:var(--space-4)"></div>
   `;
@@ -89,6 +90,9 @@ export default async function settingsOrg(container) {
     else if (currentTab === 'schedules') await renderSchedules();
     else if (currentTab === 'expenses') await renderExpenseCategories();
     else if (currentTab === 'integrations') { navigate('settings/integrations'); return; }
+    // Modules, custom roles and feature access live on the new stack
+    // (app/(platform)/settings/), outside the hash router: a full page load.
+    else if (currentTab === 'modules-roles') { window.location.assign('/settings/modules'); return; }
   }
 
   function renderOrgSettings() {
