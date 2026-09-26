@@ -1,6 +1,18 @@
 # Phase 3 — Roles, Custom Roles, Module Enablement (plan)
 
-Status: **draft for owner review** (2026-09-26). Nothing here is built yet.
+Status: **approved with owner decisions** (2026-09-26); decision 4 (module
+keys) still awaits review. Nothing here is built yet.
+
+**Owner decisions (2026-09-26):** 1 — existing orgs start with every module
+**off** (not the recommended backfill); 2 — base system role + custom role;
+3 — admin screens on the new stack; 4 — pending; Step 0 ships now as its own
+release.
+
+**Consequence of decision 1 for the order:** the admin module-toggle screen
+(Step 4) must be live, and org admins told, *before* the gate is enforced
+(Step 3) — otherwise an org is locked out with no way to switch its modules
+back on. Enforcement becomes its own owner-triggered go-live. Revised order:
+0 → 1 → 2 → 4 → 5 → 3.
 Source of truth for the goal: CLAUDE.md §3.5 and TRANSITION.md Phase 3.
 
 ## What exists today (verified 2026-09-26)
@@ -66,8 +78,9 @@ Verified in a rolled-back transaction on production, like v1.2.3.
   `users.role` CHECK to add `developer` (and record the CHECK in a migration,
   ending the drift).
 - **Seed** the five system roles for every org, and on org creation.
-- **Backfill `org_modules`** so every existing org keeps exactly what it sees
-  today (see Decision 1). New orgs start with all modules off, per §3.5.
+- **Seed `org_modules`** with every module **off** for every org, existing
+  and new (owner decision 1). Nothing reads it yet, so nothing changes for
+  users until Step 3's enforcement go-live.
 - `module_enabled(p_org uuid, p_key text) returns boolean` (stable, security
   definer, search_path pinned) — the SQL mirror of the gate.
 

@@ -589,6 +589,26 @@ _(none yet)_
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
 
+### 2026-09-26 — Phase 3 plan and owner decisions
+
+Plan: `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md`, grounded
+in the live schema (no `org_modules`/`roles`/`role_permissions`, module
+gating UI-only, roles hard-coded in ~50 views and every RLS helper). Owner
+decisions:
+
+1. **Existing orgs start with every module off** — the recommended faithful
+   backfill was declined. So the admin toggle screen must be live and org
+   admins told before the gate is enforced; enforcement is its own
+   owner-triggered go-live. Order: 0 → 1 → 2 → 4 → 5 → 3.
+2. **Base system role + custom role**: a custom-role user keeps a system role
+   in `users.role` (what the legacy app and RLS read) and `custom_role_id`
+   adds module permissions on the new stack. Deviates from §3.5's "never
+   both" until the legacy app is gone (Phase 8).
+3. **Admin screens on the new stack** (`app/(platform)/settings/`).
+4. Module keys — pending the owner's review of the plan.
+5. **Step 0 ships now**: guard role changes (only an owner grants or removes
+   `owner`, nobody changes their own role, an org always keeps an owner).
+
 ### 2026-09-24 — Phase 2 item 4: what blocks `v0.2.0` (owner's call)
 
 The `service_role` audit (Phase 2 notes, 2026-09-24) passed on the client and
