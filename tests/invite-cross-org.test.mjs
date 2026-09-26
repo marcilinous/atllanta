@@ -81,10 +81,10 @@ beforeEach(() => {
 function res() {
   return { statusCode: 0, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
 }
-const invite = (email) => ({
+const invite = (email, role = 'member') => ({
   method: 'POST',
   headers: { authorization: 'Bearer user-jwt' },
-  body: { action: 'invite', email, role: 'member' },
+  body: { action: 'invite', email, role },
   query: {},
 });
 
@@ -141,5 +141,21 @@ describe('invite across organisations', () => {
     assert.deepEqual([r.statusCode, r.body], [403, { error: 'Your account is no longer active' }]);
     assert.equal(S.upserts.length, 0);
     assert.equal(S.created.length, 0);
+  });
+
+  test('an admin cannot invite an owner', async () => {
+    const r = res(); await handler(invite('new@a.com', 'owner'), r);
+    assert.deepEqual([r.statusCode, r.body], [403, { error: 'Only an owner can invite another owner' }]);
+    assert.equal(S.upserts.length, 0);
+    assert.equal(S.created.length, 0);
+  });
+
+  test('an owner can invite an owner', async () => {
+    S.callerRole = 'owner';
+    const r = res(); await handler(invite('new@a.com', 'owner'), r);
+    assert.equal(r.body.invited, true);
+    assert.equal(r.body.role, 'owner');
+    assert.deepEqual(S.created, ['new@a.com']);
+    assert.equal(S.upserts[0].role, 'owner');
   });
 });

@@ -9,6 +9,7 @@ export default async function settingsUsers(container) {
   const org = getOrg();
   const membership = getMembership();
   const isAdmin = membership && ['owner', 'admin'].includes(membership.role);
+  const isOwner = membership && membership.role === 'owner';
 
   container.innerHTML = `
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-3)">
@@ -106,9 +107,9 @@ export default async function settingsUsers(container) {
                 <option value="member" ${m.role === 'member' ? 'selected' : ''}>Member</option>
                 <option value="manager" ${m.role === 'manager' ? 'selected' : ''}>Manager</option>
                 <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
-                <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>
+                ${isOwner ? `<option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>` : ''}
               </select>
-              <button class="btn btn-ghost btn-sm" data-remove-member="${m.id}" style="color:var(--color-error)" title="Remove member">&times;</button>` : '<span class="u-meta">—</span>'}
+              <button class="btn btn-ghost btn-sm" data-remove-member="${m.id}" style="color:var(--color-error)" title="Remove member">&times;</button>` : `<span class="badge badge-${roleColors[m.role] || 'neutral'}">${esc(m.role || 'member')}</span>`}
             </div>
           </td>` : ''}
         </tr>`;
@@ -173,7 +174,7 @@ export default async function settingsUsers(container) {
               <option value="member">Member</option>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
-              <option value="owner">Owner</option>
+              ${isOwner ? '<option value="owner">Owner</option>' : ''}
             </select>
           </div>
           <button class="btn btn-primary" id="invite-save">Send Invite</button>
