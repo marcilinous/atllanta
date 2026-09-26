@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.3.3 — 2026-09-26
+
+### What changed
+- Nothing you can see yet. This release lays the groundwork for switching modules on and off per organisation and for custom roles: every organisation now has its five built-in roles and a list of 13 modules, all switched off and not yet enforced.
+- A Developer role now exists alongside Owner, Admin, Manager and Member (not yet assignable from the app).
+
+### Admins need to
+- Nothing yet. Before modules are enforced, you'll get a settings screen to switch on the ones your organisation uses.
+
 ## v1.3.2 — 2026-09-26
 
 ### What changed
