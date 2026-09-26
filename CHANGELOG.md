@@ -5,6 +5,14 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.3.4 — 2026-09-26
+
+### What changed
+- Nothing you can see yet. The new screens now have one place that decides what each person may do in each module, based on their role, any custom role, and which modules the organisation has switched on. It is not yet used by any screen.
+
+### Admins need to
+- Nothing.
+
 ## v1.3.3 — 2026-09-26
 
 ### What changed
