@@ -385,6 +385,14 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   added 2026-09-25 for production + preview, plain type so the build
   inlines them. Values are the public ones from `public/js/config.js`; the
   key was checked to be the `anon` role before writing.
+- 2026-09-26 — Gotcha: a **stacked PR merges into its base branch, not
+  production**. #118 (v1.3.3, based on `claude/release-1.3.2`) merged there,
+  the deployment promoted to production was built from that branch
+  (`6c14b63`), and the production branch was left at v1.3.2 — the next
+  release would have rolled v1.3.3 back. Fixed by #119 (merge
+  `claude/release-1.3.2` into production; tree verified identical to live).
+  Rule: retarget a stacked PR to the production branch before merging it,
+  and promote only deployments built from the production branch.
 - 2026-09-26 — Gotcha: the connected Vercel integration cannot promote —
   `request_promote` returns 422 and `deploymentRollback` returns 403 — so
   promotion stays a manual dashboard step for the owner.
