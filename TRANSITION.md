@@ -615,6 +615,19 @@ decisions:
    2026-09-26 after a rolled-back verification on production (9/9
    scenarios); server checks + UI in v1.3.2, PR #117. Open follow-up:
    marking an org's last owner `exited` is not yet refused.
+6. **Step 1 done** (2026-09-26): migration `20260926063815_roles_and_org_modules`
+   applied on the owner's direct approval after a rolled-back verification
+   on production — `roles` (5 immutable system roles per org),
+   `role_permissions` (custom roles only), `org_modules` (13 keys × 5 orgs,
+   all off, not enforced), guarded `users.custom_role_id`, `developer` in
+   `users_role_check`, `module_enabled()`. Code in v1.3.3, PR #118 (stacked
+   on #117). Next: Step 2, `src/lib/auth/permissions.ts`.
+7. **Security advisor follow-ups** (pre-existing, found 2026-09-26): 27
+   `SECURITY DEFINER` functions executable by `anon`, CRM materialized views
+   readable over the API, two functions with a mutable `search_path`, and
+   leaked-password protection off in Supabase Auth. Plus: revoke the default
+   RPC grant on the new trigger functions (harmless — Postgres refuses to run
+   trigger functions directly).
 
 ### 2026-09-24 — Phase 2 item 4: what blocks `v0.2.0` (owner's call)
 
