@@ -32,21 +32,20 @@
   Action pattern, event bus stub, two-org isolation test)
 - **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-25 — all four Phase 2 items done. Item 4's
-  audit led to legacy **v1.2.4** and **v1.2.5** (both live), Drizzle now runs
-  under RLS, and production was merged into this branch (`95563c4`).
-- **Next:** the 2026-09-25 browser test passed for sign-in, the shared
-  session and sign-out (Phase 2 notes). Still unexercised in a browser: the
-  password-reset flow with a real recovery link — needs a throwaway test user
-  (the test account was a real RTcompu user, so no reset was run on it).
-  Tag `v0.2.0` after that, or on the owner's call without it. Items 1 and 3 ship to production
-  together with a Supabase email-template change (Decisions & Blockers,
-  2026-09-24, item 3). Phase 3 starts after `v0.2.0`.
+- **Last updated:** 2026-09-26 — **Phase 2 is live in production** as legacy
+  **v1.3.0 + v1.3.1** (one deployment, `d279bec`): one shared cookie session,
+  server-verified password reset, the reset-email template switched, and
+  `/health` no longer shows counts. Tracker now lives on
+  `claude/phase-3-roles` (branched from production); `claude/phase-2-auth` is
+  fully contained in production and done.
+- **Next:** exercise a real password reset end to end on production — the
+  one Phase 2 flow not yet run in a browser — then tag `v0.2.0`. Phase 3
+  starts after that.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.2.6** live since
-2026-09-25), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.3.1** live since
+2026-09-26), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -368,6 +367,25 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
   `0xc0000142`); `next build && next start` works. And `next dev` appends a
   `nextjs-agent-rules` block to `CLAUDE.md` on every start — reverted, not
   committed; owner's call whether to keep it.
+- 2026-09-26 — **Shipped.** PR #115 (v1.3.0, Phase 2) and #116 (v1.3.1,
+  `/health` without counts) merged; the owner promoted deployment
+  `dpl_2ubJo2eF1qNMwDAssmSc4bHpF8E5` (`d279bec`) and switched the Supabase
+  Reset Password template to `/auth/confirm?token_hash=…&type=recovery`.
+  Production smoke test: `/version.json` 1.3.1; `/session` "Supabase
+  configured: Yes"; `/auth/confirm` refuses a missing token and shows only
+  Continue for one; `/api/reports` 404; `/health` "Database: reachable", no
+  counts; `/js/supabase.js` serves `@supabase/ssr@0.12.7`. Every user was
+  signed out once, as planned. Rollback target: v1.2.6,
+  `dpl_GX4Sow39YCfzzxgpVCRk4jgzyGvx` (`f6896c1`) — plus reverting the
+  template.
+- 2026-09-26 — `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  were missing on Vercel (the new stack would have failed `/auth/confirm`);
+  added 2026-09-25 for production + preview, plain type so the build
+  inlines them. Values are the public ones from `public/js/config.js`; the
+  key was checked to be the `anon` role before writing.
+- 2026-09-26 — Gotcha: the connected Vercel integration cannot promote —
+  `request_promote` returns 422 and `deploymentRollback` returns 403 — so
+  promotion stays a manual dashboard step for the owner.
 - 2026-09-24 — Known wart: if the audit insert itself fails, Postgres aborts
   the transaction and the role restore in `asOwner`'s `finally` fails too, so
   the *logged* error is "transaction aborted" rather than the insert error.
@@ -618,6 +636,8 @@ Phase 2 notes). Two fixes were offered: patch `login.html` to wait for the
 browser that asked for it — or verify the token on the server. **The owner chose
 server-side verification**, Supabase's documented SSR pattern: it works on any
 device and has no race.
+
+**Done 2026-09-26** — template switched at the v1.3.0/v1.3.1 go-live.
 
 **Ship-together step (owner, Supabase dashboard):** when items 1 and 3 go to
 production, and not before, set Authentication → Emails → *Reset Password* to
