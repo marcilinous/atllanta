@@ -605,9 +605,16 @@ decisions:
    adds module permissions on the new stack. Deviates from §3.5's "never
    both" until the legacy app is gone (Phase 8).
 3. **Admin screens on the new stack** (`app/(platform)/settings/`).
-4. Module keys — pending the owner's review of the plan.
+4. **Module keys split finer** (owner, 2026-09-26): the legacy feature keys
+   `people`, `me`, `inbox`, `documents`, `finance`, `announcements`,
+   `recruitment`, `crm`, `crm_partner`, `analytics`, `helpdesk`, `projects`,
+   `ai`; `dashboard` and `reports` always-on.
 5. **Step 0 ships now**: guard role changes (only an owner grants or removes
    `owner`, nobody changes their own role, an org always keeps an owner).
+   **Done:** migration `20260926055357_users_role_change_guard` applied
+   2026-09-26 after a rolled-back verification on production (9/9
+   scenarios); server checks + UI in v1.3.2, PR #117. Open follow-up:
+   marking an org's last owner `exited` is not yet refused.
 
 ### 2026-09-24 — Phase 2 item 4: what blocks `v0.2.0` (owner's call)
 

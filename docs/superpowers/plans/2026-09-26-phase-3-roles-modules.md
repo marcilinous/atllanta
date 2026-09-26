@@ -5,8 +5,14 @@ keys) still awaits review. Nothing here is built yet.
 
 **Owner decisions (2026-09-26):** 1 — existing orgs start with every module
 **off** (not the recommended backfill); 2 — base system role + custom role;
-3 — admin screens on the new stack; 4 — pending; Step 0 ships now as its own
-release.
+3 — admin screens on the new stack; 4 — **split finer**: the module keys
+are the legacy app's own top-level feature keys, so `org_modules` and the
+existing nav gate name the same things — `people`, `me`, `inbox`,
+`documents`, `finance`, `announcements`, `recruitment`, `crm`,
+`crm_partner`, `analytics`, `helpdesk`, `projects`, `ai` (13, all off);
+`dashboard` and `reports` stay always-on; `feature_access` keeps the
+per-role fine grain inside a module (e.g. `crm_leads`, `crm_pipeline`).
+Step 0 shipped as v1.3.2 (migration `20260926055357`, PR #117).
 
 **Consequence of decision 1 for the order:** the admin module-toggle screen
 (Step 4) must be live, and org admins told, *before* the gate is enforced
