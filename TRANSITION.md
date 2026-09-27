@@ -720,7 +720,23 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
    and `webhook_deliveries` policy requires `is_org_admin()`, and the
    developer role is in no RLS helper. `audit_logs` is the exception — its
    one policy lets **every** org member read it already, which is wider
-   than this decision implies and worth a look of its own. Module-level defaults for business modules
+   than this decision implies and worth a look of its own.
+3. **Audit log: owners, admins and developers only** (owner, 2026-09-27).
+   Legacy **v1.4.1**, branch `claude/release-1.4.1`: migration
+   `20260927152500` adds `can_read_audit_log()` (security definer, pinned
+   search path, not callable by `anon`; refuses exited users) and narrows
+   `audit_select` to it. Managers are excluded too, reading "regular
+   members" as everyone outside those three roles. The legacy audit screen
+   now admits developers (and drops a dead `super_admin` check). Nothing a
+   user sees is lost: the only screen reading `audit_logs` was already
+   admin-only; what closes is direct API and analytics-SQL reading by 61
+   managers and members. Verified on production in an always-rolled-back
+   transaction, with the migration applied inside it: before, a member read
+   13 rows; after, owner/admin/developer 13 of their own org and 0 of
+   another, member 0, manager 0, exited admin 0, `anon` refused the helper;
+   afterwards the old policy, no helper, and both borrowed users unchanged.
+   The local isolation test gains a member-cannot-read check. 288/288 unit
+   tests. **Not applied** — the migration needs the owner's go-ahead. Module-level defaults for business modules
    stay equal to `member` until the owner says otherwise.
 
 ### 2026-09-26 — Phase 3 plan and owner decisions

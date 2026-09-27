@@ -12,10 +12,11 @@ function withoutOrgId(values) {
 export default async function auditLog(container) {
   const org = getOrg();
   const membership = getMembership();
-  const isAdmin = membership && ['owner', 'admin', 'super_admin'].includes(membership.role);
+  // Mirrors can_read_audit_log() (v1.4.1): RLS returns no rows to anyone else.
+  const canRead = membership && ['owner', 'admin', 'developer'].includes(membership.role);
 
-  if (!isAdmin) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Access Denied</div><div class="empty-state-desc">Only admins can view the audit log.</div></div>`;
+  if (!canRead) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Access Denied</div><div class="empty-state-desc">Only owners, admins and developers can view the audit log.</div></div>`;
     return;
   }
 

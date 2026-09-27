@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.4.1 — 2026-09-27
+
+### What changed
+- Security: only owners, admins and developers can read your organisation's audit log. Before, any member could read it through the app's data connection, even though the Audit Log screen was already limited to admins.
+- Developers can now open the Audit Log screen.
+
+### Admins need to
+- Nothing.
+
 ## v1.4.0 — 2026-09-26
 
 ### What changed
