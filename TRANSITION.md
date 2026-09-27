@@ -723,7 +723,7 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
    than this decision implies and worth a look of its own.
 3. **Audit log: owners, admins and developers only** (owner, 2026-09-27).
    Legacy **v1.4.1**, branch `claude/release-1.4.1`: migration
-   `20260927152500` adds `can_read_audit_log()` (security definer, pinned
+   `20260927152738` adds `can_read_audit_log()` (security definer, pinned
    search path, not callable by `anon`; refuses exited users) and narrows
    `audit_select` to it. Managers are excluded too, reading "regular
    members" as everyone outside those three roles. The legacy audit screen
@@ -736,7 +736,13 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
    another, member 0, manager 0, exited admin 0, `anon` refused the helper;
    afterwards the old policy, no helper, and both borrowed users unchanged.
    The local isolation test gains a member-cannot-read check. 288/288 unit
-   tests. **Not applied** — the migration needs the owner's go-ahead. Module-level defaults for business modules
+   tests. **Applied to production 2026-09-27** on the owner's direct
+   approval (recorded version `20260927152738`; the file was renamed to
+   match). Checked live afterwards: one `audit_logs` policy, calling the
+   helper; `anon` cannot execute it, `authenticated` can; reading as real
+   users — owner 13, admin 13, manager 0, member 0. Rollback: recreate
+   `audit_select` as `org_id in (select auth_user_org_ids())`. The code half
+   (developers on the audit screen) ships with the v1.4.1 deployment. Module-level defaults for business modules
    stay equal to `member` until the owner says otherwise.
 
 ### 2026-09-26 — Phase 3 plan and owner decisions

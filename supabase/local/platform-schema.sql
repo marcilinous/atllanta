@@ -325,7 +325,7 @@ create policy invitations_admin_all on public.invitations
   for all using (org_id = auth_org_id() and is_org_admin())
   with check (org_id = auth_org_id() and is_org_admin());
 
--- v1.4.1 (20260927152500): only owners, admins and developers read it.
+-- v1.4.1 (20260927152738): only owners, admins and developers read it.
 create or replace function public.can_read_audit_log()
 returns boolean language sql stable security definer set search_path to 'public'
 as $$ select exists (select 1 from public.users u where u.id = auth.uid()

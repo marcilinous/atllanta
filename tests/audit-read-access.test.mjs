@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8').replace(/\r\n/g, '\n');
 
-const MIGRATION = read('supabase', 'migrations', '20260927152500_audit_logs_read_owners_admins_developers.sql');
+const MIGRATION = read('supabase', 'migrations', '20260927152738_audit_logs_read_owners_admins_developers.sql');
 
 test('the migration limits audit_select to readers the helper allows, in the caller\'s org', () => {
   assert.match(MIGRATION, /drop policy if exists audit_select on public\.audit_logs;/);
