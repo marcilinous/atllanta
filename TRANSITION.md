@@ -446,7 +446,8 @@ to end (CLAUDE.md §3.5).
   a disabled module denies everything; a custom role's grants replace the
   base role's for the modules it lists. The item above stays unticked until
   Server Actions and the AI path actually call it.
-- 2026-09-26 — Open for the owner: what `developer` may do (provisionally
+- 2026-09-26 — (Answered 2026-09-27, see Decisions & Blockers.) Open for
+  the owner: what `developer` may do (provisionally
   equal to `member` in `SYSTEM_ROLE_DEFAULTS`).
 - 2026-09-26 — Known gaps, not yet fixed: marking an org's last owner
   `exited` is not refused; an admin cannot delete a custom role that is
@@ -696,6 +697,31 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-27 — Owner decisions after v1.4.0 (Phase 3)
+
+1. **Assigning a custom role lives on a new-stack Members screen**, not on
+   the legacy Users screen — organisation membership and permissions stay
+   separate from user accounts and authentication. It writes
+   `users.custom_role_id` through a Server Action like the Step 4 ones;
+   `users_guard_admin_fields()` already refuses a self-assignment and a role
+   from another org. Until it ships, custom roles have no effect.
+2. **The `developer` role** (resolves the Phase 3 open item of 2026-09-26):
+   - **Read/write:** developer tools — API keys, webhooks, error and audit
+     logs, integrations.
+   - **Read-only:** organisation configuration (including, by that reading,
+     the Step 4 settings screens — to be confirmed when built).
+   - **No access:** billing/financial settings, and deleting members.
+   Consequences to carry into the work: these are *capabilities*, not the
+   per-module view/create/edit grants in `SYSTEM_ROLE_DEFAULTS`, so they
+   need a capability check beside `requirePermission()` (and beside
+   `requireOrgAdmin()` for read-only settings). Several need RLS changes
+   first (checked live 2026-09-27): every `api_keys`, `webhook_endpoints`
+   and `webhook_deliveries` policy requires `is_org_admin()`, and the
+   developer role is in no RLS helper. `audit_logs` is the exception — its
+   one policy lets **every** org member read it already, which is wider
+   than this decision implies and worth a look of its own. Module-level defaults for business modules
+   stay equal to `member` until the owner says otherwise.
 
 ### 2026-09-26 — Phase 3 plan and owner decisions
 
