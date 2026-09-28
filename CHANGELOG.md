@@ -8,7 +8,8 @@ was promoted to production.
 ## v1.4.2 — 2026-09-28
 
 ### What changed
-- Nothing you can see. Switching a module on or off, and creating, changing or deleting a custom role, are now covered by tests end to end: each change is recorded once and then marked done, with no other effect.
+- The dashboard's activity feed no longer shows admin settings changes (a module switched on or off, a custom role created, changed or deleted). They were appearing to everyone as "enabled module" without saying which. They are still recorded, and still in the audit log.
+- Behind the scenes: each of those changes is now covered by tests end to end — recorded once, then marked done, with no other effect.
 
 ### Admins need to
 - Nothing.

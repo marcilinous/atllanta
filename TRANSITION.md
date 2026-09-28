@@ -545,10 +545,12 @@ to end (CLAUDE.md §3.5).
   action publishes only after its transaction closes. A future consumer
   belongs in `drain.ts`, not as a legacy recipe (those run as the service
   role).
-- 2026-09-28 — Noticed, not changed: the legacy dashboard's activity feed
-  shows these events in its fallback wording ("*name* enabled module",
-  "created role") to the whole org, without saying which module. Harmless;
-  owner's call whether to give them proper wording or hide them there.
+- 2026-09-28 — The legacy dashboard's activity feed showed these events in
+  its fallback wording ("*name* enabled module", "created role") to the whole
+  org. **Owner decision: hidden.** `public/views/dashboard.js` now excludes
+  `platform.%` in the events query itself, before `.limit(15)`, so a burst
+  of settings changes cannot crowd real activity out of the feed. The events
+  and their audit rows are unchanged. In v1.4.2 (PR #125).
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits
