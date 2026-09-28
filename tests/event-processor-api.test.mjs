@@ -154,6 +154,24 @@ describe('claiming', () => {
   });
 });
 
+// Phase 3 Step 5: the admin screens' platform.* events have no recipe; the
+// cron must complete them without touching anything but the events row.
+describe('platform events', async () => {
+  const { PLATFORM_EVENT_TYPES } = await import('../src/lib/events/platform-events.ts');
+  for (const type of PLATFORM_EVENT_TYPES) {
+    test(`${type} is completed with no side effects`, async () => {
+      S.pending = [{ id: 'ev-1', org_id: 'org-1', event_type: type, attempts: 0, payload: { module_key: 'crm' } }];
+      const r = res();
+      await handler(req('GET', 'Bearer test-secret'), r);
+      assert.deepEqual(r.body, { processed: 1, failed: 0, skipped: 0, total: 1 });
+      assert.deepEqual([...new Set(S.calls.filter(c => c.table).map(c => c.table))], ['events']);
+      assert.deepEqual(S.calls.filter(c => c.rpc).map(c => c.rpc), ['requeue_stale_events']);
+      const done = S.calls.find(c => c.table === 'events' && c.ops[0][0] === 'update' && c.ops[0][1].status === 'completed');
+      assert.ok(done, 'expected the event to be marked completed');
+    });
+  }
+});
+
 describe('replay safety', () => {
   // Real event rows carry org_id as a column (stamped by publish_event and
   // forwarded as event.org_id); the fixtures below now set it at the top

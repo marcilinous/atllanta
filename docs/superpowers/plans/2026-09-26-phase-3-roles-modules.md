@@ -16,8 +16,9 @@ Step 0 shipped as v1.3.2 (migration `20260926055357`, PR #117).
 
 **Progress (2026-09-26):** Step 0 live (v1.3.2), Step 1 live (v1.3.3,
 migration `20260926063815`), Step 2 live (v1.3.4, `src/lib/auth/permissions.ts`),
-Step 4 live (v1.4.0, PR #121, `705e23c`).
-**Next: Step 5**, then 3.
+Step 4 live (v1.4.0, PR #121, `705e23c`), Step 5 built (v1.4.2, branch
+`claude/phase-3-step5-events`).
+**Next: Step 3** (enforcement), once org admins have switched their modules on.
 
 **Consequence of decision 1 for the order:** the admin module-toggle screen
 (Step 4) must be live, and org admins told, *before* the gate is enforced

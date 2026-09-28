@@ -96,6 +96,20 @@ describe('claiming and resolving', () => {
   });
 });
 
+// Phase 3 Step 5: platform.* events have no handler; the browser processor
+// must resolve them completed without writing anywhere.
+describe('platform events', async () => {
+  const { PLATFORM_EVENT_TYPES } = await import('../src/lib/events/platform-events.ts');
+  for (const type of PLATFORM_EVENT_TYPES) {
+    test(`${type} is completed with no side effects`, async () => {
+      await runOnce({ id: 'ev-p', event_type: type, attempts: 1, payload: { module_key: 'crm' } });
+      assert.deepEqual(rpcs('resolve_event')[0].args, { event_id: 'ev-p', new_status: 'completed' });
+      assert.equal(S.calls.some(c => c.kind === 'from'), false, 'no table read or write');
+      assert.deepEqual(S.calls.filter(c => c.kind === 'rpc').map(c => c.name), ['claim_events', 'resolve_event']);
+    });
+  }
+});
+
 describe('leave approval is applied at most once', () => {
   const approved = { id: 'ev-4', event_type: 'leave.request.approved', attempts: 1,
     payload: { user_id: 'u-2', approved_by: 'u-3', leave_request_id: 'lr-1', leave_type_id: 'lt-1', days: '2' } };

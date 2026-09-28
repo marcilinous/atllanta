@@ -40,17 +40,22 @@
   by any screen); and owners/admins can switch modules, manage custom roles
   and edit feature access from **Admin → Modules & roles** (the first real
   new-stack screens). Phase 2 is live as v1.3.0 + v1.3.1, tagged `v0.2.0`.
-- **Next:** Phase 3 **Step 5** — drain the `platform.module.*` /
-  `platform.role.*` events the Step 4 actions already publish — then
-  **Step 3** (enforcement), which waits until org admins have been told to
-  switch their modules on. Plan:
+- **Update 2026-09-28:** **v1.4.1 is live** (audit log readable by owners,
+  admins and developers only; migration applied 2026-09-27) — but it was
+  promoted from the PR branch's preview, so the production branch is still
+  at v1.4.0 until PR #124 merges (see Phase 3 notes). **Step 5 is built** as
+  v1.4.2 on `claude/phase-3-step5-events`.
+- **Next:** after #124 and the Step 5 PR merge: Phase 3 **Step 3**
+  (enforcement), which waits until org admins have been told to switch
+  their modules on — plus the Members screen (custom-role assignment) and
+  the developer-role capabilities from the 2026-09-27 owner decisions. Plan:
   `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md` (order
   0 → 1 → 2 → 4 → 5 → 3). Start from a branch off the production branch.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.0** live since
-2026-09-26), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.1** live since
+2026-09-28), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -420,7 +425,7 @@ to end (CLAUDE.md §3.5).
 - [ ] `src/lib/auth/permissions.ts` — resolves system role defaults, then
       custom-role overrides; used by every Server Action and by the AI
       Assistant path
-- [ ] `platform.module.enabled/disabled` and `platform.role.created/updated`
+- [x] `platform.module.enabled/disabled` and `platform.role.created/updated`
       events emitted and drained correctly
 
 **Notes:**
@@ -509,7 +514,41 @@ to end (CLAUDE.md §3.5).
   out redirects to `/login`; the Admin panel script carries the Modules &
   roles link; `sw.js` is on cache `atllanta-1.4.0`. Rollback target: v1.3.4
   (`aaeb9b6`) — no database change, so a redeploy is the whole rollback.
-  Tag `v1.4.0` on `705e23c` is the owner's to push.
+  Tag `v1.4.0` on `705e23c` is the owner's to push. (Pushed, 2026-09-27.)
+- 2026-09-28 — **v1.4.1 promoted from the wrong place.** Production serves
+  1.4.1 from deployment `dpl_E1romiwLLH2y8hUbd9rGGjsP2H7i`, built from the
+  PR branch `claude/release-1.4.1` (`54dabb3`), while PR #124 was still
+  open — the production branch stayed at `9f991fb` (v1.4.0). And the
+  `v1.4.1` tag was pushed on `ee57e9a`, an unrelated 2026-08 `main` commit:
+  the tag command read `mergeCommit` of an unmerged PR (empty), so `git tag`
+  tagged the local checkout's HEAD. Harmless for users today (the live code
+  is the reviewed 1.4.1, and the database half was already live), but the
+  next production-branch build would drop 1.4.1's code. Fix, owner: merge
+  #124 (its tree equals `54dabb3`, since it was based on the production
+  head), promote the build from the production branch, and re-point the tag.
+  Gotcha, second time: **promote only deployments whose ref is the
+  production branch**, and tag from `git rev-parse` of the merged branch,
+  never from a PR's `mergeCommit` before checking it is merged.
+- 2026-09-28 — **Step 5 built (v1.4.2, `claude/phase-3-step5-events`).**
+  Item 5 ticked. Emitted: the Step 4 actions publish after commit, now via
+  one shared list, `src/lib/events/platform-events.ts` (five names:
+  `platform.module.enabled/disabled`, `platform.role.created/updated/
+  deleted`). Drained: CLAUDE.md §4 defines no consumer, so the correct
+  handling is "complete, do nothing" — which both legacy processors already
+  do for any event without a recipe, and the new-stack drain does for any
+  event without a subscriber. Evidence in production: the first two real
+  events (`platform.module.enabled`, then `.disabled`, 2026-09-28 06:29 UTC)
+  were completed on their first attempt. Tests (+19, 302/302): each name,
+  through the cron (only its own `events` row touched), the browser
+  processor (only `claim_events` + `resolve_event`) and `drainEvents`
+  (completed, no subscriber registered); plus a static check that every
+  action publishes only after its transaction closes. A future consumer
+  belongs in `drain.ts`, not as a legacy recipe (those run as the service
+  role).
+- 2026-09-28 — Noticed, not changed: the legacy dashboard's activity feed
+  shows these events in its fallback wording ("*name* enabled module",
+  "created role") to the whole org, without saying which module. Harmless;
+  owner's call whether to give them proper wording or hide them there.
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits

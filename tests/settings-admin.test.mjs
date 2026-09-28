@@ -166,6 +166,24 @@ describe('static: the gate', () => {
     assert.deepEqual(all.sort(), ['createCustomRole', 'deleteCustomRole', 'setFeatureRule', 'setModuleEnabled', 'updateCustomRole']);
   });
 
+  test('events use the shared names and publish only after the transaction commits', () => {
+    assert.doesNotMatch(actions, /"platform\./, 'event names come from PLATFORM_EVENTS, not literals');
+    for (const name of ['moduleEnabled', 'moduleDisabled', 'roleCreated', 'roleUpdated', 'roleDeleted']) {
+      assert.match(actions, new RegExp(`PLATFORM_EVENTS\\.${name}\\b`));
+    }
+    // Each exported action's body: every publish( comes after its
+    // withTransaction(...) call has been awaited and closed (`});`).
+    const bodies = actions.split(/\nexport const \w+ = action\(/).slice(1);
+    assert.equal(bodies.length, 5);
+    for (const body of bodies) {
+      const tx = body.indexOf('await withTransaction(');
+      const txEnd = body.indexOf('\n  });', tx);
+      const pub = body.indexOf('publish(');
+      assert.ok(tx !== -1 && txEnd !== -1, 'has a transaction');
+      if (pub !== -1) assert.ok(pub > txEnd, 'publish runs after the transaction closes');
+    }
+  });
+
   test('actions never take an org id from input, and write only through withTransaction', () => {
     assert.doesNotMatch(actions, /input\.orgId/);
     assert.doesNotMatch(actions, /getDb\(/);
