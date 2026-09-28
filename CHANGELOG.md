@@ -5,6 +5,14 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.4.3 — 2026-09-28
+
+### What changed
+- The dashboard's activity feed no longer shows admin settings changes (a module switched on or off, a custom role created, changed or deleted). They were appearing to everyone as "enabled module" without saying which. They are still recorded, and still in the audit log.
+
+### Admins need to
+- Nothing.
+
 ## v1.4.2 — 2026-09-28
 
 ### What changed
