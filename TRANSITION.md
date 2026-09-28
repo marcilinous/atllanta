@@ -40,12 +40,14 @@
   by any screen); and owners/admins can switch modules, manage custom roles
   and edit feature access from **Admin → Modules & roles** (the first real
   new-stack screens). Phase 2 is live as v1.3.0 + v1.3.1, tagged `v0.2.0`.
-- **Update 2026-09-28:** **v1.4.1 is live** (audit log readable by owners,
-  admins and developers only; migration applied 2026-09-27) — but it was
-  promoted from the PR branch's preview, so the production branch is still
-  at v1.4.0 until PR #124 merges (see Phase 3 notes). **Step 5 is built** as
-  v1.4.2 on `claude/phase-3-step5-events`.
-- **Next:** after #124 and the Step 5 PR merge: Phase 3 **Step 3**
+- **Update 2026-09-28:** **v1.4.2 is live** (PR #125, `2325f81`,
+  deployment `dpl_5WaXxZ2R6V8gePSw79NUb5YzfQdc`, built from the production
+  branch) — Phase 3 **Step 5 done**. v1.4.1 (audit log for owners, admins
+  and developers only) is merged too (#124, `b9d6604`), and tags v1.4.0,
+  v1.4.1 (re-pointed) and v1.4.2 each sit on their release merge. The
+  dashboard-feed change missed #125's merge and follows as **v1.4.3** on
+  `claude/release-1.4.3`.
+- **Next:** Phase 3 **Step 3**
   (enforcement), which waits until org admins have been told to switch
   their modules on — plus the Members screen (custom-role assignment) and
   the developer-role capabilities from the 2026-09-27 owner decisions. Plan:
@@ -54,7 +56,7 @@
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.1** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.2** live since
 2026-09-28), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
@@ -545,10 +547,21 @@ to end (CLAUDE.md §3.5).
   action publishes only after its transaction closes. A future consumer
   belongs in `drain.ts`, not as a legacy recipe (those run as the service
   role).
-- 2026-09-28 — Noticed, not changed: the legacy dashboard's activity feed
-  shows these events in its fallback wording ("*name* enabled module",
-  "created role") to the whole org, without saying which module. Harmless;
-  owner's call whether to give them proper wording or hide them there.
+- 2026-09-28 — The legacy dashboard's activity feed showed these events in
+  its fallback wording ("*name* enabled module", "created role") to the whole
+  org. **Owner decision: hidden.** `public/views/dashboard.js` now excludes
+  `platform.%` in the events query itself, before `.limit(15)`, so a burst
+  of settings changes cannot crowd real activity out of the feed. The events
+  and their audit rows are unchanged.
+- 2026-09-28 — **v1.4.2 shipped** (PR #125 → `2325f81`, deployment
+  `dpl_5WaXxZ2R6V8gePSw79NUb5YzfQdc` from the production branch, tag on the
+  merge). Verified: `/version.json` 1.4.2; tags v1.4.0 `705e23c`, v1.4.1
+  `b9d6604` (re-pointed from `ee57e9a`), v1.4.2 `2325f81`. **But** #125 was
+  merged at `52ca436`, before the feed commit (`96a66d1`) was pushed to it,
+  so the live `dashboard.js` has no filter. It ships as **v1.4.3**
+  (`claude/release-1.4.3`, the same change on a fresh branch off
+  production). Gotcha: re-check a PR's head just before merging when a
+  commit is pushed to it after review.
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits

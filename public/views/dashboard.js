@@ -171,7 +171,9 @@ export default async function dashboard(container) {
   const [attResult, postsResult, eventsResult, membersResult, leavesResult, annResult] = await Promise.all([
     sb.from('attendance').select('*').eq('user_id', user.id).eq('date', todayStr).maybeSingle(),
     sb.from('posts').select('*').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(30),
-    sb.from('events').select('*').eq('org_id', org.id).order('created_at', { ascending: false }).limit(15),
+    // Admin configuration events (platform.module.*, platform.role.*) are not
+    // team activity; excluded before the limit so they can't crowd it out.
+    sb.from('events').select('*').eq('org_id', org.id).not('event_type', 'like', 'platform.%').order('created_at', { ascending: false }).limit(15),
     sb.from('users').select('user_id:id, full_name, email, role').eq('org_id', org.id),
     sb.from('holidays').select('*').eq('year', today.getFullYear()).order('date', { ascending: true }),
     sb.from('announcements').select('*, author:author_id(full_name)').eq('org_id', org.id).order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(5),

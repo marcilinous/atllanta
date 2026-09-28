@@ -43,6 +43,18 @@ test('dashboard.js selects plain columns from events, not an actor embed', () =>
   assert.doesNotMatch(src, /actor:actor_id\s*\(/);
 });
 
+// v1.4.2 (owner, 2026-09-28): admin configuration events (platform.module.*,
+// platform.role.*) are hidden from the org-wide activity feed. Filtered in
+// the query, before .limit(15), so a burst of settings changes cannot push
+// real activity out of the feed.
+test('dashboard.js leaves platform.* events out of the activity feed, in the query', () => {
+  const src = read('public/views/dashboard.js');
+  const query = src.match(/sb\.from\('events'\)[^\n]*/)[0];
+  const notAt = query.indexOf(".not('event_type', 'like', 'platform.%')");
+  assert.ok(notAt !== -1, 'events query excludes platform.* types');
+  assert.ok(notAt < query.indexOf('.limit('), 'the exclusion comes before the limit');
+});
+
 test('letters.js no longer embeds actor:actor_id on the generated-letters query', () => {
   const src = read('public/views/people/letters.js');
   assert.doesNotMatch(src, /actor:actor_id\s*\(/);
