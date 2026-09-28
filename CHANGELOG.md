@@ -5,6 +5,14 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.4.2 — 2026-09-28
+
+### What changed
+- Nothing you can see. Switching a module on or off, and creating, changing or deleting a custom role, are now covered by tests end to end: each change is recorded once and then marked done, with no other effect.
+
+### Admins need to
+- Nothing.
+
 ## v1.4.1 — 2026-09-27
 
 ### What changed

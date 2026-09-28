@@ -24,6 +24,7 @@ import { withTransaction } from "../../db/transaction";
 import { featureAccess, orgModules, rolePermissions, roles, users } from "../../db/schema/platform";
 import { getSupabaseServerClient } from "../supabase/server";
 import { publishEvent } from "../events/publish";
+import { PLATFORM_EVENTS, type PlatformEventType } from "../events/platform-events";
 import { requireOrgAdmin } from "../auth/admin";
 import {
   grantRows,
@@ -39,7 +40,7 @@ import {
   setFeatureRuleSchema,
 } from "./schemas";
 
-async function publish(orgId: string, eventType: string, payload: Record<string, unknown>) {
+async function publish(orgId: string, eventType: PlatformEventType, payload: Record<string, unknown>) {
   const supabase = await getSupabaseServerClient();
   await publishEvent(supabase, { eventType, orgId, payload });
 }
@@ -101,7 +102,7 @@ export const setModuleEnabled = action(setModuleEnabledSchema, async (input) => 
   });
 
   if (changed) {
-    await publish(admin.orgId, input.enabled ? "platform.module.enabled" : "platform.module.disabled", {
+    await publish(admin.orgId, input.enabled ? PLATFORM_EVENTS.moduleEnabled : PLATFORM_EVENTS.moduleDisabled, {
       module_key: input.moduleKey,
     });
   }
@@ -127,58 +128,58 @@ export const createCustomRole = action(createCustomRoleSchema, async (input) => 
   const rows = grantRows(input.grants);
 
   const role = await withTransaction({ id: admin.userId }, async (tx, audit) => {
-      const [clash] = await tx
-        .select({ id: roles.id })
-        .from(roles)
-        .where(
-          and(
-            eq(roles.orgId, admin.orgId),
-            sql`(lower(${roles.name}) = lower(${input.name}) or ${roles.slug} = ${slug})`
-          )
+    const [clash] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(
+        and(
+          eq(roles.orgId, admin.orgId),
+          sql`(lower(${roles.name}) = lower(${input.name}) or ${roles.slug} = ${slug})`
         )
-        .limit(1);
-      if (clash) throw new ActionError("Please check the highlighted fields.", NAME_TAKEN);
+      )
+      .limit(1);
+    if (clash) throw new ActionError("Please check the highlighted fields.", NAME_TAKEN);
 
-      let created: { id: string; name: string; slug: string };
-      try {
-        [created] = await tx
-          .insert(roles)
-          .values({
-            orgId: admin.orgId,
-            name: input.name,
-            slug,
-            isSystem: false,
-            description: input.description ?? null,
-            createdBy: admin.userId,
-          })
-          .returning({ id: roles.id, name: roles.name, slug: roles.slug });
-      } catch (err) {
-        // Two admins creating the same name at once: the second loses the
-        // race on unique (org_id, slug). Caught here, inside the
-        // transaction, because withTransaction replaces any other error
-        // with a generic one; throwing still rolls the transaction back.
-        if (isUniqueViolation(err)) throw new ActionError("Please check the highlighted fields.", NAME_TAKEN);
-        throw err;
-      }
+    let created: { id: string; name: string; slug: string };
+    try {
+      [created] = await tx
+        .insert(roles)
+        .values({
+          orgId: admin.orgId,
+          name: input.name,
+          slug,
+          isSystem: false,
+          description: input.description ?? null,
+          createdBy: admin.userId,
+        })
+        .returning({ id: roles.id, name: roles.name, slug: roles.slug });
+    } catch (err) {
+      // Two admins creating the same name at once: the second loses the
+      // race on unique (org_id, slug). Caught here, inside the
+      // transaction, because withTransaction replaces any other error
+      // with a generic one; throwing still rolls the transaction back.
+      if (isUniqueViolation(err)) throw new ActionError("Please check the highlighted fields.", NAME_TAKEN);
+      throw err;
+    }
 
-      if (rows.length > 0) {
-        await tx.insert(rolePermissions).values(
-          rows.map((r) => ({ orgId: admin.orgId, roleId: created.id, moduleKey: r.moduleKey, permission: r.permission }))
-        );
-      }
+    if (rows.length > 0) {
+      await tx.insert(rolePermissions).values(
+        rows.map((r) => ({ orgId: admin.orgId, roleId: created.id, moduleKey: r.moduleKey, permission: r.permission }))
+      );
+    }
 
-      await audit({
-        orgId: admin.orgId,
-        module: "platform",
-        entityType: "role",
-        entityId: created.id,
-        action: "created",
-        newValues: { name: created.name, slug: created.slug, description: input.description ?? null, grants: input.grants },
-      });
-      return created;
+    await audit({
+      orgId: admin.orgId,
+      module: "platform",
+      entityType: "role",
+      entityId: created.id,
+      action: "created",
+      newValues: { name: created.name, slug: created.slug, description: input.description ?? null, grants: input.grants },
     });
+    return created;
+  });
 
-  await publish(admin.orgId, "platform.role.created", { role_id: role.id, name: role.name, slug: role.slug });
+  await publish(admin.orgId, PLATFORM_EVENTS.roleCreated, { role_id: role.id, name: role.name, slug: role.slug });
   revalidatePath("/settings/roles");
   return { id: role.id };
 });
@@ -250,7 +251,7 @@ export const updateCustomRole = action(updateCustomRoleSchema, async (input) => 
   });
 
   if (result.changed) {
-    await publish(admin.orgId, "platform.role.updated", { role_id: result.id, name: result.name });
+    await publish(admin.orgId, PLATFORM_EVENTS.roleUpdated, { role_id: result.id, name: result.name });
   }
   revalidatePath("/settings/roles");
   revalidatePath(`/settings/roles/${result.id}`);
@@ -302,7 +303,7 @@ export const deleteCustomRole = action(deleteCustomRoleSchema, async (input) => 
     return current;
   });
 
-  await publish(admin.orgId, "platform.role.deleted", { role_id: deleted.id, name: deleted.name });
+  await publish(admin.orgId, PLATFORM_EVENTS.roleDeleted, { role_id: deleted.id, name: deleted.name });
   revalidatePath("/settings/roles");
   return { id: deleted.id };
 });

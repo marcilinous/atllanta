@@ -72,6 +72,32 @@ describe('publishEvent', () => {
   });
 });
 
+describe('platform events (Phase 3 Step 5)', async () => {
+  const { PLATFORM_EVENTS, PLATFORM_EVENT_TYPES } = await import('../src/lib/events/platform-events.ts');
+
+  test('the five names follow module.entity.action and are distinct', () => {
+    assert.equal(PLATFORM_EVENT_TYPES.length, 5);
+    assert.equal(new Set(PLATFORM_EVENT_TYPES).size, 5);
+    for (const t of PLATFORM_EVENT_TYPES) assert.match(t, /^platform\.(module|role)\.[a-z]+$/);
+    assert.equal(PLATFORM_EVENTS.moduleEnabled, 'platform.module.enabled');
+  });
+
+  test('no new-stack subscriber is registered for them yet', () => {
+    for (const t of PLATFORM_EVENT_TYPES) assert.equal(subscribers[t], undefined);
+  });
+
+  test('the drain completes every one of them', async () => {
+    const batch = PLATFORM_EVENT_TYPES.map((t, i) => event({ id: `p-${i}`, event_type: t }));
+    const c = client({ claim_events: { data: batch, error: null } });
+    const r = await drainEvents(c, 20);
+    assert.deepEqual(r, { success: true, data: { claimed: 5, completed: 5, failed: 0 } });
+    assert.deepEqual(
+      c.calls.filter(x => x.fn === 'resolve_event').map(x => x.args),
+      batch.map(e => ({ event_id: e.id, new_status: 'completed' }))
+    );
+  });
+});
+
 describe('drainEvents', () => {
   test('claims a batch and completes events that have no subscribers', async () => {
     const c = client({ claim_events: { data: [event(), event({ id: 'e-2' })], error: null } });
