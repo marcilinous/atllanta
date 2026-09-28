@@ -128,6 +128,28 @@ begin
 end
 $notifications$;
 
+-- 2b. The audit log is for owners, admins and developers only (v1.4.1) -------
+
+do $audit$
+declare
+  admin_a uuid := 'aaaaaaa1-0000-0000-0000-000000000001';
+  member_a uuid := 'aaaaaaa1-0000-0000-0000-000000000002';
+  n integer;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', admin_a, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', admin_a::text, true);
+  select count(*) into n from audit_logs;
+  if n <> 1 then raise exception 'isolation: admin A saw % own audit row(s), expected 1', n; end if;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', member_a, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', member_a::text, true);
+  select count(*) into n from audit_logs;
+  if n <> 0 then raise exception 'isolation: member A read % audit row(s); only owners, admins and developers may', n; end if;
+  perform set_config('role', 'postgres', true);
+end
+$audit$;
+
 -- 3. Writes: nothing of the other organisation can be created or changed -----
 
 do $writes$
