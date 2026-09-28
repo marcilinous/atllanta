@@ -40,23 +40,25 @@
   by any screen); and owners/admins can switch modules, manage custom roles
   and edit feature access from **Admin → Modules & roles** (the first real
   new-stack screens). Phase 2 is live as v1.3.0 + v1.3.1, tagged `v0.2.0`.
-- **Update 2026-09-28:** **v1.4.2 is live** (PR #125, `2325f81`,
-  deployment `dpl_5WaXxZ2R6V8gePSw79NUb5YzfQdc`, built from the production
-  branch) — Phase 3 **Step 5 done**. v1.4.1 (audit log for owners, admins
-  and developers only) is merged too (#124, `b9d6604`), and tags v1.4.0,
-  v1.4.1 (re-pointed) and v1.4.2 each sit on their release merge. The
-  dashboard-feed change missed #125's merge and follows as **v1.4.3** on
-  `claude/release-1.4.3`.
-- **Next:** Phase 3 **Step 3**
-  (enforcement), which waits until org admins have been told to switch
-  their modules on — plus the Members screen (custom-role assignment) and
-  the developer-role capabilities from the 2026-09-27 owner decisions. Plan:
-  `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md` (order
-  0 → 1 → 2 → 4 → 5 → 3). Start from a branch off the production branch.
+- **Update 2026-09-28:** **v1.4.3 is live** (PR #126 → `cf39b0b`, tag on
+  the merge): Phase 3 Steps 0–2, 4 and 5 are live, with the audit log
+  limited to owners/admins/developers (v1.4.1) and admin events hidden from
+  the dashboard feed (v1.4.3). **Step 3 (enforcement) is built as v1.5.0 on
+  `claude/phase-3-step3-enforce` and deliberately held**: on 2026-09-28 no
+  organisation had switched on any module (RTcompu, 63 users, included),
+  so shipping it would hide every module from all 67 users. Go-live is the
+  owner's call once the readiness query in the Phase 3 notes shows each
+  org's modules on.
+- **Next:** v1.5.0's go-live (owner), then the Members screen (custom-role
+  assignment) and the developer-role capabilities from the 2026-09-27
+  owner decisions, which finish Phase 3's item 4 (Server Actions and the AI
+  path calling `requirePermission`). Plan:
+  `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md`. Start from a
+  branch off the production branch.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.2** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.3** live since
 2026-09-28), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
@@ -562,6 +564,38 @@ to end (CLAUDE.md §3.5).
   (`claude/release-1.4.3`, the same change on a fresh branch off
   production). Gotcha: re-check a PR's head just before merging when a
   commit is pushed to it after review.
+- 2026-09-28 — **v1.4.3 shipped** (PR #126, head `cf8d5e7` → merge
+  `cf39b0b`, promoted from the production branch, tag on the merge). Live
+  `dashboard.js` carries the `platform.%` filter. The owner reports org
+  admins notified.
+- 2026-09-28 — **Step 3 built and held (v1.5.0,
+  `claude/phase-3-step3-enforce`).** `public/js/features.js` gains the
+  `org_modules` gate: `loadOrgModules(orgId)` at bootstrap (index.html,
+  before `loadFeatureAccess`), `MODULE_OF` (feature key → module key, a test
+  holds it equal to `FEATURE_MODULE` in `permissions-core.ts`), checked in
+  `isFeatureAllowed` beside the CRM and partner-pack flags and, like them,
+  **not bypassed by owners/admins**. It is AND-ed with those flags, so a
+  non-RTcompu org switching on "Partner CRM" still sees nothing of the
+  pack. Non-module screens (dashboard, reports, admin, settings, audit)
+  are never hidden, so an admin can always reach Modules & roles. A failed
+  load — error *or* a thrown exception — leaves the gate off (pre-1.5
+  behaviour) and warns: this is a navigation gate on top of RLS, so failing
+  open exposes nothing, failing closed would lock a whole org out (the
+  thrown-exception case was caught by the test: it would have stopped the
+  app loading). +8 gating tests, 310/310.
+  **Why held:** on 2026-09-28 `org_modules` had **no row switched on in any
+  org** — RTcompu (63 users, partner pack) included. Readiness check before
+  go-live (read-only):
+  `select o.name, string_agg(m.module_key, ',' order by m.module_key) from
+  organizations o left join org_modules m on m.org_id = o.id and
+  m.is_enabled group by o.name;` — every org with active users should list
+  what it uses; RTcompu at least `people, me, inbox, crm, crm_partner` plus
+  whatever else it uses today. Rollback after go-live: redeploy v1.4.3 (no
+  database change).
+  Not in this step: server-side module checks on the legacy `/api`
+  endpoints and RLS-level module enforcement — per module at its cutover,
+  as the plan says; the new stack's `requirePermission()` already denies a
+  disabled module.
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits

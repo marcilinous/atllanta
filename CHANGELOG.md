@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.5.0 — 2026-09-28
+
+### What changed
+- **Modules you haven't switched on are now hidden.** The switches under **Admin → Modules & roles → Modules** take effect: a module that is off disappears from the sidebar and its pages can't be opened — for everyone in your organisation, owners and admins included.
+- The dashboard, reports, the Admin panel and your settings are not modules and are always there, so an owner or admin can always switch a module back on.
+- If the list of switched-on modules can't be loaded, the app shows every module as before rather than hiding them.
+
+### Admins need to
+- **Before this release reaches you**, open **Admin → Modules & roles → Modules** and switch on every module your organisation uses. Anything left off will disappear for everyone when this ships.
+
 ## v1.4.3 — 2026-09-28
 
 ### What changed
