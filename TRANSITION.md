@@ -28,11 +28,19 @@
 
 ## Current State
 
-- **Version:** `v0.1.0` — Phase 1 complete (platform schema, policies, Server
-  Action pattern, event bus stub, two-org isolation test)
-- **Active phase:** Phase 2 (Auth & Server Action Pipeline) — Phase 1 complete
+- **Version:** `v0.3.0` — **Phase 3 complete** (2026-09-29, owner): roles,
+  custom roles, module enablement live end to end; item 4 carried forward
+  to Phases 4 and 9 (see Phase 3 notes).
+- **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-26 — **Phase 3 Steps 0, 1, 2 and 4 are live**
+- **Last updated:** 2026-09-29 — **v1.7.0 is live** (#130, `3efe7a4`,
+  tagged): the developer role, on top of v1.6.0 (module switches enforced)
+  and v1.5.0 (Members screen). Owner tested the developer role in
+  production. Google sign-in is switched on and working (verified in the
+  auth log, 10:31 UTC). **Known issue:** password-reset emails do not send
+  until a Resend domain is bought and verified (owner: on hold) — see
+  Decisions & Blockers, 2026-09-29.
+- **Update 2026-09-26:** **Phase 3 Steps 0, 1, 2 and 4 are live**
   as legacy **v1.3.2–v1.4.0** (production `705e23c`, PR #121): only owners
   grant or remove `owner`; the `roles` / `role_permissions` / `org_modules`
   tables exist with every module **off** and nothing enforcing them;
@@ -70,18 +78,16 @@
   **v1.7.0** on `claude/phase-3-developer` (Decisions 2026-09-27 item 2);
   its migration is **applied** (2026-09-29, `20260929065828`); the code half
   ships with the v1.7.0 deployment.
-- **Next:** Phase 3's one open item is **item 4** — `requirePermission()`
-  "used by every Server Action and by the AI Assistant path". The resolver
-  exists and is tested, but no module Server Action exists yet on the new
-  stack (the settings actions are owner/admin capabilities, gated by
-  `requireOrgAdmin`), and the AI path is still legacy. It is naturally met
-  by Phase 4 (HRMS actions) and Phase 9 (AI) — owner's call whether to close
-  Phase 3 (v0.3.0) with item 4 carried forward, or hold it open.
+- **Next:** Phase 4 (HRMS Migration), first unchecked item —
+  `src/db/schema/hrms.ts`. Read the Phase 4 notes first: the live HRMS
+  carries features the target list omits, and every HRMS Server Action
+  must call `requirePermission()` (Phase 3 item 4, carried forward). Start
+  from a branch off the production branch.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.3** live since
-2026-09-28), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.7.0** live since
+2026-09-29), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -98,7 +104,7 @@ vanilla-JS/Supabase-direct code no longer runs in production.
 |---|---|---|
 | v0.1.0 | Phase 1 — Next.js/Drizzle scaffold + Platform module | ✅ 2026-09-23 |
 | v0.2.0 | Phase 2 — Auth, RLS, Server Action pipeline | ✅ 2026-09-26 |
-| v0.3.0 | Phase 3 — Roles, custom roles, module enablement | ☐ |
+| v0.3.0 | Phase 3 — Roles, custom roles, module enablement | ✅ 2026-09-29 |
 | v0.4.0 | Phase 4 — HRMS migrated | ☐ |
 | v0.5.0 | Phase 5 — Recruitment migrated | ☐ |
 | v0.6.0 | Phase 6 — CRM (generic + custom engine) migrated | ☐ |
@@ -437,7 +443,7 @@ all live in Drizzle schema, RLS policies applied, nothing user-facing yet.
 
 ---
 
-## Phase 3 — Roles, Custom Roles, Module Enablement
+## Phase 3 — Roles, Custom Roles, Module Enablement ✅ Done (v0.3.0, 2026-09-29)
 
 **Goal:** `org_modules`, `roles`, `role_permissions` live and enforced end
 to end (CLAUDE.md §3.5).
@@ -633,6 +639,20 @@ to end (CLAUDE.md §3.5).
   exercised in a signed-in browser — needs the owner signing in against a
   `next start` build or the preview, as for Phase 2; (d) Vercel's function
   count after this change is unconfirmed until a preview deploys (was 2).
+  — (a) resolved by the Members screen (v1.5.0); (c) resolved by the
+  owner's browser checks of v1.4.0–v1.7.0.
+- 2026-09-29 — **v1.7.0 shipped** (#130 → `3efe7a4`, tagged). The owner
+  tested the developer role in production: the four Admin cards, Modules &
+  roles view-only, the Audit Log reachable.
+- 2026-09-29 — **Phase 3 closed as v0.3.0** (owner). Items 1, 2, 3 and 5 are
+  done and live. **Item 4 is carried forward, not done:** the resolver
+  (`permissions.ts`) exists, is tested and already denies a disabled module,
+  but "used by every Server Action and by the AI Assistant path" can only
+  be met once module Server Actions exist — the settings actions are
+  owner/admin capabilities (`requireOrgAdmin`), not module actions. It
+  moves to Phase 4 (every HRMS action calls `requirePermission`) and Phase 9
+  (the AI path calls the same function). See Decisions & Blockers,
+  2026-09-29.
 
 ---
 
@@ -656,6 +676,12 @@ running on the new stack; old vanilla-JS HRMS views retired.
   documents/files, lifecycle and letters, `work_locations` + geofenced check-in,
   `posts` (noticeboard), and the approvals inbox. Fold them in or decide explicitly
   to drop them before this phase starts.
+- 2026-09-29 — Carried in from Phase 3 item 4: **every HRMS Server Action
+  calls `requirePermission(module, permission)`** (`src/lib/auth/
+  permissions.ts`) with the right module key (`people`, `me`, `inbox`,
+  `documents`, `finance`, `announcements`) — so both gates apply (org
+  module on, role/custom-role grants) as CLAUDE.md §1 requires. Module
+  enforcement is live in the legacy nav since v1.6.0.
 
 ---
 
@@ -779,7 +805,11 @@ _(none yet)_
 - [ ] `developer`-role-only access to Langfuse trace views confirmed
 
 **Notes:**
-_(none yet)_
+- 2026-09-29 — Carried in from Phase 3 item 4: the AI Assistant path must
+  call the same `requirePermission()` as Server Actions (CLAUDE.md §3.5 —
+  "the AI Assistant is not an exception"). The `developer` role exists and
+  is assignable since v1.7.0, with `can_manage_developer_tools()` for its
+  tools — Langfuse trace access should follow that capability pattern.
 
 ---
 
@@ -807,6 +837,32 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-29 — Phase 3 closed; password-reset email on hold; Google sign-in on
+
+1. **Phase 3 closed as v0.3.0 with item 4 carried forward** (owner). See the
+   Phase 3 notes; the item moves to Phase 4 (HRMS Server Actions) and
+   Phase 9 (AI path). Not ticked — it is not done.
+2. **Password-reset email is broken in production, on hold** (owner:
+   waiting for a domain purchase). Two separate faults, found in Supabase's
+   auth log:
+   - The Reset Password template had broken HTML (`"<" in attribute name`),
+     so `/recover` answered 500 before sending. **Fixed by the owner** in the
+     Supabase dashboard with a clean template linking to
+     `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`.
+   - Supabase Auth sends through **Resend** (custom SMTP) with a
+     **@gmail.com sender**, which Resend rejects (`550 The gmail.com domain
+     is not verified`) — `/recover` still answers 500 and no email goes out.
+     **Blocked** until a domain is bought and verified in Resend; then set
+     the SMTP sender to an address on it (e.g. the one `RESEND_FROM` uses
+     for app notifications — default `notifications@atllanta.app`).
+   Until then **users cannot reset a forgotten password** themselves.
+   Gotcha: `/recover` answers **200 and sends nothing** for an email with no
+   account (Supabase's anti-enumeration), so "it said sent" is not proof.
+3. **Google sign-in switched on** (owner). The first attempt failed with
+   `invalid_client` (wrong client secret); after the fix the auth log shows
+   a successful Google login (2026-09-29 10:31 UTC). Google sign-in is the
+   working way back in for anyone locked out while reset email is down.
 
 ### 2026-09-27 — Owner decisions after v1.4.0 (Phase 3)
 
