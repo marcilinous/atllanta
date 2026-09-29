@@ -38,6 +38,7 @@ import {
   updateCustomRoleSchema,
   deleteCustomRoleSchema,
   setFeatureRuleSchema,
+  setMemberCustomRoleSchema,
 } from "./schemas";
 
 async function publish(orgId: string, eventType: PlatformEventType, payload: Record<string, unknown>) {
@@ -390,4 +391,70 @@ export const setFeatureRule = action(setFeatureRuleSchema, async (input) => {
 
   revalidatePath("/settings/access");
   return { featureKey: input.featureKey, value: input.value };
+});
+
+// ---------------------------------------------------------------------------
+// Members: assign a custom role (owner decision 2026-09-27)
+// ---------------------------------------------------------------------------
+
+export const setMemberCustomRole = action(setMemberCustomRoleSchema, async (input) => {
+  const admin = await requireOrgAdmin();
+
+  // users_guard_admin_fields() refuses a self change too, but as a generic
+  // database error; say why instead.
+  if (input.userId === admin.userId) {
+    throw new ActionError("You can't change your own role. Ask another owner or admin.");
+  }
+
+  const changed = await withTransaction({ id: admin.userId }, async (tx, audit) => {
+    const [person] = await tx
+      .select({ role: users.role, customRoleId: users.customRoleId, status: users.status })
+      .from(users)
+      .where(and(eq(users.id, input.userId), eq(users.orgId, admin.orgId)))
+      .limit(1);
+    if (!person || person.status === "exited") {
+      throw new ActionError("That person was not found in your organisation.");
+    }
+    // A custom role replaces module permissions, so it can narrow what an
+    // owner may do. Only an owner may change an owner's, mirroring the rule
+    // that only an owner grants or removes the owner role. (Enforced here;
+    // the database guard covers the owner role itself, not custom_role_id.)
+    if (person.role === "owner" && admin.role !== "owner") {
+      throw new ActionError("Only an owner can change an owner's role.");
+    }
+    if ((person.customRoleId ?? null) === input.customRoleId) return false;
+
+    let roleName: string | null = null;
+    if (input.customRoleId) {
+      const [role] = await tx
+        .select({ name: roles.name })
+        .from(roles)
+        .where(and(eq(roles.id, input.customRoleId), eq(roles.orgId, admin.orgId), eq(roles.isSystem, false)))
+        .limit(1);
+      if (!role) throw new ActionError("That role was not found. It may have been deleted.");
+      roleName = role.name;
+    }
+
+    const rows = await tx
+      .update(users)
+      .set({ customRoleId: input.customRoleId })
+      .where(and(eq(users.id, input.userId), eq(users.orgId, admin.orgId)))
+      .returning({ id: users.id });
+    if (rows.length === 0) throw new ActionError("Only owners and admins can change these settings.");
+
+    await audit({
+      orgId: admin.orgId,
+      module: "platform",
+      entityType: "user",
+      entityId: input.userId,
+      action: input.customRoleId ? "custom_role_assigned" : "custom_role_removed",
+      oldValues: { custom_role_id: person.customRoleId ?? null },
+      newValues: { custom_role_id: input.customRoleId, custom_role_name: roleName },
+    });
+    return true;
+  });
+
+  revalidatePath("/settings/members");
+  revalidatePath("/settings/roles");
+  return { userId: input.userId, customRoleId: input.customRoleId, changed };
 });

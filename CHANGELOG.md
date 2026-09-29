@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.5.0 — 2026-09-29
+
+### What changed
+- New for owners and admins: **Admin → Modules & roles → Members** lets you give a person one of your custom roles, or take it away. A custom role changes what they may do in the modules it lists; everywhere else their built-in role (Owner, Admin, Manager, Member, Developer) still applies.
+- Nobody can change their own role, and only an owner can change an owner's.
+- Built-in roles are still changed where they always were, under Admin → User Management.
+
+### Admins need to
+- Nothing. Custom roles only take effect for people you assign them to.
+
 ## v1.4.3 — 2026-09-28
 
 ### What changed

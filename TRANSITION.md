@@ -47,16 +47,20 @@
   v1.4.1 (re-pointed) and v1.4.2 each sit on their release merge. The
   dashboard-feed change missed #125's merge and follows as **v1.4.3** on
   `claude/release-1.4.3`.
-- **Next:** Phase 3 **Step 3**
-  (enforcement), which waits until org admins have been told to switch
-  their modules on — plus the Members screen (custom-role assignment) and
-  the developer-role capabilities from the 2026-09-27 owner decisions. Plan:
-  `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md` (order
-  0 → 1 → 2 → 4 → 5 → 3). Start from a branch off the production branch.
+- **Update 2026-09-29:** v1.4.3 is live (#126). Phase 3 **Step 3**
+  (enforcement) is built and **held** on draft PR #127 until the
+  organisations switch on their remaining modules (owner); its full notes
+  live on that branch. The **Members screen** is built as **v1.5.0** on
+  `claude/phase-3-members` (below, Decisions 2026-09-27 item 1); #127 is
+  renumbered when it is rebased for go-live.
+- **Next:** the developer-role capabilities (Decisions 2026-09-27 item 2),
+  then Step 3's go-live when the owner calls it. Plan:
+  `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md`. Start from a
+  branch off the production branch.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.2** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.4.3** live since
 2026-09-28), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
@@ -758,6 +762,20 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
    `users.custom_role_id` through a Server Action like the Step 4 ones;
    `users_guard_admin_fields()` already refuses a self-assignment and a role
    from another org. Until it ships, custom roles have no effect.
+   **Built 2026-09-29 as v1.5.0** (`claude/phase-3-members`):
+   `/settings/members` lists active members with their built-in role and a
+   custom-role picker; `setMemberCustomRole` (Server Action) takes the org
+   from the caller, refuses a self change with a clear message, lets **only
+   an owner change an owner's custom role** (a custom role can narrow what
+   an owner may do; the database guard covers the owner role itself, not
+   `custom_role_id` — enforced in the action, and mirrored in the UI),
+   checks the role is one of this org's custom roles, writes under RLS as
+   the caller and audits (`custom_role_assigned` / `custom_role_removed`).
+   No event (§3.5 names none). Verified on production in an
+   always-rolled-back transaction: admin assigns (stored) and clears; self,
+   another org's role and a system role are refused by the database
+   (42501); a member's update takes no effect. Afterwards 0 probe roles and
+   0 users with a custom role. 305/305 unit tests.
 2. **The `developer` role** (resolves the Phase 3 open item of 2026-09-26):
    - **Read/write:** developer tools — API keys, webhooks, error and audit
      logs, integrations.

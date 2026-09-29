@@ -73,6 +73,14 @@ export const deleteCustomRoleSchema = z.object({
 });
 export type DeleteCustomRoleInput = z.infer<typeof deleteCustomRoleSchema>;
 
+// Members screen (owner decision 2026-09-27): give a person one of the org's
+// custom roles, or none (null) to return them to their base role alone.
+export const setMemberCustomRoleSchema = z.object({
+  userId: z.uuid("Choose a valid person."),
+  customRoleId: z.uuid("Choose a valid role.").nullable(),
+});
+export type SetMemberCustomRoleInput = z.infer<typeof setMemberCustomRoleSchema>;
+
 const featureKey = z.enum(ACCESS_FEATURE_KEYS, "Choose a valid feature.");
 
 // A role rule is a tick box (visible, or hidden); a person's rule can also

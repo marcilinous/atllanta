@@ -128,6 +128,57 @@ export async function loadCustomRole(admin: OrgAdmin, roleId: string): Promise<C
   return custom.find((r) => r.id === roleId) ?? null;
 }
 
+export interface MemberRow {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string;
+  customRoleId: string | null;
+  isSelf: boolean;
+}
+
+export interface MembersData {
+  members: MemberRow[];
+  customRoles: { id: string; name: string }[];
+  callerRole: OrgAdmin["role"];
+}
+
+/** Active members of the caller's org with their custom role, plus the org's custom roles to choose from. */
+export async function loadMembers(admin: OrgAdmin): Promise<MembersData> {
+  return withTransaction({ id: admin.userId }, async (tx) => {
+    const people = await tx
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        role: users.role,
+        customRoleId: users.customRoleId,
+      })
+      .from(users)
+      .where(and(eq(users.orgId, admin.orgId), eq(users.status, "active")))
+      .orderBy(asc(users.fullName));
+
+    const customRoles = await tx
+      .select({ id: roles.id, name: roles.name })
+      .from(roles)
+      .where(and(eq(roles.orgId, admin.orgId), eq(roles.isSystem, false)))
+      .orderBy(asc(roles.name));
+
+    return {
+      members: people.map((p) => ({
+        id: p.id,
+        name: p.fullName || p.email || "Unnamed",
+        email: p.email,
+        role: p.role ?? "member",
+        customRoleId: p.customRoleId ?? null,
+        isSelf: p.id === admin.userId,
+      })),
+      customRoles,
+      callerRole: admin.role,
+    };
+  });
+}
+
 export interface AccessPerson {
   id: string;
   name: string;

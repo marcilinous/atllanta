@@ -138,6 +138,18 @@ describe('schemas', () => {
     assert.ok(!createCustomRoleSchema.safeParse({ name: 'Ops', grants: [{ moduleKey: 'crm', permissions: ['view', 'own'] }] }).success);
   });
 
+  test('member custom role: a person id and a role id, or null to clear', async () => {
+    const { setMemberCustomRoleSchema } = await import('../src/lib/settings/schemas.ts');
+    const ok = (v) => setMemberCustomRoleSchema.safeParse(v).success;
+    assert.ok(ok({ userId: UUID, customRoleId: UUID }));
+    assert.ok(ok({ userId: UUID, customRoleId: null }));
+    assert.ok(!ok({ userId: UUID }), 'clearing must be explicit');
+    assert.ok(!ok({ userId: 'me', customRoleId: null }));
+    assert.ok(!ok({ userId: UUID, customRoleId: 'owner' }), 'a system role slug is not a custom role id');
+    const parsed = setMemberCustomRoleSchema.parse({ userId: UUID, customRoleId: null, orgId: UUID });
+    assert.equal('orgId' in parsed, false);
+  });
+
   test('update needs a role id', () => {
     assert.ok(!updateCustomRoleSchema.safeParse({ roleId: 'nope', name: 'Ops', grants: [] }).success);
     assert.ok(updateCustomRoleSchema.safeParse({ roleId: UUID, name: 'Ops', grants: [] }).success);
@@ -163,7 +175,7 @@ describe('static: the gate', () => {
     const exported = [...actions.matchAll(/export const (\w+) = action\([^,]+, async \(input\) => \{\n\s+const admin = await requireOrgAdmin\(\);/g)].map((m) => m[1]);
     const all = [...actions.matchAll(/export const (\w+) = action\(/g)].map((m) => m[1]);
     assert.deepEqual(exported, all);
-    assert.deepEqual(all.sort(), ['createCustomRole', 'deleteCustomRole', 'setFeatureRule', 'setModuleEnabled', 'updateCustomRole']);
+    assert.deepEqual(all.sort(), ['createCustomRole', 'deleteCustomRole', 'setFeatureRule', 'setMemberCustomRole', 'setModuleEnabled', 'updateCustomRole']);
   });
 
   test('events use the shared names and publish only after the transaction commits', () => {
@@ -174,7 +186,7 @@ describe('static: the gate', () => {
     // Each exported action's body: every publish( comes after its
     // withTransaction(...) call has been awaited and closed (`});`).
     const bodies = actions.split(/\nexport const \w+ = action\(/).slice(1);
-    assert.equal(bodies.length, 5);
+    assert.equal(bodies.length, 6);
     for (const body of bodies) {
       const tx = body.indexOf('await withTransaction(');
       const txEnd = body.indexOf('\n  });', tx);
@@ -213,6 +225,20 @@ describe('static: the gate', () => {
     assert.match(hub, /href: '\/settings\/modules', title: 'Modules & roles'/);
     // A path, not a hash route: the new screens live outside the legacy router.
     assert.doesNotMatch(hub, /#\/settings\/modules/);
+  });
+
+  test('members: nobody changes their own role, only owners change an owner\'s, and the role must be this org\'s custom role', () => {
+    const body = actions.split('export const setMemberCustomRole = action(')[1];
+    assert.ok(body, 'setMemberCustomRole exists');
+    assert.match(body, /if \(input\.userId === admin\.userId\) \{\n\s+throw new ActionError/);
+    assert.match(body, /if \(person\.role === "owner" && admin\.role !== "owner"\) \{\n\s+throw new ActionError/);
+    assert.match(body, /eq\(roles\.id, input\.customRoleId\), eq\(roles\.orgId, admin\.orgId\), eq\(roles\.isSystem, false\)/);
+    assert.match(body, /eq\(users\.id, input\.userId\), eq\(users\.orgId, admin\.orgId\)/);
+    assert.match(body, /await audit\(\{/);
+    // The UI mirrors the same two locks.
+    const table = read('app/(platform)/settings/members/members-table.tsx');
+    assert.match(table, /if \(m\.isSelf\) return/);
+    assert.match(table, /m\.role === "owner" && data\.callerRole !== "owner"/);
   });
 
   test('the guard refuses exited users and non-admins', () => {
