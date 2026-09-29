@@ -1,10 +1,13 @@
 import { esc } from '../../js/ui.js';
 import { navigate } from '../../js/router.js';
+import { isRouteAllowed } from '../../js/features.js';
 
 // CRM module hub. Accent is CRM blue (var(--color-accent) under data-module="crm").
 // Built objects link through; upcoming ones render as muted, non-interactive cards
 // so the module's shape is visible without dead links.
 export default async function crmHub(container) {
+  // Only cards this user can open: a card for a switched-off module (or a
+  // hidden feature) would lead to a "Not available" page.
   const live = [
     {
       title: 'Leads',
@@ -72,7 +75,7 @@ export default async function crmHub(container) {
       icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5-5 5 5M12 15V3',
       route: 'crm/reports',
     },
-  ];
+  ].filter((c) => isRouteAllowed(c.route));
 
   const soon = [];
 

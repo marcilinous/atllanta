@@ -139,11 +139,12 @@ describe('module gate', () => {
 
   test('a module the org has switched off is hidden, with its sub-routes and aliases', () => {
     const allowed = asOrg({ crm: true, pack: true, modules: ALL.filter(m => m !== 'people' && m !== 'crm') });
-    for (const r of ['people', 'employees/profile', 'lifecycle', 'crm', 'crm/leads', 'crm/opportunities']) {
+    for (const r of ['people', 'employees/profile', 'lifecycle', 'crm/leads', 'crm/opportunities']) {
       assert.equal(allowed(r), false, r);
     }
     assert.equal(allowed('recruitment'), true);
     assert.equal(allowed('crm/partners'), true, 'the partner pack is its own module');
+    assert.equal(allowed('crm'), true, 'the hub still opens for the partner pack');
   });
 
   test('an org with nothing switched on keeps only the non-module screens', () => {
@@ -190,6 +191,28 @@ describe('module gate', () => {
     F.setCrmEnabled(true); F.setPartnerPack(true);
     F.loadFeatureAccess({ orgId: null, userId: null, role: 'member', isAdmin: false });
     assert.equal(F.isRouteAllowed('crm'), true);
+  });
+
+  // The CRM hub (#/crm) fronts both generic CRM and the partner pack, like the
+  // sidebar CRM button (index.html shows it if crm OR crm_partners is allowed).
+  test('the CRM hub opens with only the partner pack switched on', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: ['crm_partner', 'people'] });
+    assert.equal(allowed('crm'), true, 'hub reachable');
+    assert.equal(allowed('crm?x=1'), true, 'hub with a query string');
+    assert.equal(allowed('crm/partners'), true);
+    assert.equal(allowed('crm/leads'), false, 'generic screens stay behind the crm module');
+    assert.equal(allowed('crm/opportunities'), false);
+  });
+
+  test('the CRM hub stays hidden when neither CRM module is on', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: ['people'] });
+    assert.equal(allowed('crm'), false);
+  });
+
+  test('the CRM hub only offers cards the user can open', () => {
+    const hub = fs.readFileSync(path.join(HERE, '..', 'public/views/crm/index.js'), 'utf8');
+    assert.match(hub, /import \{ isRouteAllowed \} from '\.\.\/\.\.\/js\/features\.js';/);
+    assert.match(hub, /\.filter\(\(?c\)? => isRouteAllowed\(c\.route\)\)/);
   });
 
   test('the legacy map equals the new stack\'s FEATURE_MODULE', async () => {

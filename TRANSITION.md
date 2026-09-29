@@ -592,6 +592,20 @@ to end (CLAUDE.md §3.5).
   what it uses; RTcompu at least `people, me, inbox, crm, crm_partner` plus
   whatever else it uses today. Rollback after go-live: redeploy v1.4.3 (no
   database change).
+  2026-09-29 readiness check (owner reports admins done): RTcompu has 10 on
+  — analytics, announcements, crm_partner, documents, finance, helpdesk,
+  inbox, me, people, projects — and left crm, recruitment, ai off (its data:
+  1 lead + 1 opportunity from 2026-09-16, 0 jobs, 0 candidates, 0 AI calls in
+  30 days). Hiretrack (2 users), Atllanta Pvt Ltd (1), Generic CRM Test Co
+  (1) and BlueHire (0) have **nothing** on. Found and fixed while checking:
+  the CRM hub route `#/crm` was gated as generic CRM, so a partner-only org
+  (RTcompu after go-live) could not open it — it now opens if either CRM
+  module is on (the sidebar button's rule), and the hub hides cards the user
+  cannot open. Open for the owner before go-live: in RTcompu's hub the
+  **Leads** ("prospects your partners report") and **Opportunities** ("UAP &
+  transacting win-back") cards are partner workflow but map to generic
+  `crm`, so they disappear unless RTcompu also switches on CRM; and the four
+  smaller orgs lose every module. 313/313 tests.
   Not in this step: server-side module checks on the legacy `/api`
   endpoints and RLS-level module enforcement — per module at its cutover,
   as the plan says; the new stack's `requirePermission()` already denies a

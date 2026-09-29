@@ -164,5 +164,9 @@ export function isFeatureAllowed(key) {
 }
 
 export function isRouteAllowed(path) {
+  // The CRM hub (#/crm) fronts both generic CRM and the partner pack, so it
+  // opens if either is allowed — the same rule as the sidebar CRM button.
+  const clean = (path || '').split('?')[0].replace(/\/$/, '');
+  if (clean === 'crm') return isFeatureAllowed('crm') || isFeatureAllowed('crm_partners');
   return isFeatureAllowed(featureForRoute(path));
 }
