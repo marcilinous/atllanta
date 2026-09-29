@@ -33,7 +33,14 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-29 (night) — **v1.7.1 is live** (#133,
+- **Last updated:** 2026-09-30 — **v1.8.0 is live** (new-stack leave
+  screens in preview; the `documents` storage bucket created, fixing every
+  legacy upload). **v1.9.0 (leave cutover) is built** on
+  `claude/leave-cutover`: `#/leave` and `#/leave/approvals` forward to the
+  new screens. RTcompu now has an admin. Next in Phase 4 item 3: the rest
+  of HRMS on the new stack (attendance, expenses, people, …), one area at a
+  time, each on the same two-gate Server Action pattern.
+- **Earlier (2026-09-29 night):** **v1.7.1 is live** (#133,
   `562a3a7`, tagged) with its migration applied: leave can no longer be
   self-approved, balances and holidays are owner/admin-only, and every
   deduction goes through one checked database function (Decisions &
@@ -93,8 +100,8 @@
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.7.1** live since
-2026-09-29), and follows
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.8.0** live since
+2026-09-30), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
 
@@ -772,6 +779,24 @@ running on the new stack; old vanilla-JS HRMS views retired.
   Not yet: switching the legacy nav to these screens (the cutover, owner's
   call after a browser check), leave settings/types/holidays/balance
   adjustments (still legacy), and viewing an attached document.
+- 2026-09-30 — **v1.8.0 shipped** (#135 → `b2fcdfe`, tagged; production
+  `dpl_7CDWPknghRGPTjx5EK4vjVix2vCe` from the production branch).
+  Verified: `/version.json` 1.8.0; `/hrms/leave` signed out redirects to
+  `/login`. RTcompu now has an admin (owner's report, checked live: 1 owner,
+  1 admin, 13 managers, 48 members), so the owner's leave can be approved.
+- 2026-09-30 — **Leave cutover built (v1.9.0, `claude/leave-cutover`),
+  owner's call ("switch leave over").** The legacy `#/leave` and
+  `#/leave/approvals` routes now forward to `/hrms/leave` and
+  `/hrms/leave/approvals` (`window.location.replace`, so Back does not
+  loop); every in-app link to `#/leave` follows. The legacy leave page's
+  other tabs are **not** ported and stay legacy: team calendar
+  (`#/leave/calendar`) and report (`#/leave/report`), linked from the new
+  screens' tabs (Approvals and Report shown only to people who can
+  approve), plus balances and settings under Admin. `views/leave/apply.js`
+  and `approvals.js` are no longer loaded but stay in the repo until
+  Phase 4 item 4 (retire legacy views once parity is confirmed). Other
+  legacy places that approve leave (the approvals inbox) keep working under
+  the v1.7.1 guard. 369/369 unit tests. Rollback: redeploy v1.8.0.
 
 ---
 

@@ -163,7 +163,6 @@ import dashboard from '/views/dashboard.js';
 import meView from '/views/me/index.js';
 import employeeList from '/views/employees/list.js';
 import attendanceDashboard from '/views/attendance/dashboard.js';
-import leaveApply from '/views/leave/apply.js';
 import recruitmentJobs from '/views/recruitment/jobs.js';
 import interviewsView from '/views/recruitment/interviews.js';
 import settingsOrg from '/views/settings/org.js';
@@ -184,7 +183,6 @@ import aiAssistant from '/views/ai/assistant.js';
 import auditLog from '/views/audit/log.js';
 import leaveCalendar from '/views/leave/calendar.js';
 import leaveBalances from '/views/leave/balances.js';
-import leaveApprovals from '/views/leave/approvals.js';
 import leaveReport from '/views/leave/report.js';
 import jobDetail from '/views/recruitment/job-detail.js';
 import orgChart from '/views/employees/orgchart.js';
@@ -467,7 +465,15 @@ registerRoute('inbox', inboxView);
 registerRoute('people', peopleHub);
 registerRoute('employees', employeeList);
 registerRoute('attendance', attendanceDashboard);
-registerRoute('leave', leaveApply);
+// Leave cutover (v1.9.0): requesting, my requests and approvals now live on
+// the new stack. A full page load (the new screens are outside this hash
+// router); replace() so Back doesn't bounce into the redirect again. Team
+// calendar, report, balances and settings stay here for now.
+const toNewStack = (path) => (container) => {
+  container.innerHTML = '<div style="padding:var(--space-6);color:var(--color-text-secondary)">Opening leave…</div>';
+  window.location.replace(path);
+};
+registerRoute('leave', toNewStack('/hrms/leave'));
 registerRoute('recruitment', recruitmentJobs);
 registerRoute('recruitment/jobs', recruitmentJobs);
 registerRoute('recruitment/interviews', interviewsView);
@@ -488,7 +494,7 @@ registerRoute('recruitment/upload', uploadResumes);
 registerRoute('recruitment/matcher', matcherView);
 registerRoute('leave/calendar', leaveCalendar);
 registerRoute('leave/balances', leaveBalances);
-registerRoute('leave/approvals', leaveApprovals);
+registerRoute('leave/approvals', toNewStack('/hrms/leave/approvals'));
 registerRoute('leave/report', leaveReport);
 registerRoute('recruitment/job', jobDetail);
 registerRoute('ai', aiAssistant);
