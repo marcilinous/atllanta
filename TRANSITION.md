@@ -606,6 +606,11 @@ to end (CLAUDE.md §3.5).
   transacting win-back") cards are partner workflow but map to generic
   `crm`, so they disappear unless RTcompu also switches on CRM; and the four
   smaller orgs lose every module. 313/313 tests.
+  **Owner, 2026-09-29:** RTcompu and the other organisations will switch
+  on their remaining modules later, so v1.5.0 (draft PR #127) **stays
+  held**; go-live is the owner's call after a fresh readiness check. Work
+  that does not depend on it (Members screen, developer role) goes ahead
+  on branches off production.
   Not in this step: server-side module checks on the legacy `/api`
   endpoints and RLS-level module enforcement — per module at its cutover,
   as the plan says; the new stack's `requirePermission()` already denies a
