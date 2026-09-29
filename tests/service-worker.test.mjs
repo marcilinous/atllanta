@@ -75,6 +75,8 @@ for (const url of [
   'https://atllanta.vercel.app/session',
   'https://atllanta.vercel.app/auth/confirm?token_hash=x&type=recovery',
   'https://atllanta.vercel.app/health',
+  'https://atllanta.vercel.app/hrms/leave',
+  'https://atllanta.vercel.app/hrms/leave/approvals',
 ]) {
   test(`new-stack page bypasses the worker: ${new URL(url).pathname}`, async () => {
     const { dispatch } = loadWorker();

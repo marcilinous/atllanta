@@ -8,6 +8,7 @@ import { MODULE_KEYS, PERMISSIONS, type ModuleKey, type Permission } from "./mod
 import {
   isSystemRole,
   can,
+  canSeeFeature,
   type PermissionContext,
   type FeatureRule,
   type SystemRole,
@@ -118,5 +119,36 @@ export async function requirePermission(module: ModuleKey, permission: Permissio
   if (!ctx || !can(ctx, module, permission)) {
     throw new ActionError("You don't have access to do that.");
   }
+  return ctx;
+}
+
+/**
+ * Both gates of CLAUDE.md §3 (decision 2026-09-18): the org module is on and
+ * the role grants `permission` (requirePermission), AND feature_access lets
+ * this person see `featureKey` (canSeeFeature). Module Server Actions call
+ * this, so an action is refused for anyone the legacy nav would hide it from.
+ */
+export async function requireFeature(
+  featureKey: string,
+  module: ModuleKey,
+  permission: Permission
+): Promise<PermissionContext> {
+  const ctx = await requirePermission(module, permission);
+  if (!canSeeFeature(ctx, featureKey)) {
+    throw new ActionError("You don't have access to do that.");
+  }
+  return ctx;
+}
+
+/** The same two gates for a page: null instead of throwing, for a friendly screen. */
+export async function featureContext(
+  featureKey: string,
+  module: ModuleKey,
+  permission: Permission
+): Promise<PermissionContext | null> {
+  const user = await getSessionUser();
+  if (!user) return null;
+  const ctx = await loadPermissionContext(user);
+  if (!ctx || !can(ctx, module, permission) || !canSeeFeature(ctx, featureKey)) return null;
   return ctx;
 }
