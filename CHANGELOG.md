@@ -5,6 +5,18 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.7.1 — 2026-09-29
+
+### What changed
+- Security: leave can no longer be misused from outside the app's screens. Before, any signed-in person could approve their own leave, change their own or a colleague's leave balance, add company holidays, or send a request already marked approved.
+- Nobody can approve or reject their own leave. An owner's or admin's leave is approved by an admin or another owner; everyone else's by an admin, their reporting manager, or a manager over their department — as the approvals screen already shows.
+- Only the person who asked can cancel a leave request, and only while it is pending. A request can't be edited after it is sent.
+- Leave balances and holidays can only be changed by owners and admins.
+- Approved leave is always deducted from the right balance exactly once, from the request itself.
+
+### Admins need to
+- If your organisation has no admin, an owner's leave can only be approved by another owner — consider making a trusted person an admin.
+
 ## v1.7.0 — 2026-09-29
 
 ### What changed

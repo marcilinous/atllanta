@@ -182,38 +182,32 @@ describe('replay safety', () => {
   const createdEvent = { id: 'ev-1', org_id: 'org-1', event_type: 'people.employee.created', attempts: 0,
     payload: { employee_id: 'u-1', org_id: 'org-1' } };
 
-  test('leave.request.approved claims the side effect and applies usage atomically, once', async () => {
+  // v1.7.1: the deduction is one database call, apply_approved_leave_usage,
+  // given only the request id and the event id. The function reads the real
+  // request and deduplicates per request inside the database (advisory lock +
+  // side-effect key, incl. the pre-v1.2.5 bare key) — verified on production
+  // in a rolled-back probe; here we hold the JavaScript to that contract.
+  test('leave.request.approved deducts through apply_approved_leave_usage with the request id only', async () => {
     S.pending = [approvedEvent];
     await handler(req('GET', 'Bearer test-secret'), res());
-
-    const claimAt = S.calls.findIndex(c => c.rpc === 'claim_side_effect');
-    const applyAt = S.calls.findIndex(c => c.rpc === 'apply_leave_usage');
-    assert.ok(claimAt !== -1, 'expected claim_side_effect to be called');
-    // Changed: dedup is now PER REQUEST, not per event — the effect key is
-    // derived from the leave_requests row id (lr-1) instead of the fixed
-    // literal "leave_used", so a fresh fake event for the same request
-    // can't deduct usage twice (see event-recipes-org-scope.test.mjs).
-    assert.deepEqual(S.calls[claimAt].args, { p_event_id: 'ev-1', p_effect_key: 'leave_used:lr-1' });
-    assert.ok(applyAt !== -1, 'expected apply_leave_usage to be called');
-    assert.ok(claimAt < applyAt, 'claim must happen before applying usage');
-    assert.deepEqual(S.calls[applyAt].args, {
-      p_user_id: 'u-2',
-      p_leave_type_id: 'lt-1',
-      p_year: new Date().getFullYear(),
-      p_days: 2,
-    });
+    const applies = S.calls.filter(c => c.rpc === 'apply_approved_leave_usage');
+    assert.equal(applies.length, 1);
+    assert.deepEqual(applies[0].args, { p_leave_request_id: 'lr-1', p_event_id: 'ev-1' });
+    for (const old of ['apply_leave_usage', 'claim_side_effect']) {
+      assert.equal(S.calls.some(c => c.rpc === old), false, `${old} is no longer called`);
+    }
     assert.equal(
-      S.calls.some(c => c.table === 'leave_balances' && c.ops[0][0] === 'update'),
+      S.calls.some(c => c.table === 'leave_balances' && ['update', 'insert', 'upsert'].includes(c.ops[0][0])),
       false,
-      'must not read-then-update leave_balances directly'
+      'never writes leave_balances directly'
     );
   });
 
-  test('leave.request.approved skips apply_leave_usage when the side effect was already claimed', async () => {
+  test('leave.request.approved deducts nothing when the reloaded request is not approved', async () => {
     S.pending = [approvedEvent];
-    S.firstTime = false;
+    S.leaveRequest = { ...S.leaveRequest, status: 'pending' };
     await handler(req('GET', 'Bearer test-secret'), res());
-    assert.equal(S.calls.some(c => c.rpc === 'apply_leave_usage'), false, 'apply_leave_usage must not run on replay');
+    assert.equal(S.calls.some(c => c.rpc === 'apply_approved_leave_usage'), false);
   });
 
   test('people.employee.created upserts leave_balances with ignoreDuplicates so replay cannot reset used to 0', async () => {
@@ -233,24 +227,14 @@ describe('replay safety', () => {
     assert.ok(call, 'expected a "event completion write failed:" console.error call');
   });
 
-  test('a claim_side_effect error is thrown, so the event is retried and apply_leave_usage never runs', async () => {
+  test('an apply_approved_leave_usage error fails the attempt, so the event is retried', async () => {
+    // The function records nothing unless it deducts, so a retry is safe.
     S.pending = [approvedEvent];
-    S.rpcErrors.claim_side_effect = true;
+    S.rpcErrors.apply_approved_leave_usage = true;
     const r = res();
     await handler(req('GET', 'Bearer test-secret'), r);
-    assert.equal(S.calls.some(c => c.rpc === 'apply_leave_usage'), false, 'apply_leave_usage must not run when claim_side_effect errors');
     assert.deepEqual(r.body, { processed: 0, failed: 1, skipped: 0, total: 1 });
-  });
-
-  test('an apply_leave_usage error after a successful claim is logged loudly, not retried', async (t) => {
-    const errorMock = t.mock.method(console, 'error', () => {});
-    S.pending = [approvedEvent];
-    S.rpcErrors.apply_leave_usage = true;
-    const r = res();
-    await handler(req('GET', 'Bearer test-secret'), r);
-    const call = errorMock.mock.calls.find(c => c.arguments[0] === 'leave usage apply failed after claim:');
-    assert.ok(call, 'expected a "leave usage apply failed after claim:" console.error call');
-    assert.deepEqual(r.body, { processed: 1, failed: 0, skipped: 0, total: 1 });
+    assert.equal(S.calls.some(c => c.table === 'attendance'), false, 'attendance is not marked before the deduction succeeds');
   });
 });
 

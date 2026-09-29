@@ -162,57 +162,16 @@ const recipes = {
     );
     if (!req || req.status !== "approved") return;
 
-    // Dedup PER REQUEST, not per event: event_side_effects' primary key is
-    // (event_id, effect_key), so a fresh fake event for the same request would
-    // otherwise deduct again.
-    const effectKey = `leave_used:${req.id}`;
-    const { count } = await sb
-      .from("event_side_effects")
-      .select("*", { count: "exact", head: true })
-      .eq("effect_key", effectKey);
-    // Before v1.2.5 the claim key was the bare "leave_used", recorded against
-    // whichever event applied it. Count those too, or a fresh event for a
-    // request approved before this release would deduct a second time.
-    let legacyApplied = false;
-    if (!(count > 0)) {
-      const { data: earlier } = await sb
-        .from("events")
-        .select("id")
-        .eq("org_id", orgId)
-        .eq("event_type", "leave.request.approved")
-        .eq("payload->>leave_request_id", req.id)
-        .neq("id", event.id);
-      const earlierIds = (earlier || []).map((e) => e.id);
-      if (earlierIds.length) {
-        const { count: legacyCount } = await sb
-          .from("event_side_effects")
-          .select("*", { count: "exact", head: true })
-          .eq("effect_key", "leave_used")
-          .in("event_id", earlierIds);
-        legacyApplied = legacyCount > 0;
-      }
-    }
-    const alreadyApplied = count > 0 || legacyApplied;
-
-    // Atomic in-DB claim, applied at most once per request: claim_side_effect
-    // dedupes across retries and across the browser processor.
-    const { data: firstTime, error: claimError } = await sb.rpc("claim_side_effect", {
+    // v1.7.1: one database function does the deduction for both processors —
+    // from the real request (approved, this org), exactly once per request
+    // (advisory lock + per-request side-effect key, honouring the pre-v1.2.5
+    // bare "leave_used" key). It records nothing unless it deducts, so an
+    // error is safe to retry.
+    const { error: applyError } = await sb.rpc("apply_approved_leave_usage", {
+      p_leave_request_id: req.id,
       p_event_id: event.id,
-      p_effect_key: effectKey,
     });
-    // Nothing was recorded, so a retry is safe.
-    if (claimError) throw new Error(`claim_side_effect failed: ${claimError.message}`);
-    if (firstTime && !alreadyApplied) {
-      const year = new Date().getFullYear();
-      const { error: applyError } = await sb.rpc("apply_leave_usage", {
-        p_user_id: req.user_id,
-        p_leave_type_id: req.leave_type_id,
-        p_year: year,
-        p_days: parseFloat(req.days) || 0,
-      });
-      // The side effect is already claimed, so a retry would skip it: log loudly.
-      if (applyError) console.error("leave usage apply failed after claim:", event.id, applyError.message);
-    }
+    if (applyError) throw new Error(`apply_approved_leave_usage failed: ${applyError.message}`);
 
     const start = new Date(req.start_date);
     const end = new Date(req.end_date);
