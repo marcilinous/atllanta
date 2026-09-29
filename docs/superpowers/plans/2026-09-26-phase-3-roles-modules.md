@@ -1,6 +1,12 @@
 # Phase 3 — Roles, Custom Roles, Module Enablement (plan)
 
-Status: **approved with owner decisions** (2026-09-26); decision 4 (module
+**Status: COMPLETE — Phase 3 closed as v0.3.0 on 2026-09-29** (legacy
+v1.3.2–v1.7.0 live: role-change guard, schema, resolver, admin screens,
+events, module enforcement, Members screen, developer role). Item 4 —
+`requirePermission()` in every Server Action and the AI path — is carried
+forward to Phases 4 and 9 (TRANSITION.md).
+
+Original status: **approved with owner decisions** (2026-09-26); decision 4 (module
 keys) still awaits review. Nothing here is built yet.
 
 **Owner decisions (2026-09-26):** 1 — existing orgs start with every module
