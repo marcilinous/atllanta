@@ -1,13 +1,19 @@
-// New-stack leave screens (Phase 4 item 3). They run beside the legacy leave
-// screens until the owner switches the legacy nav over to them.
+// New-stack leave screens (Phase 4 item 3). Since v1.9.0 the legacy
+// #/leave and #/leave/approvals routes forward here; the team calendar and
+// the leave report are still legacy screens, linked from the tabs.
 import type { Metadata } from "next";
+import { featureContext } from "@/src/lib/auth/permissions";
 import LeaveNav from "./leave-nav";
 
 export const metadata: Metadata = {
   title: "Leave · Atllanta",
 };
 
-export default function LeaveLayout({ children }: LayoutProps<"/hrms/leave">) {
+export default async function LeaveLayout({ children }: LayoutProps<"/hrms/leave">) {
+  // Only people who can approve see the Approvals and Report tabs; the
+  // pages check again on their own.
+  const canApprove = (await featureContext("me", "me", "approve")) !== null;
+
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
       <div className="flex flex-col gap-3">
@@ -19,7 +25,7 @@ export default function LeaveLayout({ children }: LayoutProps<"/hrms/leave">) {
         </a>
         <h1 className="text-2xl font-semibold">Leave</h1>
       </div>
-      <LeaveNav />
+      <LeaveNav canApprove={canApprove} />
       {children}
     </main>
   );

@@ -78,6 +78,26 @@ describe('input schemas', () => {
   });
 });
 
+describe('cutover (v1.9.0)', () => {
+  const html = read('public', 'index.html');
+
+  test('the legacy #/leave and #/leave/approvals routes forward to the new screens', () => {
+    assert.match(html, /registerRoute\('leave', toNewStack\('\/hrms\/leave'\)\);/);
+    assert.match(html, /registerRoute\('leave\/approvals', toNewStack\('\/hrms\/leave\/approvals'\)\);/);
+    assert.match(html, /window\.location\.replace\(path\);/, 'replace, so Back does not loop');
+    assert.doesNotMatch(html, /views\/leave\/apply\.js|views\/leave\/approvals\.js/);
+  });
+
+  test('calendar, report, balances and settings stay on the legacy app', () => {
+    for (const [route, view] of [['leave/calendar', 'leaveCalendar'], ['leave/report', 'leaveReport'], ['leave/balances', 'leaveBalances'], ['leave/settings', 'leaveSettings']]) {
+      assert.match(html, new RegExp(`registerRoute\\('${route.replace('/', '\\/')}', ${view}\\);`), route);
+    }
+    const nav = read('app', '(dashboard)', 'hrms', 'leave', 'leave-nav.tsx');
+    assert.match(nav, /href="\/#\/leave\/calendar"/);
+    assert.match(nav, /href="\/#\/leave\/report"/);
+  });
+});
+
 describe('static: the actions', () => {
   const actions = read('src', 'lib', 'hrms', 'leave', 'actions.ts');
 

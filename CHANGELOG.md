@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.9.0 — 2026-09-30
+
+### What changed
+- **Leave has moved to the new leave screen.** Opening Leave (or following any link to it) now takes you to the new screen: your balances, requesting leave, your requests and cancelling, and — for managers and admins — Approvals.
+- Team calendar and the leave report are still where they were, linked from the new screen's tabs. Leave settings and balance adjustments are unchanged, under Admin.
+- You can't request leave on dates you already have pending or approved leave.
+
+### Admins need to
+- Nothing. If something looks wrong on the new leave screen, tell us — the old one can be switched back.
+
 ## v1.8.0 — 2026-09-30
 
 ### What changed
