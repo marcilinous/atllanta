@@ -68,7 +68,8 @@
   branch (`dpl_82GEyGRpoVMK2MgRTrGx6Esg4XsA`); the owner checked RTcompu's
   sidebar and CRM as an RTcompu user. The **developer role** is built as
   **v1.7.0** on `claude/phase-3-developer` (Decisions 2026-09-27 item 2);
-  its migration waits for the owner's approval.
+  its migration is **applied** (2026-09-29, `20260929065828`); the code half
+  ships with the v1.7.0 deployment.
 - **Next:** Phase 3's one open item is **item 4** — `requirePermission()`
   "used by every Server Action and by the AI Assistant path". The resolver
   exists and is tested, but no module Server Action exists yet on the new
@@ -848,7 +849,7 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
    - *Assignable:* Developer in the Users screen (filter, role change,
      invite), `create-org` invite and `bulk-import` allowed roles, and the
      CSV import. No one had the role before because nothing offered it.
-   - *Developer tools:* migration `20260929080000` adds
+   - *Developer tools:* migration `20260929065828` adds
      `can_manage_developer_tools()` (owner/admin/developer, not exited,
      not callable by `anon`) and recreates all nine `api_keys` /
      `webhook_endpoints` / `webhook_deliveries` policies on it, otherwise
@@ -860,7 +861,11 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
      reads deliveries; another org, a key acting as someone else, a member,
      and an exited developer are refused or see nothing; admin still works.
      Afterwards: no helper, policies as before, 0 keys, the borrowed user
-     unchanged.
+     unchanged. **Applied to production 2026-09-29** on the owner's direct
+     approval (recorded `20260929065828`; file renamed to match). Checked
+     live: 9 policies, all on the helper, none on `is_org_admin`; `anon`
+     cannot execute it, `authenticated` can; an admin passes it, a member
+     does not. Rollback: recreate the nine policies with `is_org_admin()`.
    - *Where they go:* the Admin button now shows for developers; the Admin
      panel shows them only Modules & roles, Organization Settings,
      Integrations and a new Audit Log card; Reports' Audit Log card and the

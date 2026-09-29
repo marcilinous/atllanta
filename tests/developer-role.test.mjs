@@ -13,7 +13,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8').replace(/\r\n/g, '\n');
 
 describe('migration: developer tools', () => {
-  const sql = read('supabase', 'migrations', '20260929080000_developer_tools_access.sql');
+  const sql = read('supabase', 'migrations', '20260929065828_developer_tools_access.sql');
 
   test('the helper admits owner, admin and developer, never an exited user, and not anon', () => {
     assert.match(sql, /u\.role in \('owner', 'admin', 'developer'\)/);
