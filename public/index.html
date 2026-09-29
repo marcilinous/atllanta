@@ -262,8 +262,11 @@ const isAdmin = ['owner', 'admin'].includes(userRole);
 document.querySelectorAll('.nav-btn[data-role="manager"]').forEach(btn => {
   if (!isManager) btn.style.display = 'none';
 });
+// Developers open the Admin panel too, which shows them only their tools and
+// read-only configuration (views/admin/index.js). isAdmin itself is unchanged.
+const canOpenAdminPanel = isAdmin || userRole === 'developer';
 document.querySelectorAll('.nav-btn[data-role="admin"]').forEach(btn => {
-  if (!isAdmin) btn.style.display = 'none';
+  if (!canOpenAdminPanel) btn.style.display = 'none';
 });
 
 // Platform + admin/HR-configurable feature access. Platform gates (generic CRM,

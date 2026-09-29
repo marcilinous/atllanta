@@ -24,7 +24,7 @@ function withRule(rules: Rules, subject: string, feature: string, allowed: boole
   return next;
 }
 
-export default function AccessEditor({ data }: { data: AccessData }) {
+export default function AccessEditor({ data, readOnly = false }: { data: AccessData; readOnly?: boolean }) {
   const [roleRules, setRoleRules] = useState<Rules>(data.roleRules);
   const [userRules, setUserRules] = useState<Rules>(data.userRules);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -111,7 +111,7 @@ export default function AccessEditor({ data }: { data: AccessData }) {
                         className="size-4 accent-[var(--primary)]"
                         aria-label={`${feature.label} for ${role.label}`}
                         checked={roleRules[role.key]?.[feature.key] !== false}
-                        disabled={isPending}
+                        disabled={readOnly || isPending}
                         onChange={(e) => handleRoleToggle(role.key, feature.key, e.target.checked)}
                       />
                     </td>
@@ -165,7 +165,7 @@ export default function AccessEditor({ data }: { data: AccessData }) {
                       className="h-8 rounded-md border border-border bg-field px-2 text-xs"
                       aria-label={`${feature.label} for ${selectedPerson.name}`}
                       value={value}
-                      disabled={isPending}
+                      disabled={readOnly || isPending}
                       onChange={(e) =>
                         handlePersonChange(selectedPerson.id, feature.key, e.target.value as PersonValue)
                       }

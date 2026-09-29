@@ -3,14 +3,19 @@ import { esc } from '../../js/ui.js';
 
 export default async function adminView(container) {
   const membership = await getMembership();
-  if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
+  // Owners and admins see every card; a developer (owner decision 2026-09-27)
+  // sees only the cards marked `developer: true` — their tools, plus
+  // organisation configuration, which those screens show them read-only.
+  const role = membership?.role;
+  const isDeveloper = role === 'developer';
+  if (!membership || (role !== 'owner' && role !== 'admin' && !isDeveloper)) {
     container.innerHTML = `
       <div class="empty-state">
         <svg width="48" height="48" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.5" viewBox="0 0 24 24">
           <path d="M12 15v.01M12 12a1.5 1.5 0 0 0 1.14-2.47A1.5 1.5 0 0 0 12 9m-7.4 7.8a9 9 0 1 1 14.8 0"/>
         </svg>
         <h3>Access Denied</h3>
-        <p>You need an owner or admin role to view this page.</p>
+        <p>You need an owner, admin or developer role to view this page.</p>
       </div>`;
     return;
   }
@@ -18,9 +23,9 @@ export default async function adminView(container) {
   const sections = [
     // New-stack screens (app/(platform)/settings/): a path, not a hash route,
     // so the link is a full page load out of the legacy router.
-    { href: '/settings/modules', title: 'Modules & roles', desc: 'Switch modules on, create custom roles, and choose who sees what',
+    { href: '/settings/modules', title: 'Modules & roles', desc: 'Switch modules on, create custom roles, and choose who sees what', developer: true,
       icon: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/>' },
-    { href: '#/settings/org', title: 'Organization Settings', desc: 'Company name, timezone, currency, and branding',
+    { href: '#/settings/org', title: 'Organization Settings', desc: 'Company name, timezone, currency, and branding', developer: true,
       icon: '<path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>' },
     { href: '#/settings/users', title: 'User Management', desc: 'Invite members, manage roles and permissions',
       icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
@@ -34,9 +39,12 @@ export default async function adminView(container) {
       icon: '<path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>' },
     { href: '#/helpdesk/settings', title: 'Helpdesk Categories', desc: 'Configure ticket categories and assign handlers',
       icon: '<path d="M15 5v2M15 11v2M15 17v2M5 5a2 2 0 0 0-2 2v3c1.66 0 3 1.34 3 3s-1.34 3-3 3v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3c-1.66 0-3-1.34-3-3s1.34-3 3-3V7a2 2 0 0 0-2-2H5z"/>' },
-    { href: '#/settings/integrations', title: 'Integrations', desc: 'Connected services and API keys',
-      icon: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>' }
-  ];
+    { href: '#/settings/integrations', title: 'Integrations', desc: 'Connected services and API keys', developer: true,
+      icon: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>' },
+    // Readable by owners, admins and developers since v1.4.1 (can_read_audit_log()).
+    { href: '#/audit', title: 'Audit Log', desc: 'Every recorded change across the platform', developer: true,
+      icon: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 12h6M9 16h6"/>' }
+  ].filter(s => !isDeveloper || s.developer);
 
   container.innerHTML = `
     <div style="padding:var(--space-6)">

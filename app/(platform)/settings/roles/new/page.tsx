@@ -1,9 +1,10 @@
-import { adminOrNull, NotAllowed } from "../../gate";
+import { adminOrNull, NotAllowed, ReadOnlyNotice } from "../../gate";
 import RoleForm from "../role-form";
 
 export default async function NewRolePage() {
   const admin = await adminOrNull();
   if (!admin) return <NotAllowed />;
+  if (!admin.canEdit) return <ReadOnlyNotice />;
 
   return (
     <section className="flex flex-col gap-4">
