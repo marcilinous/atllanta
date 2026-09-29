@@ -11,6 +11,15 @@ export async function adminOrNull(): Promise<OrgAdmin | null> {
   return result.status === "ok" ? result.admin : null;
 }
 
+/** Shown to a developer: they may look at the organisation's configuration, not change it. */
+export function ReadOnlyNotice() {
+  return (
+    <p role="note" className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+      View only. Owners and admins make changes here.
+    </p>
+  );
+}
+
 export function NotAllowed() {
   return (
     <div className="rounded-lg border border-border bg-card p-8 text-center">

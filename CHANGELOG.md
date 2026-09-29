@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.7.0 — 2026-09-29
+
+### What changed
+- **Developer is now a role you can give people.** It appears in User Management (invite and change role) and in the employee import.
+- A developer can manage the developer tools — API keys, webhooks and integrations — and read the audit log.
+- A developer can open the Admin panel, but only sees Modules & roles, Organization Settings, Integrations and the Audit Log. Organisation settings and Modules & roles are view-only for them.
+- Everywhere else a developer has the same access as a Member. They can't change billing or financial settings, and can't remove people.
+
+### Admins need to
+- Nothing. Give someone the Developer role under Admin → User Management when you want them to have it.
+
 ## v1.6.0 — 2026-09-29
 
 ### What changed

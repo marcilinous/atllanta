@@ -24,7 +24,7 @@ function without(grants: Grants, key: ModuleKey): Grants {
   return next;
 }
 
-export default function RoleForm({ role }: { role?: CustomRoleSummary }) {
+export default function RoleForm({ role, readOnly = false }: { role?: CustomRoleSummary; readOnly?: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -96,6 +96,8 @@ export default function RoleForm({ role }: { role?: CustomRoleSummary }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      {/* A developer sees the role, never edits it (the actions refuse anyway). */}
+      <fieldset disabled={readOnly} className="flex flex-col gap-6 disabled:opacity-80">
       <div className="flex max-w-md flex-col gap-2">
         <Label htmlFor="role-name">Name</Label>
         <Input
@@ -182,6 +184,8 @@ export default function RoleForm({ role }: { role?: CustomRoleSummary }) {
         </div>
       </section>
 
+      </fieldset>
+
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -189,14 +193,16 @@ export default function RoleForm({ role }: { role?: CustomRoleSummary }) {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : role ? "Save changes" : "Create role"}
-        </Button>
+        {readOnly ? null : (
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Saving…" : role ? "Save changes" : "Create role"}
+          </Button>
+        )}
         <Button type="button" variant="ghost" onClick={() => router.push("/settings/roles")}>
-          Cancel
+          {readOnly ? "Back" : "Cancel"}
         </Button>
 
-        {role ? (
+        {role && !readOnly ? (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {confirmDelete ? (
               <>

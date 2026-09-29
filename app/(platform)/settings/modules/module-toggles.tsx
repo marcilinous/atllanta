@@ -7,7 +7,7 @@ import { MODULE_LABELS, type ModuleKey } from "@/src/lib/settings/catalogue";
 import type { ModuleRow } from "@/src/lib/settings/queries";
 import { Badge } from "@/components/ui/badge";
 
-export default function ModuleToggles({ modules }: { modules: ModuleRow[] }) {
+export default function ModuleToggles({ modules, readOnly = false }: { modules: ModuleRow[]; readOnly?: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export default function ModuleToggles({ modules }: { modules: ModuleRow[] }) {
                   role="switch"
                   aria-checked={on}
                   aria-label={label}
-                  disabled={pendingKey === m.moduleKey || isPending}
+                  disabled={readOnly || pendingKey === m.moduleKey || isPending}
                   onClick={() => handleToggle(m.moduleKey)}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     on ? "bg-primary" : "bg-muted"

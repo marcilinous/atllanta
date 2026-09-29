@@ -26,6 +26,7 @@ export default async function settingsUsers(container) {
           <option value="">All roles</option>
           <option value="owner">Owner</option>
           <option value="admin">Admin</option>
+          <option value="developer">Developer</option>
           <option value="manager">Manager</option>
           <option value="member">Member</option>
         </select>
@@ -81,7 +82,7 @@ export default async function settingsUsers(container) {
       return;
     }
 
-    const roleColors = { owner: 'error', admin: 'warning', manager: 'info', member: 'neutral' };
+    const roleColors = { owner: 'error', admin: 'warning', developer: 'success', manager: 'info', member: 'neutral' };
 
     wrap.innerHTML = `<div class="table-wrap"><table class="table">
       <thead><tr><th>Member</th><th>Role</th><th>Invited</th><th>Joined</th>${isAdmin ? '<th>Actions</th>' : ''}</tr></thead>
@@ -106,6 +107,7 @@ export default async function settingsUsers(container) {
               ${!isSelf ? `<select class="form-input" data-role-change="${m.id}" style="height:30px;width:auto;font-size:var(--text-xs);padding:0 var(--space-2)">
                 <option value="member" ${m.role === 'member' ? 'selected' : ''}>Member</option>
                 <option value="manager" ${m.role === 'manager' ? 'selected' : ''}>Manager</option>
+                <option value="developer" ${m.role === 'developer' ? 'selected' : ''}>Developer</option>
                 <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
                 ${isOwner ? `<option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>` : ''}
               </select>
@@ -173,6 +175,7 @@ export default async function settingsUsers(container) {
             <select class="form-input" id="invite-role">
               <option value="member">Member</option>
               <option value="manager">Manager</option>
+              <option value="developer">Developer</option>
               <option value="admin">Admin</option>
               ${isOwner ? '<option value="owner">Owner</option>' : ''}
             </select>

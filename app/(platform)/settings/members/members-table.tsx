@@ -17,6 +17,7 @@ export default function MembersTable({ data }: { data: MembersData }) {
   // Mirrors the server's rules (setMemberCustomRole): nobody changes their own
   // role, and only an owner changes an owner's.
   const lockReason = (m: MemberRow): string | null => {
+    if (data.callerRole === "developer") return "Only owners and admins can change roles.";
     if (m.isSelf) return "You can't change your own role.";
     if (m.role === "owner" && data.callerRole !== "owner") return "Only an owner can change an owner's role.";
     return null;

@@ -1,5 +1,5 @@
 import { loadModules } from "@/src/lib/settings/queries";
-import { adminOrNull, NotAllowed } from "../gate";
+import { adminOrNull, NotAllowed, ReadOnlyNotice } from "../gate";
 import ModuleToggles from "./module-toggles";
 
 export default async function ModulesPage() {
@@ -17,7 +17,8 @@ export default async function ModulesPage() {
           hides it for everyone, owners and admins included.
         </p>
       </div>
-      <ModuleToggles modules={modules} />
+      {admin.canEdit ? null : <ReadOnlyNotice />}
+      <ModuleToggles modules={modules} readOnly={!admin.canEdit} />
     </section>
   );
 }

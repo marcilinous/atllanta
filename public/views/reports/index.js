@@ -23,7 +23,7 @@ export default async function reportsView(container) {
     { icon: '🎫', title: 'Helpdesk Report', desc: 'Ticket volume, categories, and resolution times', route: '#/reports/helpdesk', roles: ['owner', 'admin', 'manager'] },
     { icon: '📅', title: 'Team Planner', desc: 'Weekly view of team availability and leave', route: '#/reports/planner', roles: ['owner', 'admin', 'manager'] },
     { icon: '💰', title: 'Expense Report', desc: 'Expense analytics, categories, and monthly trends', route: '#/reports/expenses', roles: ['owner', 'admin', 'manager'] },
-    { icon: '📋', title: 'Audit Log', desc: 'Track all actions across the platform', route: '#/audit', roles: ['owner', 'admin'] },
+    { icon: '📋', title: 'Audit Log', desc: 'Track all actions across the platform', route: '#/audit', roles: ['owner', 'admin', 'developer'] },
   ];
 
   const visible = reports.filter(r => r.roles.includes(role));

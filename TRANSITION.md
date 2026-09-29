@@ -63,9 +63,20 @@
   `feature-gating.test.mjs`), unchanged, with new release files; #127 is
   superseded. Merge #128 first, then v1.6.0. Rollback after go-live:
   redeploy v1.5.0 (no database change).
-- **Next:** the developer-role capabilities (Decisions 2026-09-27 item 2). Plan:
-  `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md`. Start from a
-  branch off the production branch.
+- **Update 2026-09-29 (evening):** v1.5.0 (#128, `7f7ef36`) and v1.6.0
+  (#129, `00e93b8`) are live and tagged, promoted from the production
+  branch (`dpl_82GEyGRpoVMK2MgRTrGx6Esg4XsA`); the owner checked RTcompu's
+  sidebar and CRM as an RTcompu user. The **developer role** is built as
+  **v1.7.0** on `claude/phase-3-developer` (Decisions 2026-09-27 item 2);
+  its migration is **applied** (2026-09-29, `20260929065828`); the code half
+  ships with the v1.7.0 deployment.
+- **Next:** Phase 3's one open item is **item 4** — `requirePermission()`
+  "used by every Server Action and by the AI Assistant path". The resolver
+  exists and is tested, but no module Server Action exists yet on the new
+  stack (the settings actions are owner/admin capabilities, gated by
+  `requireOrgAdmin`), and the AI path is still legacy. It is naturally met
+  by Phase 4 (HRMS actions) and Phase 9 (AI) — owner's call whether to close
+  Phase 3 (v0.3.0) with item 4 carried forward, or hold it open.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -834,6 +845,40 @@ _(Log anything that changes scope, gets deferred, or needs the owner's call
    developer role is in no RLS helper. `audit_logs` is the exception — its
    one policy lets **every** org member read it already, which is wider
    than this decision implies and worth a look of its own.
+   **Built 2026-09-29 as v1.7.0** (`claude/phase-3-developer`):
+   - *Assignable:* Developer in the Users screen (filter, role change,
+     invite), `create-org` invite and `bulk-import` allowed roles, and the
+     CSV import. No one had the role before because nothing offered it.
+   - *Developer tools:* migration `20260929065828` adds
+     `can_manage_developer_tools()` (owner/admin/developer, not exited,
+     not callable by `anon`) and recreates all nine `api_keys` /
+     `webhook_endpoints` / `webhook_deliveries` policies on it, otherwise
+     unchanged (org scoping, `created_by`/`acting_user_id` stamping,
+     deliveries read-only). No application code used these tables yet.
+     Verified on production in an always-rolled-back transaction with the
+     migration applied inside it: an admin makes someone a developer; the
+     developer creates, reads, updates and deletes a key and a webhook and
+     reads deliveries; another org, a key acting as someone else, a member,
+     and an exited developer are refused or see nothing; admin still works.
+     Afterwards: no helper, policies as before, 0 keys, the borrowed user
+     unchanged. **Applied to production 2026-09-29** on the owner's direct
+     approval (recorded `20260929065828`; file renamed to match). Checked
+     live: 9 policies, all on the helper, none on `is_org_admin`; `anon`
+     cannot execute it, `authenticated` can; an admin passes it, a member
+     does not. Rollback: recreate the nine policies with `is_org_admin()`.
+   - *Where they go:* the Admin button now shows for developers; the Admin
+     panel shows them only Modules & roles, Organization Settings,
+     Integrations and a new Audit Log card; Reports' Audit Log card and the
+     audit screen admit them. `isAdmin` (feature-access bypass, every other
+     admin check) is unchanged.
+   - *Read-only settings:* `getOrgAdmin()` admits a developer with
+     `canEdit: false`; `requireOrgAdmin()` (every settings action) still
+     requires owner/admin. Every settings screen disables its controls and
+     shows "View only" for them; the new-role page shows only the notice.
+   - *No billing/financial, no member deletion:* both stay owner/admin —
+     a developer is a member everywhere else. Organisation settings (legacy
+     `#/settings/org`) was already view-only for non-admins.
+   325/325 unit tests.
 3. **Audit log: owners, admins and developers only** (owner, 2026-09-27).
    Legacy **v1.4.1**, branch `claude/release-1.4.1`: migration
    `20260927152738` adds `can_read_audit_log()` (security definer, pinned

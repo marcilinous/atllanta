@@ -65,7 +65,7 @@ export default async function handler(req, res) {
         full_name: row.full_name,
         email: row.email,
         phone: row.phone || null,
-        role: ["owner", "admin", "manager", "member"].includes(row.role) ? row.role : "member",
+        role: ["owner", "admin", "developer", "manager", "member"].includes(row.role) ? row.role : "member",
         status: "pending",
       });
       if (error) {

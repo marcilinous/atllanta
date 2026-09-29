@@ -1,9 +1,10 @@
 // Who may use the Phase 3 admin screens (app/(platform)/settings/): an
-// active owner or admin of an organisation.
+// active owner or admin of an organisation — and, read-only, a developer
+// (owner decision 2026-09-27: developers get read-only access to organisation
+// configuration).
 //
 // This is deliberately not requirePermission(): that check denies every
-// action in a module the org has switched off, and every org starts with
-// every module off (Phase 3 owner decision 1) — so the screen that switches
+// action in a module the org has switched off, and the screen that switches
 // modules on cannot itself sit behind a module. Organisation settings are a
 // capability of the owner/admin system role, as they are in the legacy app
 // and in the RLS helper is_org_admin(), which guards every table these
@@ -19,7 +20,9 @@ import { ActionError } from "../actions";
 export interface OrgAdmin {
   userId: string;
   orgId: string;
-  role: "owner" | "admin";
+  role: "owner" | "admin" | "developer";
+  /** false for a developer: they may look, never change (requireOrgAdmin). */
+  canEdit: boolean;
 }
 
 export type OrgAdminResult =
@@ -27,7 +30,7 @@ export type OrgAdminResult =
   | { status: "signed-out" }
   | { status: "forbidden" };
 
-/** Resolves the caller for a page: never throws for a signed-out or non-admin caller. */
+/** Resolves the caller for a page: never throws for a signed-out or not-allowed caller. */
 export async function getOrgAdmin(): Promise<OrgAdminResult> {
   const user = await getSessionUser();
   if (!user) return { status: "signed-out" };
@@ -42,14 +45,19 @@ export async function getOrgAdmin(): Promise<OrgAdminResult> {
   });
 
   if (!row || !row.orgId || row.status === "exited") return { status: "forbidden" };
-  if (row.role !== "owner" && row.role !== "admin") return { status: "forbidden" };
-  return { status: "ok", admin: { userId: user.id, orgId: row.orgId, role: row.role } };
+  if (row.role !== "owner" && row.role !== "admin" && row.role !== "developer") return { status: "forbidden" };
+  return {
+    status: "ok",
+    admin: { userId: user.id, orgId: row.orgId, role: row.role, canEdit: row.role !== "developer" },
+  };
 }
 
-/** The same check for a Server Action: throws ActionError unless the caller is an active owner/admin. */
+/** The check for a Server Action: throws ActionError unless the caller is an active owner/admin. */
 export async function requireOrgAdmin(): Promise<OrgAdmin> {
   const result = await getOrgAdmin();
   if (result.status === "signed-out") throw new ActionError("You must be signed in to do that.");
-  if (result.status === "forbidden") throw new ActionError("Only owners and admins can change these settings.");
+  if (result.status === "forbidden" || !result.admin.canEdit) {
+    throw new ActionError("Only owners and admins can change these settings.");
+  }
   return result.admin;
 }

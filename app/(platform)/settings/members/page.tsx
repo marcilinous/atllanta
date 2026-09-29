@@ -1,5 +1,5 @@
 import { loadMembers } from "@/src/lib/settings/queries";
-import { adminOrNull, NotAllowed } from "../gate";
+import { adminOrNull, NotAllowed, ReadOnlyNotice } from "../gate";
 import MembersTable from "./members-table";
 
 export default async function MembersPage() {
@@ -16,6 +16,7 @@ export default async function MembersPage() {
           else their built-in role applies. Built-in roles are changed under Admin &rarr; User Management.
         </p>
       </div>
+      {admin.canEdit ? null : <ReadOnlyNotice />}
       <MembersTable data={data} />
     </section>
   );

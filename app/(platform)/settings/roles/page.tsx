@@ -3,7 +3,7 @@ import { loadRoles } from "@/src/lib/settings/queries";
 import { MODULE_LABELS, PERMISSION_LABELS } from "@/src/lib/settings/catalogue";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { adminOrNull, NotAllowed } from "../gate";
+import { adminOrNull, NotAllowed, ReadOnlyNotice } from "../gate";
 
 function people(n: number) {
   return n === 1 ? "1 person" : `${n} people`;
@@ -16,6 +16,7 @@ export default async function RolesPage() {
 
   return (
     <section className="flex flex-col gap-8">
+      {admin.canEdit ? null : <ReadOnlyNotice />}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -25,9 +26,11 @@ export default async function RolesPage() {
               everything else.
             </p>
           </div>
-          <Link href="/settings/roles/new" className={buttonVariants()}>
-            New role
-          </Link>
+          {admin.canEdit ? (
+            <Link href="/settings/roles/new" className={buttonVariants()}>
+              New role
+            </Link>
+          ) : null}
         </div>
         {custom.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">

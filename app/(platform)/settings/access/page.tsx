@@ -1,5 +1,5 @@
 import { loadAccess } from "@/src/lib/settings/queries";
-import { adminOrNull, NotAllowed } from "../gate";
+import { adminOrNull, NotAllowed, ReadOnlyNotice } from "../gate";
 import AccessEditor from "./access-editor";
 
 export default async function AccessPage() {
@@ -16,7 +16,8 @@ export default async function AccessPage() {
           protected by security rules either way. A module switched off under Modules stays hidden regardless.
         </p>
       </div>
-      <AccessEditor data={data} />
+      {admin.canEdit ? null : <ReadOnlyNotice />}
+      <AccessEditor data={data} readOnly={!admin.canEdit} />
     </section>
   );
 }

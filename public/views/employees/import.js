@@ -181,7 +181,7 @@ export default async function employeeImport(container) {
     importBtn.textContent = 'Importing...';
     document.getElementById('import-progress').classList.remove('hidden');
 
-    const validRoles = ['owner', 'admin', 'manager', 'member'];
+    const validRoles = ['owner', 'admin', 'developer', 'manager', 'member'];
     let imported = 0;
     let skipped = 0;
     const errors = [];

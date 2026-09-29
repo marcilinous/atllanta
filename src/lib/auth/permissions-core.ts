@@ -35,9 +35,11 @@ export const SYSTEM_ROLE_DEFAULTS: Record<SystemRole, ReadonlySet<Permission>> =
   admin: new Set(["view", "create", "edit", "delete", "approve"]),
   manager: new Set(["view", "create", "edit", "approve"]),
   member: new Set(["view", "create", "edit"]),
-  // provisional — mirrors member until the owner defines developer's module
-  // access; its technical powers (API keys, webhooks, integrations —
-  // CLAUDE.md §3.5) are capabilities, not module permissions.
+  // Equal to member in business modules (owner decision 2026-09-27). Its
+  // technical powers — API keys, webhooks, audit log, integrations, and
+  // read-only organisation settings — are capabilities, not module
+  // permissions: can_manage_developer_tools(), can_read_audit_log() and
+  // getOrgAdmin()'s canEdit=false (src/lib/auth/admin.ts).
   developer: new Set(["view", "create", "edit"]),
 };
 
