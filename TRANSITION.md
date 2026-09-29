@@ -662,7 +662,7 @@ to end (CLAUDE.md §3.5).
 running on the new stack; old vanilla-JS HRMS views retired.
 
 - [x] `src/db/schema/hrms.ts` per CLAUDE.md §3 Module 1 table list
-- [ ] Data migration script: old Supabase-direct HRMS tables → new schema
+- [x] Data migration script: old Supabase-direct HRMS tables → new schema
       (verify no data loss, especially `leave_balances`)
 - [ ] All HRMS mutations behind Server Actions + RLS
 - [ ] Old vanilla-JS HRMS views (`views/employees/`, `views/attendance/`,
@@ -712,6 +712,14 @@ running on the new stack; old vanilla-JS HRMS views retired.
   most likely be a no-op to confirm, not a script: the new stack reads and
   writes the **same** tables, so no data moves. Worth confirming with the
   owner before closing it that way.
+- 2026-09-29 — **Item 2 done: no migration needed** (owner agreed). The new
+  stack uses the same 14 tables. Live row counts at closing: attendance 2,
+  holidays 13, leave_types 2, every other HRMS table 0 (leave_requests 0,
+  leave_balances 0) — 17 rows in all; nothing to move, nothing to lose.
+- 2026-09-29 — **Leave port paused for a security fix (v1.7.1)**, found
+  while mapping legacy leave: see Decisions & Blockers, 2026-09-29 (leave
+  integrity). The port resumes on the fixed rules — its Server Actions rely
+  on the same RLS and guard.
 
 ---
 
@@ -867,6 +875,50 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-29 — Leave integrity (security, legacy v1.7.1)
+
+Found while mapping legacy leave for the Phase 4 port; confirmed on
+production in a rolled-back probe acting as a plain member of RTcompu. A
+member could: approve their own leave request; insert a leave balance of 999
+days for themselves; write a colleague's balance; add a company holiday;
+insert a request already marked `approved`. Cause: `lr_update` let the
+requester update their own row freely, `lr_insert` checked only the user,
+and `lb_*` / `hol_*` checked only the organisation — no guard trigger. And
+the **browser** event processor still trusted a `leave.request.approved`
+payload (person, days, leave type) — the class v1.2.5 fixed for the server
+processor only — so a forged event could deduct a colleague's balance.
+Production had 0 leave requests and 0 balances, so no sign of use.
+
+**Owner decision (option a):** nobody approves their own leave; an owner's
+or admin's leave is approved by an admin or another owner.
+
+Fix, migration `…_leave_integrity.sql`: a new request must be your own and
+pending; a `leave_requests_guard()` trigger lets the requester only cancel
+their own pending request and an approver (admin, reporting line, or a
+manager over the department — as before, minus self) only approve/reject
+someone else's pending one, stamping `reviewed_by`/`reviewed_at` itself;
+`leave_balances` and `holidays` writes need `hr_can_configure()`; one
+security-definer `apply_approved_leave_usage(request, event)` does every
+deduction for both processors from the real row, once per request (advisory
+lock + per-request key + the pre-v1.2.5 key), and `apply_leave_usage` is
+withdrawn from signed-in users; `init_leave_balances(user)` sets a new
+employee's defaults (the browser processor runs as any member). Code: both
+processors call the new function; the approval notification moved after
+the deduction. Verified: 22 scenarios on production with the migration
+applied inside an always-rolled-back transaction (member, manager, admin,
+owner), all as intended; afterwards production unchanged. 348/348 tests.
+
+**Consequence for RTcompu:** it has **no admin** today (1 owner, 1
+developer — `tsap.mis@rtcompu.com`, changed from admin by the owner while
+testing v1.7.0 — 13 managers, 48 members). Under (a) nobody can approve the
+owner's own leave until an admin exists or a second owner is added. Owner
+informed.
+
+Known, not fixed here (pre-existing, low): the browser processor's
+"leave approved/rejected" notifications still take the person and approver
+names from the payload, so a forged event can send a misleading
+notification (no balance or approval effect).
 
 ### 2026-09-29 — Phase 3 closed; password-reset email on hold; Google sign-in on
 

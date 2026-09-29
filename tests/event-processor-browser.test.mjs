@@ -114,18 +114,28 @@ describe('leave approval is applied at most once', () => {
   const approved = { id: 'ev-4', event_type: 'leave.request.approved', attempts: 1,
     payload: { user_id: 'u-2', approved_by: 'u-3', leave_request_id: 'lr-1', leave_type_id: 'lt-1', days: '2' } };
 
-  test('first run claims the side effect, then applies the usage', async () => {
+  // v1.7.1: this browser may belong to any member, and the payload can be
+  // forged, so the deduction is a single database call that is given only the
+  // request id and reads the real request itself (approved? this org? already
+  // applied?). Its once-per-request rule was verified on production.
+  test('deducts through apply_approved_leave_usage with the request id only — never the payload', async () => {
     await runOnce(approved);
-    const order = S.calls.filter(c => c.kind === 'rpc').map(c => c.name);
-    assert.ok(order.indexOf('claim_side_effect') < order.indexOf('apply_leave_usage'));
-    assert.deepEqual(rpcs('claim_side_effect')[0].args, { p_event_id: 'ev-4', p_effect_key: 'leave_used' });
-    assert.deepEqual(rpcs('apply_leave_usage')[0].args, { p_user_id: 'u-2', p_leave_type_id: 'lt-1', p_year: new Date().getFullYear(), p_days: 2 });
+    assert.deepEqual(rpcs('apply_approved_leave_usage').map(c => c.args), [{ p_leave_request_id: 'lr-1', p_event_id: 'ev-4' }]);
+    assert.equal(rpcs('apply_leave_usage').length, 0);
+    assert.equal(rpcs('claim_side_effect').length, 0);
+    assert.equal(S.calls.some(c => c.kind === 'from' && c.table === 'leave_balances'), false, 'never writes balances directly');
   });
 
-  test('a retry whose side effect was already claimed does not deduct again', async () => {
-    S.firstTime = false;
+  test('the approval notification is sent only after the deduction', async () => {
     await runOnce(approved);
-    assert.equal(rpcs('apply_leave_usage').length, 0);
+    const applyAt = S.calls.findIndex(c => c.kind === 'rpc' && c.name === 'apply_approved_leave_usage');
+    const notifyAt = S.calls.findIndex(c => c.kind === 'from' && c.table === 'notifications');
+    assert.ok(applyAt !== -1 && notifyAt !== -1 && applyAt < notifyAt);
+  });
+
+  test('balances for a new employee come from init_leave_balances, not a direct write', async () => {
+    await runOnce({ id: 'ev-5', event_type: 'people.employee.created', attempts: 1, payload: { employee_id: 'u-9' } });
+    assert.deepEqual(rpcs('init_leave_balances').map(c => c.args), [{ p_user_id: 'u-9' }]);
     assert.equal(S.calls.some(c => c.kind === 'from' && c.table === 'leave_balances'), false);
   });
 });

@@ -137,40 +137,22 @@ const HANDLERS = {
   },
 
   'leave.request.approved': async (p, org, actorId, eventId) => {
+    // v1.7.1: the deduction is done by the database from the real request —
+    // never from this event's payload, which any member can forge. The
+    // function deducts only for an approved request in this org, exactly once
+    // per request (shared with the server processor). An error re-queues the
+    // event; nothing was recorded, so the retry is safe.
+    if (p.leave_request_id && eventId) {
+      const { error } = await sb.rpc('apply_approved_leave_usage', {
+        p_leave_request_id: p.leave_request_id,
+        p_event_id: eventId,
+      });
+      if (error) throw new Error(`apply_approved_leave_usage failed: ${error.message}`);
+    }
+
+    // After the deduction, so a failed deduction's retry doesn't notify twice.
     const approverName = await getUserName(p.approved_by);
     await notify(org.id, p.user_id, 'Leave approved', `Your leave request was approved by ${approverName}`, 'leave', 'leave_request', p.leave_request_id, true);
-
-    if (p.days && p.leave_type_id && p.user_id) {
-      const year = new Date().getFullYear();
-      const days = parseFloat(p.days) || 0;
-      if (days > 0) {
-        // Idempotent: apply the used-days increment at most once per event, so a
-        // retry (or the server backstop re-running this) can't double-count.
-        const firstTime = eventId
-          ? (await sb.rpc('claim_side_effect', { p_event_id: eventId, p_effect_key: 'leave_used' })).data
-          : true;
-        if (firstTime) {
-          const { data: newUsed } = await sb.rpc('apply_leave_usage', {
-            p_user_id: p.user_id,
-            p_leave_type_id: p.leave_type_id,
-            p_year: year,
-            p_days: days,
-          });
-
-          if (newUsed == null) {
-            await sb.from('leave_balances').upsert({
-              org_id: org.id,
-              user_id: p.user_id,
-              leave_type_id: p.leave_type_id,
-              year,
-              opening_balance: 0,
-              accrued: 0,
-              used: days
-            }, { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
-          }
-        }
-      }
-    }
   },
 
   'leave.request.rejected': async (p, org) => {
@@ -226,24 +208,13 @@ const HANDLERS = {
   },
 
   'people.employee.created': async (p, org) => {
-    const year = new Date().getFullYear();
-    const { data: types } = await sb
-      .from('leave_types')
-      .select('id, annual_quota')
-      .eq('org_id', org.id)
-      .eq('is_active', true);
-
-    if (types?.length) {
-      const balances = types.map(t => ({
-        org_id: org.id,
-        user_id: p.employee_id,
-        leave_type_id: t.id,
-        year,
-        opening_balance: 0,
-        accrued: t.annual_quota || 0,
-        used: 0
-      }));
-      await sb.from('leave_balances').upsert(balances, { onConflict: 'user_id,leave_type_id,year', ignoreDuplicates: true });
+    // v1.7.1: only owners/admins may write leave_balances, and this runs as
+    // whichever member's browser claimed the event — so the default balances
+    // come from a database function that checks the person is in this org
+    // and never overwrites an existing balance.
+    if (p.employee_id) {
+      const { error } = await sb.rpc('init_leave_balances', { p_user_id: p.employee_id });
+      if (error) throw new Error(`init_leave_balances failed: ${error.message}`);
     }
 
     const managerId = await getManager(p.employee_id);

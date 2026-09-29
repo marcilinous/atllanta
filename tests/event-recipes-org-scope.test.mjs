@@ -234,8 +234,7 @@ describe('event recipes org scoping and security', () => {
     await handler(req('POST'), response);
 
     assert.equal(response.statusCode, 200);
-    const applyCalls = S.calls.filter((c) => c.rpc === 'apply_leave_usage');
-    assert.equal(applyCalls.length, 0);
+    assert.equal(S.calls.filter((c) => c.rpc === 'apply_approved_leave_usage').length, 0);
     assert.equal(S.attendanceUpserts.length, 0);
     assert.equal(S.notificationInserts.length, 0);
   });
@@ -266,8 +265,7 @@ describe('event recipes org scoping and security', () => {
     await handler(req('POST'), response);
 
     assert.equal(response.statusCode, 200);
-    const applyCalls = S.calls.filter((c) => c.rpc === 'apply_leave_usage');
-    assert.equal(applyCalls.length, 0);
+    assert.equal(S.calls.filter((c) => c.rpc === 'apply_approved_leave_usage').length, 0);
   });
 
   test('leave.request.approved own-org approved uses the row values not the payload', async () => {
@@ -306,100 +304,33 @@ describe('event recipes org scoping and security', () => {
     await handler(req('POST'), response);
 
     assert.equal(response.statusCode, 200);
-    const applyCall = S.calls.find((c) => c.rpc === 'apply_leave_usage');
-    assert.ok(applyCall, 'apply_leave_usage should be called');
-    assert.equal(applyCall.args.p_user_id, 'row-user');
-    assert.equal(applyCall.args.p_leave_type_id, 'row-lt');
-    assert.equal(applyCall.args.p_days, 5);
+    // v1.7.1: the deduction is given only the request id; the database reads
+    // the person, leave type and days from the row itself.
+    const applyCalls = S.calls.filter((c) => c.rpc === 'apply_approved_leave_usage');
+    assert.deepEqual(applyCalls.map((c) => c.args), [{ p_leave_request_id: 'lr-1', p_event_id: 'ev-1' }]);
+    assert.equal(JSON.stringify(applyCalls[0].args).includes('payload'), false);
 
     assert.equal(S.attendanceUpserts.length, 1);
     assert.equal(S.attendanceUpserts[0].row.user_id, 'row-user');
     assert.equal(S.attendanceUpserts[0].row.org_id, 'org-1');
   });
 
-  test('a second different event for the same approved request does not double-apply', async () => {
-    S.rows.leave_requests['lr-1'] = {
-      id: 'lr-1',
-      org_id: 'org-1',
-      status: 'approved',
-      user_id: 'row-user',
-      leave_type_id: 'row-lt',
-      days: 5,
-      start_date: '2026-02-01',
-      end_date: '2026-02-01',
-    };
-    S.rows.users['row-user'] = {
-      id: 'row-user',
-      org_id: 'org-1',
-      email: 'row-user@example.com',
-    };
-
-    S.pending = [
-      {
-        id: 'ev-1',
-        org_id: 'org-1',
-        event_type: 'leave.request.approved',
-        attempts: 0,
-        payload: { leave_request_id: 'lr-1' },
-      },
-    ];
-    S.firstTime = true;
-    S.sideEffectCount = 0;
-
-    let response = res();
-    await handler(req('POST'), response);
-    assert.equal(response.statusCode, 200);
-
-    const firstRunApplyCount = S.calls.filter((c) => c.rpc === 'apply_leave_usage').length;
-    assert.equal(firstRunApplyCount, 1);
-
-    // A fresh, different event for the SAME request: event_side_effects
-    // already has a row for `leave_used:lr-1`, so the count check must skip
-    // apply_leave_usage even though claim_side_effect's own mocked return is
-    // still "firstTime".
-    S.calls = [];
-    S.pending = [
-      {
-        id: 'ev-2',
-        org_id: 'org-1',
-        event_type: 'leave.request.approved',
-        attempts: 0,
-        payload: { leave_request_id: 'lr-1' },
-      },
-    ];
-    S.sideEffectCount = 1;
-
-    response = res();
-    await handler(req('POST'), response);
-    assert.equal(response.statusCode, 200);
-
-    const secondRunApplyCount = S.calls.filter((c) => c.rpc === 'apply_leave_usage').length;
-    assert.equal(secondRunApplyCount, 0);
-  });
-
-  test('a request approved before v1.2.5 (bare leave_used key) is not deducted again', async () => {
-    S.rows.leave_requests['lr-old'] = {
-      id: 'lr-old', org_id: 'org-1', status: 'approved', user_id: 'row-user',
-      leave_type_id: 'row-lt', days: 2, start_date: '2026-01-05', end_date: '2026-01-05',
-    };
-    S.rows.users['row-user'] = { id: 'row-user', org_id: 'org-1', email: 'row-user@example.com' };
-    S.pending = [{ id: 'ev-new', org_id: 'org-1', event_type: 'leave.request.approved', attempts: 0, payload: { leave_request_id: 'lr-old' } }];
-    S.firstTime = true;
-    S.sideEffectCount = 0;
-    S.earlierEvents = [{ id: 'ev-old' }];
-    S.legacySideEffectCount = 1;
-
-    const response = res();
-    await handler(req('POST'), response);
-    assert.equal(response.statusCode, 200);
-    assert.equal(S.calls.filter((c) => c.rpc === 'apply_leave_usage').length, 0);
-    assert.equal(S.notificationInserts.length, 0);
-
-    // Control: with no earlier legacy claim, the same event does apply.
-    S.calls = []; S.notificationInserts = [];
-    S.earlierEvents = []; S.legacySideEffectCount = 0;
-    await handler(req('POST'), res());
-    assert.equal(S.calls.filter((c) => c.rpc === 'apply_leave_usage').length, 1);
+  // v1.7.1: once-per-request deduplication moved into the database function
+  // (it was two JavaScript checks + claim_side_effect, and the browser
+  // processor used a different key). Verified on production in a rolled-back
+  // probe; here we hold the migration to the same rules.
+  test('deduplication lives in apply_approved_leave_usage: per request, locked, honouring the pre-v1.2.5 key', () => {
+    const dir = path.join(ROOT, 'supabase', 'migrations');
+    const file = fs.readdirSync(dir).find((f) => f.endsWith('_leave_integrity.sql'));
+    assert.ok(file, 'the leave integrity migration exists');
+    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
+    assert.match(sql, /v_key := 'leave_used:' \|\| r\.id::text;/);
+    assert.match(sql, /perform pg_advisory_xact_lock\(hashtext\(v_key\)\);/);
+    assert.match(sql, /where effect_key = v_key\)/);
+    assert.match(sql, /s\.effect_key = 'leave_used'[\s\S]*?e\.payload->>'leave_request_id' = r\.id::text/);
+    assert.match(sql, /if r\.status is distinct from 'approved'/);
+    assert.match(sql, /r\.org_id is distinct from auth_org_id\(\)/);
+    assert.match(sql, /revoke execute on function public\.apply_leave_usage\(uuid, uuid, integer, numeric\) from public, anon, authenticated;/);
   });
 
   test('attendance.checkin.completed with a payload user_id from another org does not update', async () => {
