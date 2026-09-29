@@ -739,8 +739,12 @@ running on the new stack; old vanilla-JS HRMS views retired.
   uploader and approvers), `employees/{user}/` (owner/admin/manager manage
   people they can see; read by those people). Verified on production in an
   always-rolled-back transaction, 12 scenarios; production unchanged after.
-  **Not applied** — awaiting the owner; it fixes the legacy uploads the
-  moment it is applied, independent of any deploy.
+  **Applied 2026-09-30** on the owner's approval (recorded
+  `20260929184245`; file renamed to match) — the legacy uploads work from
+  that moment, no deploy needed. Checked live: private bucket, 10 MB, 9
+  policies; a member uploads their own leave document, is refused one as a
+  colleague; their manager reads it; another org's admin reads nothing
+  (rolled back).
 - 2026-09-30 — **Leave on the new stack, built (v1.8.0,
   `claude/phase-4-leave-screens`; preview, not yet the default).**
   `/hrms/leave` (balances, request with document, my requests, cancel) and
