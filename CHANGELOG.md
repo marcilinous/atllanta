@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.8.0 — 2026-09-30
+
+### What changed
+- **Uploading documents works again.** Attaching a document to a leave request (Sick leave needs one), an expense receipt, or an employee document was failing because the storage area for them didn't exist. Files are private and only visible to the right people.
+- **A new leave screen, in preview** at `/hrms/leave`: your balances, requesting leave (with a document where the leave type needs one), your requests, and cancelling a pending one. Managers and admins get an Approvals tab. The current leave screens are unchanged and stay the default until we switch over.
+- On the new screen you can't request leave on dates you already have pending or approved leave.
+
+### Admins need to
+- Nothing yet. Try the new screen at `/hrms/leave` if you like; we'll tell you before it replaces the current one.
+
 ## v1.7.1 — 2026-09-29
 
 ### What changed

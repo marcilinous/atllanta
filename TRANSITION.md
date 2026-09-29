@@ -727,6 +727,47 @@ running on the new stack; old vanilla-JS HRMS views retired.
   while mapping legacy leave: see Decisions & Blockers, 2026-09-29 (leave
   integrity). The port resumes on the fixed rules — its Server Actions rely
   on the same RLS and guard.
+- 2026-09-30 — **Found: the `documents` storage bucket does not exist in
+  production** (only `attendance-selfies` and `visit-selfies`). Every legacy
+  upload targets it — leave documents, expense receipts, employee
+  documents — so all three fail, and **RTcompu staff cannot apply for Sick
+  leave at all** (its type requires a document; the upload error stops the
+  form). Fix: migration `…_documents_bucket.sql` — a private bucket (10 MB),
+  a `storage_path_uuid()` helper, and nine storage policies following the
+  legacy paths: `leave-docs/{org}/{user}/` (own upload; read by self and by
+  whoever sees their leave), `expenses/{org}/` (members upload; read by the
+  uploader and approvers), `employees/{user}/` (owner/admin/manager manage
+  people they can see; read by those people). Verified on production in an
+  always-rolled-back transaction, 12 scenarios; production unchanged after.
+  **Not applied** — awaiting the owner; it fixes the legacy uploads the
+  moment it is applied, independent of any deploy.
+- 2026-09-30 — **Leave on the new stack, built (v1.8.0,
+  `claude/phase-4-leave-screens`; preview, not yet the default).**
+  `/hrms/leave` (balances, request with document, my requests, cancel) and
+  `/hrms/leave/approvals` (approve / reject with a comment).
+  `src/lib/hrms/leave/`: `days.ts` (the legacy rule — weekdays only,
+  holidays not excluded, half day 0.5 / range − 0.5 — on UTC calendar
+  dates), `schemas.ts`, `queries.ts`, `actions.ts`. Every action calls the
+  new `requireFeature("me", "me", …)` in `permissions.ts` — **both gates**
+  (module on + role permission via `requirePermission`, and
+  `feature_access` via `canSeeFeature`) — which is Phase 3 item 4 carried
+  forward, now used by real module actions. The org, the person and the
+  days come from the server; the legacy checks are enforced server-side
+  (maximum consecutive days, balance minus pending when a balance exists,
+  required document) plus one new one: **no overlap with your own pending
+  or approved leave**. Writes run as the caller under RLS and the v1.7.1
+  guard (the reviewer is stamped by the database, never sent); events keep
+  the payload shapes the legacy processors read. Documents: up to 4 MB, PDF
+  or image, uploaded as the caller to `leave-docs/{org}/{self}/` and
+  removed if the request then fails; `next.config.mjs` raises the Server
+  Action body limit to 4.5 MB (Vercel's request cap). The approvals list
+  never offers a request the guard would refuse. `/hrms` added to the
+  service worker's network-only prefixes. Client components drafted by the
+  Groq worker and reviewed (two fixes). 367/367 unit tests, typecheck,
+  lint, build.
+  Not yet: switching the legacy nav to these screens (the cutover, owner's
+  call after a browser check), leave settings/types/holidays/balance
+  adjustments (still legacy), and viewing an attached document.
 
 ---
 
