@@ -78,11 +78,11 @@
   **v1.7.0** on `claude/phase-3-developer` (Decisions 2026-09-27 item 2);
   its migration is **applied** (2026-09-29, `20260929065828`); the code half
   ships with the v1.7.0 deployment.
-- **Next:** Phase 4 (HRMS Migration), first unchecked item —
-  `src/db/schema/hrms.ts`. Read the Phase 4 notes first: the live HRMS
-  carries features the target list omits, and every HRMS Server Action
-  must call `requirePermission()` (Phase 3 item 4, carried forward). Start
-  from a branch off the production branch.
+- **Next:** Phase 4 item 1 (`hrms.ts`) is done on
+  `claude/phase-4-hrms-schema`. Then item 2 (data migration — likely a
+  confirmed no-op, owner's call) and item 3 (all HRMS mutations behind
+  Server Actions + RLS, each calling `requirePermission()` — Phase 3 item 4
+  carried forward). Start from a branch off the production branch.
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
@@ -661,7 +661,7 @@ to end (CLAUDE.md §3.5).
 **Goal:** Directory, attendance, leave, assets, expenses, announcements
 running on the new stack; old vanilla-JS HRMS views retired.
 
-- [ ] `src/db/schema/hrms.ts` per CLAUDE.md §3 Module 1 table list
+- [x] `src/db/schema/hrms.ts` per CLAUDE.md §3 Module 1 table list
 - [ ] Data migration script: old Supabase-direct HRMS tables → new schema
       (verify no data loss, especially `leave_balances`)
 - [ ] All HRMS mutations behind Server Actions + RLS
@@ -682,6 +682,36 @@ running on the new stack; old vanilla-JS HRMS views retired.
   `documents`, `finance`, `announcements`) — so both gates apply (org
   module on, role/custom-role grants) as CLAUDE.md §1 requires. Module
   enforcement is live in the legacy nav since v1.6.0.
+- 2026-09-29 — The 2026-09-18 note's open question is **answered by
+  CLAUDE.md** (Module 1): geofenced check-in (`work_locations`), the
+  approvals inbox, lifecycle and letters, and the document store "carry
+  over and are not to be dropped by omission", and `posts` is in its table
+  list; helpdesk is its own module (Phase 8). So nothing is dropped. Checked
+  live: lifecycle and letters have **no tables of their own** (built on
+  `users` + `events`), and the document store is `files` — all in
+  `platform.ts` already.
+- 2026-09-29 — **Item 1 done** (branch `claude/phase-4-hrms-schema`).
+  `src/db/schema/hrms.ts` declares the 14 live HRMS tables — attendance,
+  attendance_regularizations, work_locations, work_schedules, holidays,
+  leave_types, leave_balances, leave_requests, assets, asset_assignments,
+  expense_categories, expenses, announcements, posts — read-only against
+  the live database: every column/type/nullability/default, all 32 foreign
+  keys with their ON DELETE rules, the 4 unique constraints and 7 CHECK
+  constraints (status lists exported for later Zod schemas).
+  `leave_balances.balance` is a generated column (opening_balance + accrued
+  − used), declared as such so it is never written. Three live columns have
+  no FK and are declared without one (`attendance_regularizations.
+  reviewed_by`, `leave_requests.reviewed_by`, `posts.author_id`). Live names
+  win over CLAUDE.md's sketch (e.g. `holidays.date`, `leave_types.
+  annual_quota`, `assets.type`, `expenses.receipt_url`, `work_schedules`'
+  shift columns). Nothing pushed or migrated. `src/db/schema/index.ts`
+  aggregates the modules (§5). `tests/hrms-schema.test.mjs` holds the
+  declarations equal to the live snapshot (checked non-vacuous: dropping
+  one NOT NULL fails it). 344/344 unit tests, typecheck, lint, build.
+- 2026-09-29 — Item 2 ("data migration script … verify no data loss") will
+  most likely be a no-op to confirm, not a script: the new stack reads and
+  writes the **same** tables, so no data moves. Worth confirming with the
+  owner before closing it that way.
 
 ---
 
