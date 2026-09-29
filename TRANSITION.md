@@ -53,8 +53,17 @@
   live on that branch. The **Members screen** is built as **v1.5.0** on
   `claude/phase-3-members` (below, Decisions 2026-09-27 item 1); #127 is
   renumbered when it is rebased for go-live.
-- **Next:** the developer-role capabilities (Decisions 2026-09-27 item 2),
-  then Step 3's go-live when the owner calls it. Plan:
+- **Update 2026-09-29 (later):** owner: RTcompu has switched on all 13
+  modules, and the other four organisations losing their modules is
+  accepted — **go ahead with Step 3**. Readiness verified live: RTcompu 13/13
+  on; Hiretrack (2 users), Atllanta Pvt Ltd (1), Generic CRM Test Co (1),
+  BlueHire (0) none. Step 3 is rebuilt as **v1.6.0** on
+  `claude/release-1.6.0`, on top of Members (v1.5.0, PR #128) — the same
+  four files as #127 (`features.js`, `index.html`, `views/crm/index.js`,
+  `feature-gating.test.mjs`), unchanged, with new release files; #127 is
+  superseded. Merge #128 first, then v1.6.0. Rollback after go-live:
+  redeploy v1.5.0 (no database change).
+- **Next:** the developer-role capabilities (Decisions 2026-09-27 item 2). Plan:
   `docs/superpowers/plans/2026-09-26-phase-3-roles-modules.md`. Start from a
   branch off the production branch.
 
@@ -566,6 +575,40 @@ to end (CLAUDE.md §3.5).
   (`claude/release-1.4.3`, the same change on a fresh branch off
   production). Gotcha: re-check a PR's head just before merging when a
   commit is pushed to it after review.
+- 2026-09-28 — **v1.4.3 shipped** (PR #126, head `cf8d5e7` → merge
+  `cf39b0b`, promoted from the production branch, tag on the merge). Live
+  `dashboard.js` carries the `platform.%` filter. The owner reports org
+  admins notified.
+- 2026-09-28/29 — **Step 3 (enforcement), first built as v1.5.0 on draft
+  PR #127, now v1.6.0 on `claude/release-1.6.0`.** `public/js/features.js`
+  gains the `org_modules` gate: `loadOrgModules(orgId)` at bootstrap
+  (index.html, before `loadFeatureAccess`), `MODULE_OF` (feature key →
+  module key, a test holds it equal to `FEATURE_MODULE` in
+  `permissions-core.ts`), checked in `isFeatureAllowed` beside the CRM and
+  partner-pack flags and, like them, **not bypassed by owners/admins**. It
+  is AND-ed with those flags, so a non-RTcompu org switching on "Partner
+  CRM" still sees nothing of the pack. Non-module screens (dashboard,
+  reports, admin, settings, audit) are never hidden, so an admin can always
+  reach Modules & roles. A failed load — error *or* a thrown exception —
+  leaves the gate off (pre-enforcement behaviour) and warns: a navigation
+  gate on top of RLS, so failing open exposes nothing, failing closed would
+  lock a whole org out (the thrown-exception case was caught by a test: it
+  would have stopped the app loading). The CRM hub route `#/crm` was gated
+  as generic CRM, so a partner-only org could not open it; it now opens if
+  either CRM module is on (the sidebar button's rule), and the hub lists
+  only cards the user can open.
+  Held 2026-09-28 because no org had any module on; 2026-09-29 RTcompu had
+  10, leaving crm/recruitment/ai off (its data: 1 lead + 1 opportunity from
+  2026-09-16, 0 jobs, 0 AI calls in 30 days); later the same day the owner
+  reported **all 13 on for RTcompu** and accepted that the four smaller
+  orgs (nothing on) lose their modules — verified live, go-live approved.
+  Readiness query for future changes: `select o.name, string_agg(m.module_key,
+  ',' order by m.module_key) from organizations o left join org_modules m on
+  m.org_id = o.id and m.is_enabled group by o.name;`.
+  Not in this step: server-side module checks on the legacy `/api`
+  endpoints and RLS-level module enforcement — per module at its cutover,
+  as the plan says; the new stack's `requirePermission()` already denies a
+  disabled module.
 - 2026-09-26 — Found: `audit_logs.entity_id` is NOT NULL (live and in
   Drizzle), but the legacy access editor logged with `entity_id = null`,
   so its audit writes could never have succeeded. The new editor audits
