@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.6.0 — 2026-09-29
+
+### What changed
+- **Modules you haven't switched on are now hidden.** The switches under **Admin → Modules & roles → Modules** take effect: a module that is off disappears from the sidebar and its pages can't be opened — for everyone in your organisation, owners and admins included.
+- The dashboard, reports, the Admin panel, your settings and the audit log are not modules and are always there, so an owner or admin can always switch a module back on.
+- The CRM page opens if either CRM or Partner CRM is on, and only shows the sections you can open.
+- If the list of switched-on modules can't be loaded, the app shows every module as before rather than hiding them.
+
+### Admins need to
+- Check **Admin → Modules & roles → Modules**: anything left off is now hidden for everyone in your organisation.
+
 ## v1.5.0 — 2026-09-29
 
 ### What changed

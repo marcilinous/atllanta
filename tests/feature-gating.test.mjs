@@ -42,9 +42,12 @@ after(() => {
 
 // Mirrors index.html's bootstrap: platform gates from the org row, then the
 // per-user rules (skipped here — no database).
-function asOrg({ crm, pack, admin = false }) {
+// `modules` is the org's switched-on org_modules keys; omitted = not loaded,
+// which leaves the module gate off (the pre-Step-3 behaviour).
+function asOrg({ crm, pack, admin = false, modules = null }) {
   F.setCrmEnabled(crm);
   F.setPartnerPack(pack);
+  F.setEnabledModules(modules);
   F.loadFeatureAccess({ orgId: null, userId: null, role: admin ? 'admin' : 'member', isAdmin: admin });
   return F.isRouteAllowed;
 }
@@ -126,5 +129,94 @@ describe('route mapping', () => {
     const allowed = asOrg({ crm: true, pack: false });
     assert.equal(allowed('settings/org'), true);
     assert.equal(allowed('helpdesk'), true);
+  });
+});
+
+// Phase 3 Step 3: the org_modules gate.
+describe('module gate', () => {
+  const ALL = ['people', 'me', 'inbox', 'documents', 'finance', 'announcements', 'recruitment',
+    'crm', 'crm_partner', 'analytics', 'helpdesk', 'projects', 'ai'];
+
+  test('a module the org has switched off is hidden, with its sub-routes and aliases', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: ALL.filter(m => m !== 'people' && m !== 'crm') });
+    for (const r of ['people', 'employees/profile', 'lifecycle', 'crm/leads', 'crm/opportunities']) {
+      assert.equal(allowed(r), false, r);
+    }
+    assert.equal(allowed('recruitment'), true);
+    assert.equal(allowed('crm/partners'), true, 'the partner pack is its own module');
+    assert.equal(allowed('crm'), true, 'the hub still opens for the partner pack');
+  });
+
+  test('an org with nothing switched on keeps only the non-module screens', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: [] });
+    for (const r of ['people', 'me', 'attendance/checkin', 'approvals', 'recruitment', 'crm', 'crm/partners',
+      'analytics', 'helpdesk', 'announcements', 'finance', 'documents', 'ai']) {
+      assert.equal(allowed(r), false, r);
+    }
+    for (const r of ['dashboard', 'reports', 'admin', 'settings', 'settings/org', 'audit']) {
+      assert.equal(allowed(r), true, r);
+    }
+  });
+
+  test('owners and admins do not bypass it (it is a platform gate)', () => {
+    const allowed = asOrg({ crm: true, pack: true, admin: true, modules: ['people'] });
+    assert.equal(allowed('people'), true);
+    assert.equal(allowed('crm'), false);
+    assert.equal(allowed('admin'), true, 'the admin panel, and so Modules & roles, stays reachable');
+  });
+
+  test('switching a module on does not override the partner-pack platform flag', () => {
+    const allowed = asOrg({ crm: true, pack: false, modules: ALL });
+    assert.equal(allowed('crm/partners'), false);
+    assert.equal(allowed('crm/leads'), true);
+  });
+
+  test('not loaded (null) leaves every module as before', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: null });
+    for (const r of ['people', 'crm', 'crm/partners', 'recruitment', 'ai']) assert.equal(allowed(r), true, r);
+  });
+
+  test('a failed load falls back to not applying the gate', async () => {
+    F.setEnabledModules(['people']);
+    const warn = console.warn; console.warn = () => {};
+    try {
+      await F.loadOrgModules('org-1'); // the stub database throws
+    } catch {
+      // loadOrgModules must not throw into the bootstrap
+      assert.fail('loadOrgModules threw');
+    } finally {
+      console.warn = warn;
+    }
+    // ...and the gate is off again, not stuck on the previous org's modules.
+    F.setCrmEnabled(true); F.setPartnerPack(true);
+    F.loadFeatureAccess({ orgId: null, userId: null, role: 'member', isAdmin: false });
+    assert.equal(F.isRouteAllowed('crm'), true);
+  });
+
+  // The CRM hub (#/crm) fronts both generic CRM and the partner pack, like the
+  // sidebar CRM button (index.html shows it if crm OR crm_partners is allowed).
+  test('the CRM hub opens with only the partner pack switched on', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: ['crm_partner', 'people'] });
+    assert.equal(allowed('crm'), true, 'hub reachable');
+    assert.equal(allowed('crm?x=1'), true, 'hub with a query string');
+    assert.equal(allowed('crm/partners'), true);
+    assert.equal(allowed('crm/leads'), false, 'generic screens stay behind the crm module');
+    assert.equal(allowed('crm/opportunities'), false);
+  });
+
+  test('the CRM hub stays hidden when neither CRM module is on', () => {
+    const allowed = asOrg({ crm: true, pack: true, modules: ['people'] });
+    assert.equal(allowed('crm'), false);
+  });
+
+  test('the CRM hub only offers cards the user can open', () => {
+    const hub = fs.readFileSync(path.join(HERE, '..', 'public/views/crm/index.js'), 'utf8');
+    assert.match(hub, /import \{ isRouteAllowed \} from '\.\.\/\.\.\/js\/features\.js';/);
+    assert.match(hub, /\.filter\(\(?c\)? => isRouteAllowed\(c\.route\)\)/);
+  });
+
+  test('the legacy map equals the new stack\'s FEATURE_MODULE', async () => {
+    const { FEATURE_MODULE } = await import('../src/lib/auth/permissions-core.ts');
+    assert.deepEqual({ ...F.MODULE_OF }, { ...FEATURE_MODULE });
   });
 });

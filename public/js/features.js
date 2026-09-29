@@ -63,6 +63,21 @@ const PARTNER_FEATURES = new Set([
 // Generic CRM keys gated by crm_enabled (the standard baseline).
 const GENERIC_CRM = new Set(['crm', 'crm_leads', 'crm_pipeline']);
 
+// Phase 3 Step 3: feature key -> org_modules key. Must equal FEATURE_MODULE
+// in src/lib/auth/permissions-core.ts (tests/feature-gating.test.mjs checks).
+// Keys not listed here (dashboard, reports, admin, settings, ...) are not
+// modules and are never hidden by this gate.
+export const MODULE_OF = {
+  people: 'people', me: 'me', inbox: 'inbox', documents: 'documents',
+  finance: 'finance', announcements: 'announcements', recruitment: 'recruitment',
+  crm: 'crm', crm_partner: 'crm_partner', analytics: 'analytics',
+  helpdesk: 'helpdesk', projects: 'projects', ai: 'ai',
+  crm_leads: 'crm', crm_pipeline: 'crm',
+  crm_partners: 'crm_partner', crm_field_sales: 'crm_partner', crm_visits: 'crm_partner',
+  crm_prospects: 'crm_partner', crm_events: 'crm_partner', crm_exports: 'crm_partner',
+  crm_pjp: 'crm_partner', crm_sales: 'crm_partner', crm_reports: 'crm_partner',
+};
+
 export function featureForRoute(path) {
   const parts = (path || '').split('?')[0].split('/');
   const base = parts[0];
@@ -81,6 +96,32 @@ let _partnerPack = false;  // platform gate: RT partner vertical pack enabled?
 
 // Platform gates, set per organization at bootstrap. Unlike per-role access,
 // these are NOT bypassed by an org's own admins.
+// Module gate (Phase 3 Step 3): the org's switched-on org_modules keys, set
+// at bootstrap. null = not loaded, and then the gate is not applied — this is
+// a navigation gate on top of RLS, so failing open only restores the pre-1.5
+// behaviour, while failing closed would hide every module from a whole org.
+let _enabledModules = null;
+export function setEnabledModules(keys) {
+  _enabledModules = Array.isArray(keys) ? new Set(keys) : null;
+}
+export async function loadOrgModules(orgId) {
+  if (!orgId) { setEnabledModules(null); return; }
+  // index.html awaits this during bootstrap: it must never throw, or a network
+  // hiccup would stop the whole app from loading.
+  try {
+    const { data, error } = await sb
+      .from('org_modules')
+      .select('module_key')
+      .eq('org_id', orgId)
+      .eq('is_enabled', true);
+    if (error || !Array.isArray(data)) throw new Error(error?.message || 'unexpected response');
+    setEnabledModules(data.map(r => r.module_key));
+  } catch (e) {
+    console.warn('[features] org modules unavailable; module gate not applied', e?.message);
+    setEnabledModules(null);
+  }
+}
+
 export function setCrmEnabled(v) { _crmEnabled = v !== false; }
 export function setPartnerPack(v) { _partnerPack = v === true; }
 export function hasPartnerPack() { return _partnerPack; }
@@ -116,11 +157,16 @@ export function isFeatureAllowed(key) {
   // Platform gates first (admins do NOT bypass these).
   if (GENERIC_CRM.has(key) && !_crmEnabled) return false;
   if (PARTNER_FEATURES.has(key) && !_partnerPack) return false;
+  if (_enabledModules && MODULE_OF[key] && !_enabledModules.has(MODULE_OF[key])) return false;
   if (!_loaded || _bypass) return true;
   if (!KNOWN.has(key)) return true;   // unknown/uncontrolled routes stay open
   return !_disallowed.has(key);
 }
 
 export function isRouteAllowed(path) {
+  // The CRM hub (#/crm) fronts both generic CRM and the partner pack, so it
+  // opens if either is allowed — the same rule as the sidebar CRM button.
+  const clean = (path || '').split('?')[0].replace(/\/$/, '');
+  if (clean === 'crm') return isFeatureAllowed('crm') || isFeatureAllowed('crm_partners');
   return isFeatureAllowed(featureForRoute(path));
 }
