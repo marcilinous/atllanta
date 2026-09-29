@@ -36,8 +36,9 @@
 - **Update 2026-09-30 (later):** **v1.9.0 is live** (#136 → `b5cc252`,
   tagged): leave cut over to the new screens. Starting attendance, its rules
   were checked first and had the same holes leave had — **v1.9.1
-  (attendance integrity) is built** on `claude/release-1.9.1`, migration
-  awaiting the owner. The attendance screens follow once it is applied.
+  (attendance integrity)**: its migration is **applied** (2026-09-30), the
+  code half (test, release files, tracker) is on `claude/release-1.9.1`.
+  Next: the new-stack attendance screens.
 - **Earlier 2026-09-30:** **v1.8.0 is live** (new-stack leave
   screens in preview; the `documents` storage bucket created, fixing every
   legacy upload). **v1.9.0 (leave cutover) is built** on
@@ -993,8 +994,13 @@ Service role (the server event processor marking lateness and on-leave
 days) is exempt from both guards; the browser processor only reads
 attendance. Verified: 16 scenarios on production with the migration applied
 inside an always-rolled-back transaction, all as intended; production
-unchanged after. **Not applied** — awaiting the owner; it is independent of
-any deploy (the code in v1.9.1 is only its test and release files).
+unchanged after. **Applied 2026-09-30** on the owner's approval (recorded
+`20260929191237`; file renamed to match). Checked live: `att_insert` as
+written, both guard triggers present, both schedule policies owner/admin
+only; replayed as a real member (rolled back) — check-in, check-out and a
+regularisation work; marking a colleague, editing one's own check-in,
+self-approval and creating a schedule are refused; the manager's approval
+works.
 
 ### 2026-09-29 — Leave integrity (security, legacy v1.7.1)
 
