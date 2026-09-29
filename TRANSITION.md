@@ -33,7 +33,12 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-30 — **v1.8.0 is live** (new-stack leave
+- **Update 2026-09-30 (later):** **v1.9.0 is live** (#136 → `b5cc252`,
+  tagged): leave cut over to the new screens. Starting attendance, its rules
+  were checked first and had the same holes leave had — **v1.9.1
+  (attendance integrity) is built** on `claude/release-1.9.1`, migration
+  awaiting the owner. The attendance screens follow once it is applied.
+- **Earlier 2026-09-30:** **v1.8.0 is live** (new-stack leave
   screens in preview; the `documents` storage bucket created, fixing every
   legacy upload). **v1.9.0 (leave cutover) is built** on
   `claude/leave-cutover`: `#/leave` and `#/leave/approvals` forward to the
@@ -952,6 +957,44 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-30 — Attendance integrity (security, legacy v1.9.1)
+
+Found when starting the attendance port (the "security check of its rules
+first" the owner agreed after leave). Confirmed on production in a
+rolled-back probe as a plain RTcompu member, who could: **mark a colleague
+present** with any time (`att_insert` checked only the org; the geofence
+trigger skips rows that are not the caller's); **rewrite their own check-in
+time** ("late" → "present") with no regularisation (`att_update` let the
+person update their own row freely); **submit a regularisation already
+approved**, and **approve their own** (`attreg_insert` checked only the user,
+`attreg_update` let the requester update); and **create a work schedule**
+(`ws_*` checked only the org). The geofence is not in use for RTcompu today
+(0 active work locations), but it also never checked a check-in set by a
+later update.
+
+Fix, migration `…_attendance_integrity.sql` — keeps every legitimate legacy
+write working, so **no app code changes**:
+- `att_insert`: your own row only; `attendance_guard()` (insert): check-in
+  within 15 minutes of now, today, status `present`, no check-out.
+- `attendance_guard()` (update): nothing moves between people or days; on
+  your own row only the check-out changes, once, within 15 minutes of now;
+  someone else's row (RLS limits it to admins, the reporting line and
+  managers over the department) — an owner's/admin's needs an admin. This
+  is what lets an approver correct the person's row after approving their
+  regularisation, as `approvals.js` / `inbox.js` / `regularize.js` do.
+- `attreg_insert`: your own, pending, on your own attendance row;
+  `attendance_regularizations_guard()`: nothing about a request changes
+  except its status; only from pending to approved/rejected; never your
+  own; an owner's/admin's needs an admin (owner decision 2026-09-29, a);
+  reviewer stamped by the database.
+- `ws_insert` / `ws_update`: owners/admins only.
+Service role (the server event processor marking lateness and on-leave
+days) is exempt from both guards; the browser processor only reads
+attendance. Verified: 16 scenarios on production with the migration applied
+inside an always-rolled-back transaction, all as intended; production
+unchanged after. **Not applied** — awaiting the owner; it is independent of
+any deploy (the code in v1.9.1 is only its test and release files).
 
 ### 2026-09-29 — Leave integrity (security, legacy v1.7.1)
 
