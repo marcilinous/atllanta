@@ -33,7 +33,14 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Last updated:** 2026-09-29 — **v1.7.0 is live** (#130, `3efe7a4`,
+- **Last updated:** 2026-09-29 (night) — **v1.7.1 is live** (#133,
+  `562a3a7`, tagged) with its migration applied: leave can no longer be
+  self-approved, balances and holidays are owner/admin-only, and every
+  deduction goes through one checked database function (Decisions &
+  Blockers, leave integrity). Phase 4 items 1 and 2 are done; the leave port
+  (item 3) resumes next. **RTcompu has no admin** — under the leave rule
+  nobody can approve its owner's leave until one exists.
+- **Earlier 2026-09-29:** **v1.7.0 is live** (#130, `3efe7a4`,
   tagged): the developer role, on top of v1.6.0 (module switches enforced)
   and v1.5.0 (Members screen). Owner tested the developer role in
   production. Google sign-in is switched on and working (verified in the
@@ -86,7 +93,7 @@
 
 **The legacy app keeps shipping until Phase 8.** It runs production on branch
 `claude/gstack-skill-install-chnb41` at `atllanta.vercel.app`, is versioned
-separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.7.0** live since
+separately (`VERSION`, `CHANGELOG.md`, tags `vX.Y.Z` — **v1.7.1** live since
 2026-09-29), and follows
 `docs/legacy/CLAUDE-legacy.md`. The `v0.x` ladder below tracks the *new* stack only;
 the two version lines are independent and must not be confused.
@@ -919,6 +926,29 @@ Known, not fixed here (pre-existing, low): the browser processor's
 "leave approved/rejected" notifications still take the person and approver
 names from the payload, so a forged event can send a misleading
 notification (no balance or approval effect).
+
+**Shipped 2026-09-29.** PR #133 merged (`562a3a7`), tagged `v1.7.1`. The
+first production-branch build failed — not the code: Turbopack's
+`next/font/google` handling of Inter errored (`Can't resolve
+'@vercel/turbopack-next/internal/font/google/font'`, "next/font/google
+queries have exactly one entry") after "Restored build cache from previous
+deployment"; #132's build with the same `app/layout.tsx` had passed and the
+code built clean locally. The owner redeployed **without the build cache**
+and it built (`dpl_HcsEsDjMst6UeQeKNJ7xgtCXrWsh`), then promoted it;
+`/version.json` read 1.7.1 and the live event processor called
+`apply_approved_leave_usage` before the migration was applied — the agreed
+order (code first; the reverse would have let the old code skip deductions
+silently). **Migration applied** on the owner's approval, recorded
+`20260929161953` (file renamed to match). Checked live: `lr_insert` as
+written, the guard trigger present, 5 owner/admin-only write policies on
+balances and holidays, `apply_leave_usage` no longer executable by signed-in
+users, the new function executable by them but not by `anon`; replaying the
+original attack as a real member (rolled back) — self-approve, a 999-day
+balance, a holiday and a pre-approved request all refused, the request itself
+and the manager's approval still work.
+Gotcha: a Vercel build that fails inside `next/font` right after restoring
+the build cache is worth one uncached redeploy before touching code; if it
+recurs, move Inter to `next/font/local`.
 
 ### 2026-09-29 — Phase 3 closed; password-reset email on hold; Google sign-in on
 
