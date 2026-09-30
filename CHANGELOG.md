@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.9.1 — 2026-09-30
+
+### What changed
+- Security: attendance can no longer be changed from outside the app's screens. Before, any signed-in person could mark a colleague present, change their own check-in time, approve their own regularisation, or create work schedules.
+- You check in and out for yourself, at the time you do it. To change your own attendance afterwards, ask for a regularisation.
+- Nobody approves their own regularisation. An owner's or admin's is approved by an admin or another owner; everyone else's by an admin, their reporting manager, or a manager over their department.
+- Only owners and admins can create or change work schedules.
+
+### Admins need to
+- Nothing.
+
 ## v1.9.0 — 2026-09-30
 
 ### What changed
