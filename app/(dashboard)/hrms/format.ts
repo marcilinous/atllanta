@@ -9,6 +9,16 @@ function formatDay(value: string): string {
   });
 }
 
+export function formatDate(value: string): string {
+  return formatDay(value);
+}
+
+// Instants shown as a clock time in the org's time zone ("—" when unknown).
+export function formatTime(value: string | null, timeZone: string): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone });
+}
+
 export function formatRange(start: string, end: string): string {
   return start === end ? formatDay(start) : `${formatDay(start)} – ${formatDay(end)}`;
 }
