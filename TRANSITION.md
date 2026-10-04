@@ -33,7 +33,18 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Update 2026-09-30 (later):** **v1.9.0 is live** (#136 → `b5cc252`,
+- **Update 2026-09-30 (latest):** **v1.9.1 is live** (#137 → `386f431`,
+  tagged). **v1.10.0 (attendance preview) is built** on
+  `claude/phase-4-attendance`: `/hrms/attendance` (check in/out, last 30
+  days, correction requests) and `/hrms/attendance/approvals` (decide
+  corrections — approving applies the times to the day in the same
+  transaction — plus who checked in today), both gates on every action,
+  events `attendance.checkin.completed` / `attendance.regularization.created`
+  / `…approved` in the processors' shapes. Legacy `#/attendance*` routes are
+  untouched. Writes verified in a rolled-back production probe as a real
+  member and their manager. Next: the owner checks it in the browser, then
+  an attendance cutover like leave's.
+- **Earlier 2026-09-30:** **v1.9.0 is live** (#136 → `b5cc252`,
   tagged): leave cut over to the new screens. Starting attendance, its rules
   were checked first and had the same holes leave had — **v1.9.1
   (attendance integrity)**: its migration is **applied** (2026-09-30), the
@@ -958,6 +969,29 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-09-30 — Attendance on the new stack (v1.10.0, preview)
+
+Built beside the legacy screens, which stay the default until the owner
+switches over. Choices made:
+- "Today" is the org's time zone (`organizations.timezone`, default
+  Asia/Kolkata), worked out on the server; the check-in time is the
+  server's `now()`. The browser location is optional and passed through —
+  the database geofence decides.
+- Approving a correction updates the request **and** applies the corrected
+  times (plus `total_hours`, and `present` when both times are known) in
+  one transaction. Legacy does this as two separate writes that can
+  half-fail.
+- The request publishes `attendance.regularization.created`, the name both
+  processors handle. The legacy dashboard publishes `…requested`, which
+  nothing handles, so managers were never notified. That legacy bug is left
+  as it is; the cutover retires it.
+- The legacy "Team" tab is replaced by "Checked in today" on Approvals. The
+  heatmap overview and the report stay legacy, linked from the tabs.
+- Probe (production, rolled back, a real member and their reporting
+  manager): check-in ok, second check-in 23505, check-out ok, correction ok,
+  self-approval 42501, the manager's approve + apply in one transaction ok,
+  reviewer stamped.
 
 ### 2026-09-30 — Attendance integrity (security, legacy v1.9.1)
 

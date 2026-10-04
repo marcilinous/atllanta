@@ -5,6 +5,20 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.10.0 — 2026-09-30
+
+### What changed
+- **New attendance screen, in preview** at `/hrms/attendance`. The current attendance screens are unchanged and still the ones the app opens. Try the new one and tell us if anything is off before we switch over.
+  - **My attendance:** check in and check out for today, your last 30 days, and "Request a correction" on any day, with the times you want and a reason. Your corrections and their status are listed underneath.
+  - **Approvals** (managers, admins and owners): approve or reject corrections. Approving now fixes the times on that day in the same step. You never see your own. An owner's or admin's correction goes to an admin or another owner.
+  - **Checked in today:** who has checked in, with their times.
+  - The overview heatmap and the attendance report are still the current screens, linked from the tabs.
+- A manager is now told when someone asks for a correction on the new screen. The current screen sent the notice under a name nothing listened to.
+- Fixed: after checking in from the **Me** page, the button kept saying "Check In", and clicking it again showed a "duplicate key" error. The check-in was always saved. The button now changes to "Check Out" straight away.
+
+### Admins need to
+- Nothing.
+
 ## v1.9.1 — 2026-09-30
 
 ### What changed
