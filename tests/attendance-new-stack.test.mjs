@@ -129,6 +129,17 @@ describe('static: the actions', () => {
   });
 });
 
+describe('legacy Me page check-in (v1.10.0 fix)', () => {
+  const me = read('public', 'views', 'me', 'index.js');
+
+  test('the new row replaces todayAtt, so the redraw offers Check Out', () => {
+    assert.match(me, /let todayAtt = attResult\.data;/);
+    assert.doesNotMatch(me, /const todayAtt\b/);
+    assert.doesNotMatch(me, /Object\.assign\(todayAtt \|\| \{\}/, 'copying into a throwaway object left todayAtt null');
+    assert.match(me, /todayAtt = data;/);
+  });
+});
+
 describe('static: the pages', () => {
   test('both pages check both gates before loading', () => {
     const mine = read('app', '(dashboard)', 'hrms', 'attendance', 'page.tsx');

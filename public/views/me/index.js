@@ -59,7 +59,10 @@ export default async function meView(container) {
     sb.from('users').select('*, department:department_id(name), manager:reporting_manager_id(full_name, email)').eq('id', user.id).maybeSingle(),
   ]);
 
-  const todayAtt = attResult.data;
+  // `let`: the check-in handler replaces it with the new row so the redraw
+  // shows "Check Out" (v1.10.0 fix — it used to stay null and offer Check In
+  // again, and every further click hit the one-row-per-day constraint).
+  let todayAtt = attResult.data;
   const balances = balResult.data || [];
   const leaveTypes = typesResult.data || [];
   const holidays = holidayResult.data || [];
@@ -211,7 +214,7 @@ export default async function meView(container) {
         if (!todayAtt) {
           const { data, error } = await sb.from('attendance').insert({ org_id: org.id, user_id: user.id, date: todayStr, check_in: new Date().toISOString(), status: 'present' }).select().single();
           if (error) { toast(error.message, 'error'); btn.disabled = false; btn.textContent = 'Check In'; return; }
-          Object.assign(todayAtt || {}, data);
+          todayAtt = data;
           await publishEvent('attendance.checkin.completed', { user_id: user.id, time: data.check_in });
           await logAction('attendance', 'attendance', data.id, 'created', null, data);
           toast('Checked in successfully', 'success');

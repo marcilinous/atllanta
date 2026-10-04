@@ -14,6 +14,7 @@ was promoted to production.
   - **Checked in today:** who has checked in, with their times.
   - The overview heatmap and the attendance report are still the current screens, linked from the tabs.
 - A manager is now told when someone asks for a correction on the new screen. The current screen sent the notice under a name nothing listened to.
+- Fixed: after checking in from the **Me** page, the button kept saying "Check In", and clicking it again showed a "duplicate key" error. The check-in was always saved. The button now changes to "Check Out" straight away.
 
 ### Admins need to
 - Nothing.
