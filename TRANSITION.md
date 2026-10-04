@@ -33,7 +33,19 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Update 2026-09-30 (latest):** **v1.9.1 is live** (#137 → `386f431`,
+- **Update 2026-10-04:** **v1.10.0 is live** (#138 → `ed7713b`; the
+  `v1.10.0` tag was pushed on an old commit and is being re-pointed by the
+  owner). It carried a legacy fix found in testing: the Me page's check-in
+  kept offering "Check In" after a successful check-in (`todayAtt` stayed
+  null), so every further click hit `attendance_user_id_date_key`.
+  **v1.11.0 (attendance cutover) is built** on `claude/attendance-cutover`
+  (owner's call): `#/attendance`, `#/attendance/checkin` and
+  `#/attendance/regularize` forward to `/hrms/attendance`. The heatmap moves
+  to `#/attendance/overview`, linked from the new tabs so they can't loop
+  back into the redirect; the report stays at `#/attendance/report`. The
+  Inbox regularisation tab and the Me page check-in are untouched. Next in
+  Phase 4 item 3: the next HRMS area.
+- **Earlier 2026-09-30:** **v1.9.1 is live** (#137 → `386f431`,
   tagged). **v1.10.0 (attendance preview) is built** on
   `claude/phase-4-attendance`: `/hrms/attendance` (check in/out, last 30
   days, correction requests) and `/hrms/attendance/approvals` (decide
