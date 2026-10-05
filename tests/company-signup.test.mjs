@@ -89,3 +89,37 @@ describe('migration: users_guard_admin_fields bootstrap clause', () => {
     assert.match(g, /if tg_op = 'INSERT' then\s+new\.role := 'member';\s+new\.custom_role_id := null;\s+return new;\s+end if;/);
   });
 });
+
+const { createCompanySchema, SIGNUP_MODULES, TIME_ZONES, CURRENCIES } = await import('../src/lib/platform/signup/schemas.ts');
+
+describe('input schema', () => {
+  const ok = { name: 'Acme Pvt Ltd', timeZone: 'Asia/Kolkata', currency: 'INR', modules: ['me', 'people'] };
+
+  test('accepts a normal company and trims the name', () => {
+    const r = createCompanySchema.parse({ ...ok, name: '  Acme  ' });
+    assert.equal(r.name, 'Acme');
+  });
+
+  test('rejects bad names, zones, currencies and module lists', () => {
+    for (const bad of [
+      { ...ok, name: 'A' },
+      { ...ok, name: 'x'.repeat(101) },
+      { ...ok, timeZone: 'not a zone' },
+      { ...ok, currency: 'inr' },
+      { ...ok, modules: [] },
+      { ...ok, modules: ['crm_partner'] },
+      { ...ok, modules: ['payroll'] },
+    ]) assert.equal(createCompanySchema.safeParse(bad).success, false, JSON.stringify(bad));
+  });
+
+  test('never accepts an org, role or user from input', () => {
+    const r = createCompanySchema.parse({ ...ok, orgId: 'x', role: 'owner', userId: 'y' });
+    for (const k of ['orgId', 'role', 'userId']) assert.equal(k in r, false, k);
+  });
+
+  test('offers exactly the twelve modules, never the partner pack; defaults are first', () => {
+    assert.deepEqual(SIGNUP_MODULES.map((m) => m.key), ['people', 'me', 'inbox', 'documents', 'finance', 'announcements', 'recruitment', 'crm', 'analytics', 'helpdesk', 'projects', 'ai']);
+    assert.equal(TIME_ZONES[0], 'Asia/Kolkata');
+    assert.equal(CURRENCIES[0], 'INR');
+  });
+});
