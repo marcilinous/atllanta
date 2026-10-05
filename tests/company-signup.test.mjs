@@ -162,3 +162,19 @@ describe('static: /start', () => {
     assert.doesNotMatch(f, /crm_partner/);
   });
 });
+
+describe('legacy entry points', () => {
+  test('the shell sends a session with no account row to /start, keyed on the membership', () => {
+    const html = read('public', 'index.html');
+    assert.match(html, /const profile = await loadUserProfile\(\);[\s\S]{0,300}?if \(!getMembership\(\)\) \{\s+window\.location\.replace\('\/start'\);/);
+    assert.doesNotMatch(html, /if \(!org\)[^\n]*\/start/, 'keyed on the account row, not the org');
+  });
+
+  test('login offers Google-only sign-up for now; the email form is kept but hidden', () => {
+    const login = read('public', 'login.html');
+    assert.match(login, /<form id="signup-form" class="login-form hidden"/);
+    assert.match(login, /Email sign-up is coming soon\./);
+    assert.match(login, /googleLabel\.textContent = view === 'signup' \? 'Sign up with Google' : 'Continue with Google';/);
+    assert.match(login, /<span id="google-label">Continue with Google<\/span>/);
+  });
+});

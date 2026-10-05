@@ -225,6 +225,12 @@ const session = await checkSession();
 if (!session) throw new Error('Not authenticated');
 
 const profile = await loadUserProfile();
+// Signed in but no account row: a new company, not an invited colleague
+// (invites create the row). Company sign-up lives on the new stack (v1.12.0).
+if (!getMembership()) {
+  window.location.replace('/start');
+  throw new Error('No organisation yet');
+}
 const org = getOrg();
 const user = getUser();
 const membership = getMembership();
