@@ -1,8 +1,7 @@
-const CACHE_NAME = "atllanta-1.13.0";
+const CACHE_NAME = "atllanta-1.14.0";
 // App Router routes (app/): never cached by this worker, see the fetch handler.
 const NETWORK_ONLY_PREFIXES = ["/settings", "/session", "/auth", "/health", "/hrms", "/start", "/paused", "/platform"];
 const STATIC_ASSETS = [
-  "/",
   "/index.html",
   "/login.html",
   "/css/tokens.css",
@@ -49,6 +48,13 @@ self.addEventListener("fetch", (event) => {
     NETWORK_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
     (request.headers && request.headers.get("RSC"))
   ) {
+    return;
+  }
+
+  // v1.14.0: "/" is the home page for visitors and the app for anyone signed
+  // in, so it always comes from the network; offline, the cached app shell.
+  if (pathname === "/") {
+    event.respondWith(fetch(request).catch(() => caches.match("/index.html")));
     return;
   }
 

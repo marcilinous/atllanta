@@ -188,13 +188,13 @@ describe('legacy entry points', () => {
     assert.match(gate, /id="profile-retry"/);
   });
 
-  test('the "Sign up" link stays hidden until trial enforcement ships (owner, 2026-10-05)', () => {
+  test('the "Sign up" link follows SIGNUP_OPEN (hidden until trial enforcement; open since v1.14.0)', () => {
     const login = read('public', 'login.html');
-    assert.match(login, /const SIGNUP_OPEN = false;/);
+    assert.match(login, /const SIGNUP_OPEN = (true|false);/);
     assert.match(login, /toggleRow\.classList\.toggle\('hidden', !oauthVisible \|\| !SIGNUP_OPEN\);/);
     // The first paint follows the same rule: the markup shows the row, so
-    // setView('login') must run on load, not only after a click.
-    const init = login.indexOf("\nsetView('login');");
+    // setView(...) must run on load, not only after a click.
+    const init = login.indexOf("\nsetView(SIGNUP_OPEN && ");
     assert.ok(init > login.indexOf('function setView(view) {'), 'runs after setView is defined');
     assert.ok(init < login.indexOf('let recovering ='), 'runs before the recovery and session checks');
   });

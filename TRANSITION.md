@@ -33,6 +33,17 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-05 (evening):** **v1.13.0 is live** (#141 → `2f8572f`,
+  tagged); `/platform` shows all five companies active. The owner moved the
+  home page (piece 4) ahead of feedback, because atllanta.com still opened
+  the login page. **v1.14.0 (home page) is built** on `claude/home-page`:
+  - `proxy.ts` serves `public/home.html` at `/` to signed-out visitors (not
+    when `?code=` is present). That page is the #64 landing restored from
+    `origin/main`, with the service-role demo form removed, pricing made
+    true to the 14-day trial, and links moved to `https://www.atllanta.com/`.
+  - The service worker no longer caches `/`.
+  - `SIGNUP_OPEN = true`, and `/login?signup` opens sign-up.
+  - Next: piece 3 (private feedback).
 - **Update 2026-10-05 (later):** **v1.12.0 is live** (#140 → `6f91af4`,
   tagged; migration `20261005080657_company_signup` applied). **v1.13.0
   (trial enforcement, piece 2) is built** on `claude/trial-enforcement`,

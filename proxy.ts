@@ -33,7 +33,20 @@ export default async function proxy(request: NextRequest) {
 
   // Nothing else runs between client creation and this call — that gap is
   // where a refreshed session gets silently dropped.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // v1.14.0: atllanta.com — the public home page for visitors, the app for
+  // anyone signed in. A Google sign-in returns to "/?code=…" before the
+  // session exists; that must reach the app, which finishes the sign-in.
+  if (request.nextUrl.pathname === "/" && !user && !request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/home.html";
+    const home = NextResponse.rewrite(url, { request });
+    for (const cookie of response.cookies.getAll()) home.cookies.set(cookie);
+    return home;
+  }
 
   return response;
 }
