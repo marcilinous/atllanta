@@ -172,6 +172,15 @@ if (location.hash.startsWith('#/') || location.hash.includes('access_token') || 
   /* Product tour gallery */
   .tour{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
   .tour-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,340px);gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 0 18px;margin-top:40px;scrollbar-width:thin}
+  .launch-video{position:relative;max-width:960px;margin:40px auto 0;border-radius:var(--r);overflow:hidden;box-shadow:0 30px 60px -30px rgba(26,23,18,.35);background:#1a1712;aspect-ratio:16/9}
+  .launch-video video{display:block;width:100%;height:100%;object-fit:cover}
+  .launch-sound{position:absolute;right:14px;bottom:14px;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border:0;border-radius:999px;background:rgba(26,23,18,.72);color:#fff;font:600 14px/1 var(--body);cursor:pointer;backdrop-filter:blur(6px)}
+  .launch-sound:hover{background:rgba(26,23,18,.86)}
+  .launch-sound:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  .launch-sound svg{width:18px;height:18px}
+  .launch-sound .wave{display:none}
+  .launch-sound[aria-pressed="true"] .wave{display:inline}
+  .launch-sound[aria-pressed="true"] .cross{display:none}
   .tour-strip::-webkit-scrollbar{height:8px}
   .tour-strip::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px}
   .screen{scroll-snap-align:start;background:var(--card);border:1px solid var(--line-strong);border-radius:18px;box-shadow:var(--sh-md);overflow:hidden;display:flex;flex-direction:column}
@@ -409,6 +418,18 @@ if (location.hash.startsWith('#/') || location.hash.includes('access_token') || 
       <div class="kicker reveal">See it in action</div>
       <h2 class="sec-h reveal">A look inside the product.</h2>
       <p class="sec-sub reveal">Screens from across the platform — hiring, sales and people, in one place. Names and figures are sample data.</p>
+    </div>
+    <!-- v1.14.1: the 30-second launch film. Muted autoplay once it scrolls into
+         view (browsers only autoplay silently); "Sound on" unmutes. Nothing but
+         the cover image loads until then. -->
+    <div class="launch-video reveal">
+      <video id="launch-video" muted playsinline loop preload="none" poster="/media/atllanta-launch.jpg" aria-label="Atllanta launch video">
+        <source src="/media/atllanta-launch.mp4" type="video/mp4">
+      </video>
+      <button type="button" id="launch-sound" class="launch-sound" aria-pressed="false" aria-label="Turn sound on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/><path class="cross" d="m16 9 6 6m0-6-6 6"/></svg>
+        <span>Sound on</span>
+      </button>
     </div>
     <div class="tour-strip reveal">
 
@@ -718,6 +739,31 @@ if (location.hash.startsWith('#/') || location.hash.includes('access_token') || 
     setTimeout(()=>requestAnimationFrame(step),650);
   });
 
+  // Launch video: muted autoplay only while on screen (it starts loading then,
+  // not before); reduced-motion visitors get controls instead of autoplay.
+  const video = document.getElementById('launch-video');
+  const soundBtn = document.getElementById('launch-sound');
+  if (video && soundBtn) {
+    if (reduce) {
+      video.controls = true;
+      soundBtn.hidden = true;
+    } else {
+      const seen = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) video.play().catch(() => { video.controls = true; });
+          else video.pause();
+        });
+      }, { threshold: 0.35 });
+      seen.observe(video);
+    }
+    soundBtn.addEventListener('click', () => {
+      video.muted = !video.muted;
+      if (!video.muted && video.paused) video.play().catch(() => {});
+      soundBtn.setAttribute('aria-pressed', String(!video.muted));
+      soundBtn.setAttribute('aria-label', video.muted ? 'Turn sound on' : 'Turn sound off');
+      soundBtn.querySelector('span').textContent = video.muted ? 'Sound on' : 'Sound off';
+    });
+  }
 </script>
 </body>
 </html>

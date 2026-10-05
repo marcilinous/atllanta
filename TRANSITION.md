@@ -33,6 +33,18 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-05 (late):** **v1.14.0 is live** (#142 → `77a3992`,
+  tagged); the home page and sign-up are confirmed working by the owner.
+  **v1.14.1 is built** on `claude/home-video`:
+  - the owner's launch film is in "See it in action";
+  - it is re-encoded from 74 MB to 7.3 MB, 1080p30, with a 33 KB cover
+    frame, under `public/media/`;
+  - it plays muted while on screen and has a "Sound on" button; reduced
+    motion gets controls instead of autoplay;
+  - `/media` is network-only in the service worker, and video is skipped by
+    the proxy.
+
+  Piece 3 (feedback) waits for the owner's go.
 - **Update 2026-10-05 (evening):** **v1.13.0 is live** (#141 → `2f8572f`,
   tagged); `/platform` shows all five companies active. The owner moved the
   home page (piece 4) ahead of feedback, because atllanta.com still opened

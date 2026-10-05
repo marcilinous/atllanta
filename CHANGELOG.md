@@ -5,6 +5,14 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.14.1 — 2026-10-05
+
+### What changed
+- The home page now shows Atllanta's 30-second launch film in "See it in action". It plays silently when you scroll to it; press **Sound on** to hear it. Nothing extra downloads unless you scroll that far.
+
+### Admins need to
+- Nothing.
+
 ## v1.14.0 — 2026-10-05
 
 ### What changed
