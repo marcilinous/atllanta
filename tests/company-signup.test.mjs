@@ -123,3 +123,24 @@ describe('input schema', () => {
     assert.equal(CURRENCIES[0], 'INR');
   });
 });
+
+describe('static: createCompany', () => {
+  const src = () => read('src', 'lib', 'platform', 'signup', 'actions.ts');
+
+  test('is a server action that needs a session and runs create_company as the caller', () => {
+    const s = src();
+    assert.match(s, /^"use server";/);
+    assert.match(s, /export const createCompany = action\(createCompanySchema,/);
+    assert.match(s, /const user = await getSessionUser\(\);\s+if \(!user\) throw new ActionError\("Sign in to create a company\."\);/);
+    assert.match(s, /withTransaction\(\{ id: user\.id \}/);
+    assert.match(s, /select public\.create_company\(/);
+  });
+
+  test('maps the database refusals to readable messages and never uses the service role', () => {
+    const s = src();
+    assert.match(s, /code === "23505"/);
+    assert.match(s, /code === "42501" \|\| code === "22023"/);
+    assert.doesNotMatch(s, /service_?role|SERVICE_ROLE/i);
+    assert.doesNotMatch(s, /input\.(orgId|role|userId)/);
+  });
+});
