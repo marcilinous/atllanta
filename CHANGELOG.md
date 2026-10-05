@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.14.0 — 2026-10-05
+
+### What changed
+- **atllanta.com now has a home page.** Visitors who aren't signed in see what Atllanta is, with **Start free trial** and **Sign in**. If you're signed in, atllanta.com opens the app as before.
+- **Sign-up is open:** "Start free trial" (or "Sign up" on the sign-in page) creates a new company with Google, on a 14-day free trial.
+- Old links into the app and password-reset links still take you to sign-in.
+
+### Admins need to
+- Nothing.
+
 ## v1.13.0 — 2026-10-05
 
 ### What changed
