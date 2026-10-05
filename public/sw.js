@@ -1,6 +1,6 @@
 const CACHE_NAME = "atllanta-1.12.0";
 // App Router routes (app/): never cached by this worker, see the fetch handler.
-const NETWORK_ONLY_PREFIXES = ["/settings", "/session", "/auth", "/health", "/hrms"];
+const NETWORK_ONLY_PREFIXES = ["/settings", "/session", "/auth", "/health", "/hrms", "/start"];
 const STATIC_ASSETS = [
   "/",
   "/index.html",

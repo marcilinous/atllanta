@@ -148,7 +148,7 @@
 <script src="/js/config.js"></script>
 <script type="module">
 import sb from '/js/supabase.js';
-import { checkSession, loadUserProfile, getUser, getOrg, getMembership, logout } from '/js/auth.js';
+import { checkSession, loadUserProfile, getUser, getOrg, getMembership, getProfileError, logout } from '/js/auth.js';
 import { registerRoute, initRouter, navigate } from '/js/router.js';
 import { loadFeatureAccess, isFeatureAllowed, FEATURES, setCrmEnabled, setPartnerPack, loadOrgModules } from '/js/features.js';
 import { onUnreadChange, fetchUnreadCount, fetchNotifications, markRead, markAllRead, subscribeRealtime } from '/js/notifications.js';
@@ -228,6 +228,15 @@ const profile = await loadUserProfile();
 // Signed in but no account row: a new company, not an invited colleague
 // (invites create the row). Company sign-up lives on the new stack (v1.12.0).
 if (!getMembership()) {
+  // A failed load is not "no row": say so instead of sending an existing
+  // member to /start (which would send them straight back — a loop).
+  if (getProfileError()) {
+    document.body.innerHTML = '<main style="max-width:28rem;margin:4rem auto;padding:0 1rem;font-family:system-ui,sans-serif">'
+      + '<p>We couldn&rsquo;t load your account. Check your connection and try again.</p>'
+      + '<button type="button" class="btn btn-primary" id="profile-retry">Try again</button></main>';
+    document.getElementById('profile-retry').addEventListener('click', () => window.location.reload());
+    throw new Error('Profile could not be loaded');
+  }
   window.location.replace('/start');
   throw new Error('No organisation yet');
 }

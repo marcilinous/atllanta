@@ -166,8 +166,26 @@ describe('static: /start', () => {
 describe('legacy entry points', () => {
   test('the shell sends a session with no account row to /start, keyed on the membership', () => {
     const html = read('public', 'index.html');
-    assert.match(html, /const profile = await loadUserProfile\(\);[\s\S]{0,300}?if \(!getMembership\(\)\) \{\s+window\.location\.replace\('\/start'\);/);
+    assert.match(html, /const profile = await loadUserProfile\(\);[\s\S]{0,300}?if \(!getMembership\(\)\) \{[\s\S]{0,900}?window\.location\.replace\('\/start'\);/);
     assert.doesNotMatch(html, /if \(!org\)[^\n]*\/start/, 'keyed on the account row, not the org');
+  });
+
+  test('/start is never served from the service-worker cache (stale Server Action ids, skipped gate)', () => {
+    const sw = read('public', 'sw.js');
+    const list = sw.match(/const NETWORK_ONLY_PREFIXES = \[([^\]]*)\]/)[1];
+    assert.match(list, /"\/start"/);
+  });
+
+  test('a failed profile load shows a retry instead of sending an existing member to /start', () => {
+    const auth = read('public', 'js', 'auth.js');
+    assert.match(auth, /\.maybeSingle\(\);/, 'no row is not an error; a real failure is');
+    assert.match(auth, /profileError = error \?\? null;/);
+    assert.match(auth, /export function getProfileError\(\) \{ return profileError; \}/);
+    const html = read('public', 'index.html');
+    const gate = html.slice(html.indexOf('if (!getMembership()) {'));
+    assert.ok(gate.indexOf('if (getProfileError()) {') > -1, 'checks the load error first');
+    assert.ok(gate.indexOf('if (getProfileError()) {') < gate.indexOf("window.location.replace('/start');"), 'before redirecting');
+    assert.match(gate, /id="profile-retry"/);
   });
 
   test('login offers Google-only sign-up for now; the email form is kept but hidden', () => {
