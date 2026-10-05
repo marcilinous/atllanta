@@ -144,3 +144,21 @@ describe('static: createCompany', () => {
     assert.doesNotMatch(s, /input\.(orgId|role|userId)/);
   });
 });
+
+describe('static: /start', () => {
+  test('the page sends the signed-out to /login and anyone with an account row to /', () => {
+    const p = read('app', '(auth)', 'start', 'page.tsx');
+    assert.match(p, /if \(!user\) redirect\("\/login"\);/);
+    assert.match(p, /if \(member\) redirect\("\/"\);/);
+    assert.match(p, /eq\(users\.id, user\.id\)/);
+  });
+
+  test('the form calls createCompany, cannot double-submit, and lands with a full page load', () => {
+    const f = read('app', '(auth)', 'start', 'start-form.tsx');
+    assert.match(f, /^"use client";/);
+    assert.match(f, /await createCompany\(/);
+    assert.match(f, /disabled=\{[^}]*isPending/);
+    assert.match(f, /window\.location\.assign\("\/"\)/);
+    assert.doesNotMatch(f, /crm_partner/);
+  });
+});
