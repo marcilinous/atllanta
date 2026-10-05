@@ -45,10 +45,18 @@
      `origin/main`, restored at atllanta.com.
 
   **v1.12.0 (company sign-up) is built** on `claude/company-signup`, with
-  spec and plan under `docs/superpowers/`. Its migration
-  `…_company_signup.sql` passed a rolled-back production probe and is
-  applied only on the owner's yes. Sign-up stays unadvertised until pieces
-  2 and 4.
+  spec and plan under `docs/superpowers/`. Its migration is **applied**
+  (2026-10-05, owner's yes; recorded `20261005080657`) and was re-probed
+  live, rolled back. The "Sign up" link on `/login` is hidden
+  (`SIGNUP_OPEN = false`, owner's choice) until trial enforcement (piece 2)
+  ships; `/start` works for any Google account without a company.
+
+  The final review (Opus, fresh context) found two Important issues, both
+  fixed:
+  - `/start` added to the service worker's network-only list;
+  - a failed profile load shows a retry instead of looping to `/start`.
+
+  Deferred minors are listed in the PR.
 - **Earlier 2026-10-04:** **v1.10.0 is live** (#138 → `ed7713b`; the
   `v1.10.0` tag was pushed on an old commit and is being re-pointed by the
   owner). It carried a legacy fix found in testing: the Me page's check-in

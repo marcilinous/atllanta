@@ -8,8 +8,9 @@ was promoted to production.
 ## v1.12.0 — 2026-10-05
 
 ### What changed
-- **New companies can sign up.** Choose "Sign up" on the sign-in page and use your Google account. Then name your company, pick your time zone and currency, and choose which modules to switch on. You start as the company's owner on a 14-day trial, with Casual, Sick and Earned leave already set up.
-- Email-and-password sign-up is coming once email is set up for atllanta.com. Signing in is unchanged.
+- **Company sign-up is ready, but not open to the public yet.** A Google account that doesn't belong to any company is taken to a short set-up. There they name the company, pick the time zone and currency, and choose which modules to switch on. They start as its owner on a 14-day trial, with Casual, Sick and Earned leave already set up.
+- The "Sign up" link on the sign-in page stays hidden until trial management is in place. Email-and-password sign-up comes once email is set up for atllanta.com. Signing in is unchanged.
+- If your account can't be loaded (for example, a dropped connection), you now see a "Try again" message instead of a blank or looping page.
 - People you invite are not affected — they join your company as before.
 
 ### Admins need to

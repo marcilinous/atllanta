@@ -319,6 +319,11 @@ const toggleText = document.getElementById('toggle-text');
 const titleEl = document.querySelector('.login-title');
 const subtitleEl = document.querySelector('.login-subtitle');
 
+// Company sign-up works (v1.12.0) but is not linked until trial enforcement
+// ships (owner, 2026-10-05): the "Sign up" link stays hidden. A new company
+// can still start with "Continue with Google", which leads to /start.
+const SIGNUP_OPEN = false;
+
 const VIEWS = {
   login:    { title: 'Welcome back',        subtitle: 'Sign in to your Atllanta workspace' },
   signup:   { title: 'Create your account', subtitle: 'Get started with Atllanta' },
@@ -335,12 +340,15 @@ function setView(view) {
   googleBtn.classList.toggle('hidden', !oauthVisible);
   googleLabel.textContent = view === 'signup' ? 'Sign up with Google' : 'Continue with Google';
   loginDivider.classList.toggle('hidden', view !== 'login');
-  toggleRow.classList.toggle('hidden', !oauthVisible);
+  toggleRow.classList.toggle('hidden', !oauthVisible || !SIGNUP_OPEN);
   toggleText.textContent = view === 'signup' ? 'Already have an account?' : "Don't have an account?";
   toggleBtn.textContent = view === 'signup' ? 'Sign in' : 'Sign up';
   titleEl.textContent = VIEWS[view].title;
   subtitleEl.textContent = VIEWS[view].subtitle;
 }
+
+// The first paint follows the same rules as every view (e.g. SIGNUP_OPEN).
+setView('login');
 
 // A password-recovery link lands here with a recovery token in the URL hash and
 // fires PASSWORD_RECOVERY. Detect it before the signed-in redirect so the recovery
