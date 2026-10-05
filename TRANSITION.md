@@ -37,8 +37,9 @@
   tagged; migration `20261005080657_company_signup` applied). **v1.13.0
   (trial enforcement, piece 2) is built** on `claude/trial-enforcement`,
   with spec and plan under `docs/superpowers/`. Its migration
-  `…_trial_enforcement.sql` passed a rolled-back production probe and is
-  applied only on the owner's yes.
+  `…_trial_enforcement.sql` passed a rolled-back production probe. It was
+  **applied** on the owner's yes (2026-10-05, recorded `20261005091125`)
+  and re-probed live, rolled back. All five companies are now `active`.
   - Blocked companies (an ended trial, or paused) are refused through
     `auth_org_id()` and sent to `/paused`.
   - The owner's new `/platform` Companies screen activates, extends (7, 14
