@@ -1047,6 +1047,24 @@ trigger refuses changes to the plan, trial and billing columns, and
 increases to `credits_balance` (`consume_credits` only decreases it), for
 everyone except server code and platform admins.
 
+**Final review** (Opus, fresh context) found two back doors, both fixed in
+the same migration:
+
+1. **18 policies never went through `auth_org_id()`.** They looked the org
+   up in `users` directly: Helpdesk ×10; the select policies on assets,
+   asset_assignments, announcements, expenses and expense_categories; and
+   the three `documents_employees_*` storage policies. Now gated. Also
+   gated, `ai_is_org_admin_of()`, with `coalesce(…, false)`: a probe
+   showed that a null result would let `ai_clear_flag` through.
+2. **The legacy service-role endpoints never checked the company.** The
+   AI gateway, bulk import and invites act for a user with the service
+   key. They now check `org_access_state_for()` (service role only) via
+   `lib/orgAccess.js`. A failed check returns 503, never "allowed".
+
+Left as they are, on purpose:
+- own-row policies (notifications, Google tokens, own posts and files);
+- the blocked company's own AI-limit and AI-report functions.
+
 **Platform functions** (platform-admin only, each audited and published):
 `platform_orgs`, `platform_activate_org`, `platform_extend_trial`,
 `platform_pause_org`.
