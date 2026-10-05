@@ -3,6 +3,7 @@ import sb from './supabase.js';
 let currentUser = null;
 let currentOrg = null;
 let currentMembership = null;
+let profileError = null;
 
 export async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
@@ -18,11 +19,14 @@ export async function loadUserProfile() {
   if (!currentUser) return null;
 
   // Single canonical identity row: users(id, org_id, role, ...). One org per user.
-  const { data: profile } = await sb
+  // maybeSingle: "no row" (a new company, v1.12.0) is not an error; a failed
+  // request is, and the shell must not mistake it for "no row".
+  const { data: profile, error } = await sb
     .from('users')
     .select('*')
     .eq('id', currentUser.id)
-    .single();
+    .maybeSingle();
+  profileError = error ?? null;
 
   // Membership-shaped for existing consumers (getMembership().organization_id/.role/.full_name).
   currentMembership = profile
@@ -50,6 +54,7 @@ export async function loadUserProfile() {
 export function getUser() { return currentUser; }
 export function getOrg() { return currentOrg; }
 export function getMembership() { return currentMembership; }
+export function getProfileError() { return profileError; }
 
 export async function logout() {
   await sb.auth.signOut();

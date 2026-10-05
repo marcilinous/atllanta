@@ -33,7 +33,31 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
-- **Update 2026-10-04:** **v1.10.0 is live** (#138 → `ed7713b`; the
+- **Update 2026-10-05:** **v1.11.0 is live** (#139 → `fe1809e`, tagged;
+  the `v1.10.0` tag re-pointed to `ed7713b`). The owner bought
+  **atllanta.com** and pointed it at Vercel (apex → `www`). The owner then
+  set a four-piece sequence, each piece its own spec and release:
+  1. company sign-up;
+  2. trial enforcement — blocked after 14 days until the platform owner
+     activates or extends;
+  3. private in-app feedback for the platform owner;
+  4. the public home page — the #64 landing, which still lives on
+     `origin/main`, restored at atllanta.com.
+
+  **v1.12.0 (company sign-up) is built** on `claude/company-signup`, with
+  spec and plan under `docs/superpowers/`. Its migration is **applied**
+  (2026-10-05, owner's yes; recorded `20261005080657`) and was re-probed
+  live, rolled back. The "Sign up" link on `/login` is hidden
+  (`SIGNUP_OPEN = false`, owner's choice) until trial enforcement (piece 2)
+  ships; `/start` works for any Google account without a company.
+
+  The final review (Opus, fresh context) found two Important issues, both
+  fixed:
+  - `/start` added to the service worker's network-only list;
+  - a failed profile load shows a retry instead of looping to `/start`.
+
+  Deferred minors are listed in the PR.
+- **Earlier 2026-10-04:** **v1.10.0 is live** (#138 → `ed7713b`; the
   `v1.10.0` tag was pushed on an old commit and is being re-pointed by the
   owner). It carried a legacy fix found in testing: the Me page's check-in
   kept offering "Check In" after a successful check-in (`todayAtt` stayed
@@ -981,6 +1005,51 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-10-05 — Company sign-up (v1.12.0)
+
+Self-serve company creation was removed in Phase 1b (2026-09-08, `3e87f32`)
+and never rebuilt:
+- "Create account" made a login with no org and no `users` row, and the
+  app broke for that person;
+- the only way in was an admin invite.
+
+**Owner decisions (2026-10-05):**
+- Google sign-up now; email+password later, once Resend runs on
+  atllanta.com;
+- modules are chosen during set-up (all ticked, the partner pack never
+  offered);
+- trials are enforced (piece 2);
+- feedback is private and in-app (piece 3);
+- the build order is sign-up → trial → feedback → home page.
+
+**What was built:**
+- `create_company(name, timezone, currency, modules[])`, `security definer`,
+  granted to `authenticated` only. It refuses anyone who already has a
+  `users` row and checks every input. In one transaction it creates:
+  - the org (existing triggers seed roles, modules, CRM stages and AI
+    quota);
+  - the owner;
+  - the chosen modules;
+  - CL 12 / SL 12 / EL 15;
+  - an audit row and `platform.org.created`.
+- **One narrow clause in `users_guard_admin_fields()`.** That guard refuses
+  any owner insert by a non-owner, so a founder could never be created. The
+  clause allows an owner insert only for the caller's own row, only while
+  `create_company`'s transaction-local `atllanta.bootstrap_org` marker
+  names the org, and only while the org has no users. The rest of the body
+  was verified line-by-line equal to live.
+- `/start` (new stack), the `createCompany` Server Action, a legacy shell
+  redirect for a session with no `users` row, and Google-only sign-up on
+  `/login`.
+
+**Probe** (production, rolled back), all as intended:
+- a fresh nameless user creates "!!" → slug `org-…`, trial/starter 14 days,
+  5 roles, only the chosen modules, 3 leave types, owner named from the
+  email, audit 1, event 1;
+- refused: a second call, bad inputs (`22023`), the partner pack, direct
+  owner inserts with no / wrong / stale marker, an existing member, and
+  anon.
 
 ### 2026-09-30 — Attendance on the new stack (v1.10.0, preview)
 
