@@ -70,6 +70,45 @@ describe('the home page', () => {
   });
 });
 
+describe('launch video (v1.14.1)', () => {
+  const html = () => read('public', 'home.html');
+
+  test('the web-compressed video and its cover ship with the site, small enough for a home page', () => {
+    const mp4 = fs.statSync(path.join(ROOT, 'public', 'media', 'atllanta-launch.mp4')).size;
+    const jpg = fs.statSync(path.join(ROOT, 'public', 'media', 'atllanta-launch.jpg')).size;
+    assert.ok(mp4 < 10 * 1024 * 1024, `video ${mp4} bytes`);
+    assert.ok(jpg < 200 * 1024, `cover ${jpg} bytes`);
+  });
+
+  test('sits in "See it in action": muted, inline, looping, nothing downloaded until needed', () => {
+    const h = html();
+    const tour = h.slice(h.indexOf('<section class="tour" id="tour">'), h.indexOf('</section>', h.indexOf('<section class="tour" id="tour">')));
+    assert.match(tour, /<video id="launch-video"[^>]*\bmuted\b[^>]*>/);
+    for (const attr of ['playsinline', 'loop', 'preload="none"', 'poster="/media/atllanta-launch.jpg"']) {
+      assert.ok(tour.match(/<video id="launch-video"[^>]*>/)[0].includes(attr), attr);
+    }
+    assert.match(tour, /<source src="\/media\/atllanta-launch\.mp4" type="video\/mp4">/);
+    assert.match(tour, /<button type="button" id="launch-sound"[^>]*aria-pressed="false"/);
+  });
+
+  test('plays only when scrolled into view, never for reduced motion, and the button turns sound on and off', () => {
+    const h = html();
+    assert.match(h, /new IntersectionObserver\(/);
+    assert.match(h, /if \(reduce\) \{\s*video\.controls = true;/);
+    assert.match(h, /video\.muted = !video\.muted;/);
+    assert.match(h, /soundBtn\.setAttribute\('aria-pressed', String\(!video\.muted\)\);/);
+  });
+
+  test('the service worker leaves video alone (it cannot serve range requests from cache)', () => {
+    const list = read('public', 'sw.js').match(/const NETWORK_ONLY_PREFIXES = \[([^\]]*)\]/)[1];
+    assert.match(list, /"\/media"/);
+  });
+
+  test('the proxy skips video files (no sign-in round trip per range request)', () => {
+    assert.match(read('proxy.ts'), /\|mp4\|webm\)\$/);
+  });
+});
+
 describe('sign-up is open', () => {
   test('the Sign up link shows, and /login?signup opens it', () => {
     const login = read('public', 'login.html');
