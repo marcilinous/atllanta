@@ -5,7 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
-## v1.10.0 — 2026-09-30
+## v1.11.0 — 2026-10-04
+
+### What changed
+- **Attendance has moved to the new attendance screen.** Opening Attendance (or Check-in, or Regularize) now takes you to the new screen: check in and check out, your last 30 days, asking for a correction, and your corrections. Managers and admins also get Approvals there, plus who has checked in today.
+- The month heatmap is still available from the new screen's **Overview** tab. The attendance report hasn't moved and is linked from the **Report** tab.
+- The Inbox's Regularization tab and the check-in button on the Me page work as before.
+
+### Admins need to
+- Nothing. If something looks wrong on the new attendance screen, tell us. The old one can be switched back.
+
+## v1.10.0 — 2026-10-04
 
 ### What changed
 - **New attendance screen, in preview** at `/hrms/attendance`. The current attendance screens are unchanged and still the ones the app opens. Try the new one and tell us if anything is off before we switch over.

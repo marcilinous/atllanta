@@ -171,9 +171,7 @@ import departmentsView from '/views/settings/departments.js';
 import integrationsView from '/views/settings/integrations.js';
 import employeeProfile from '/views/employees/profile.js';
 import employeeImport from '/views/employees/import.js';
-import checkinView from '/views/attendance/checkin.js';
 import attendanceReport from '/views/attendance/report.js';
-import regularizeView from '/views/attendance/regularize.js';
 import leaveSettings from '/views/leave/settings.js';
 import candidateProfile from '/views/recruitment/candidate-profile.js';
 import shortlistView from '/views/recruitment/shortlist.js';
@@ -464,16 +462,23 @@ registerRoute('me', meView);
 registerRoute('inbox', inboxView);
 registerRoute('people', peopleHub);
 registerRoute('employees', employeeList);
-registerRoute('attendance', attendanceDashboard);
 // Leave cutover (v1.9.0): requesting, my requests and approvals now live on
 // the new stack. A full page load (the new screens are outside this hash
 // router); replace() so Back doesn't bounce into the redirect again. Team
 // calendar, report, balances and settings stay here for now.
-const toNewStack = (path) => (container) => {
-  container.innerHTML = '<div style="padding:var(--space-6);color:var(--color-text-secondary)">Opening leave…</div>';
+const toNewStack = (path, label = 'leave') => (container) => {
+  container.innerHTML = `<div style="padding:var(--space-6);color:var(--color-text-secondary)">Opening ${label}…</div>`;
   window.location.replace(path);
 };
 registerRoute('leave', toNewStack('/hrms/leave'));
+// Attendance cutover (v1.11.0): check-in/out, my days, corrections and
+// approvals live on the new stack. The month heatmap moves to
+// #/attendance/overview (linked from the new screen's tabs, so it can't loop
+// back into this redirect); the report stays at #/attendance/report.
+registerRoute('attendance', toNewStack('/hrms/attendance', 'attendance'));
+registerRoute('attendance/checkin', toNewStack('/hrms/attendance', 'attendance'));
+registerRoute('attendance/regularize', toNewStack('/hrms/attendance', 'attendance'));
+registerRoute('attendance/overview', attendanceDashboard);
 registerRoute('recruitment', recruitmentJobs);
 registerRoute('recruitment/jobs', recruitmentJobs);
 registerRoute('recruitment/interviews', interviewsView);
@@ -484,9 +489,7 @@ registerRoute('settings/departments', departmentsView);
 registerRoute('settings/integrations', integrationsView);
 registerRoute('employees/profile', employeeProfile);
 registerRoute('employees/import', employeeImport);
-registerRoute('attendance/checkin', checkinView);
 registerRoute('attendance/report', attendanceReport);
-registerRoute('attendance/regularize', regularizeView);
 registerRoute('leave/settings', leaveSettings);
 registerRoute('recruitment/candidate', candidateProfile);
 registerRoute('recruitment/shortlist', shortlistView);

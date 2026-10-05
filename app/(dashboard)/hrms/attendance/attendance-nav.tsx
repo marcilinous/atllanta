@@ -25,9 +25,10 @@ export default function AttendanceNav({ canApprove }: { canApprove: boolean }) {
           {tab.label}
         </Link>
       ))}
-      {/* Still legacy screens: full page loads into the hash router. */}
+      {/* Still legacy screens: full page loads into the hash router. Not
+          #/attendance: since v1.11.0 that forwards back here. */}
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a href="/#/attendance" className={tabClass(false)}>
+      <a href="/#/attendance/overview" className={tabClass(false)}>
         Overview
       </a>
       {canApprove ? (

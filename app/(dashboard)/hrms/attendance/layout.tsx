@@ -1,6 +1,7 @@
-// New-stack attendance screens (Phase 4 item 3) — a preview beside the
-// legacy #/attendance screens until the owner switches them over. The
-// heatmap overview and the report stay legacy, linked from the tabs.
+// New-stack attendance screens (Phase 4 item 3). Since v1.11.0 the legacy
+// #/attendance, #/attendance/checkin and #/attendance/regularize routes
+// forward here; the month heatmap (#/attendance/overview) and the report are
+// still legacy screens, linked from the tabs.
 import type { Metadata } from "next";
 import { featureContext } from "@/src/lib/auth/permissions";
 import AttendanceNav from "./attendance-nav";

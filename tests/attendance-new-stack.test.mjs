@@ -148,9 +148,25 @@ describe('static: the pages', () => {
     assert.match(approvals, /featureContext\("me", "me", "approve"\)/);
   });
 
-  test('preview only: the legacy attendance routes are not forwarded yet', () => {
-    const shell = read('public', 'index.html');
-    assert.match(shell, /registerRoute\('leave', toNewStack\('\/hrms\/leave'\)\)/, 'the shape a cutover will copy');
-    assert.doesNotMatch(shell, /\/hrms\/attendance/);
+});
+
+describe('cutover (v1.11.0)', () => {
+  const html = read('public', 'index.html');
+  const nav = read('app', '(dashboard)', 'hrms', 'attendance', 'attendance-nav.tsx');
+
+  test('#/attendance, its check-in and regularise routes forward to the new screen', () => {
+    for (const route of ['attendance', 'attendance\\/checkin', 'attendance\\/regularize']) {
+      assert.match(html, new RegExp(`registerRoute\\('${route}', toNewStack\\('/hrms/attendance', 'attendance'\\)\\);`), route);
+    }
+    assert.doesNotMatch(html, /views\/attendance\/checkin\.js|views\/attendance\/regularize\.js/);
+    assert.match(html, /registerRoute\('leave', toNewStack\('\/hrms\/leave'\)\);/, 'leave still forwards');
+  });
+
+  test('the heatmap and report stay legacy, and the tabs never link back into the redirect', () => {
+    assert.match(html, /registerRoute\('attendance\/overview', attendanceDashboard\);/);
+    assert.match(html, /registerRoute\('attendance\/report', attendanceReport\);/);
+    assert.match(nav, /href="\/#\/attendance\/overview"/);
+    assert.match(nav, /href="\/#\/attendance\/report"/);
+    assert.doesNotMatch(nav, /href="\/#\/attendance"/);
   });
 });
