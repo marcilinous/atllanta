@@ -153,6 +153,32 @@ describe('static: /paused', () => {
   });
 });
 
+describe('static: gates', () => {
+  test('new-stack layouts send a blocked company to /paused', () => {
+    for (const file of [['app', '(dashboard)', 'layout.tsx'], ['app', '(platform)', 'settings', 'layout.tsx']]) {
+      const l = read(...file);
+      assert.match(l, /const access = user \? await getOrgAccess\(user\.id\) : null;\s+if \(access && access\.state !== "ok"\) redirect\("\/paused"\);/, file.join('/'));
+    }
+  });
+
+  test('the legacy shell checks access after the /start check, and a failed check shows the retry', () => {
+    const html = read('public', 'index.html');
+    const start = html.indexOf("window.location.replace('/start');");
+    const check = html.indexOf("await sb.rpc('my_org_access')");
+    assert.ok(start > -1 && check > start, 'after the /start check');
+    const gate = html.slice(check, check + 900);
+    assert.match(gate, /if \(accessError\) \{/);
+    assert.match(gate, /showProfileRetry\(\);/);
+    assert.match(gate, /if \(access && access\.state !== 'ok'\) \{\s+window\.location\.replace\('\/paused'\);/);
+  });
+
+  test('/paused and /platform are never served from the service-worker cache', () => {
+    const list = read('public', 'sw.js').match(/const NETWORK_ONLY_PREFIXES = \[([^\]]*)\]/)[1];
+    assert.match(list, /"\/paused"/);
+    assert.match(list, /"\/platform"/);
+  });
+});
+
 describe('schema mirror', () => {
   test('Drizzle knows trial_extended_days', () => {
     assert.match(read('src', 'db', 'schema', 'platform.ts'), /trialExtendedDays: integer\("trial_extended_days"\)\.notNull\(\)\.default\(0\),/);
