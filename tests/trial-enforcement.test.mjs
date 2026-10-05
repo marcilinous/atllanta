@@ -102,6 +102,33 @@ describe('migration: platform functions', () => {
   });
 });
 
+describe('static: shared helpers', () => {
+  test('the contact shown to blocked companies is the owner\'s', async () => {
+    const { PLATFORM_CONTACT } = await import('../src/lib/platform/contact.ts');
+    assert.deepEqual({ ...PLATFORM_CONTACT }, {
+      email: 'anchansachinv99@gmail.com',
+      phone: '8073163762',
+      whatsapp: 'https://wa.me/918073163762',
+    });
+  });
+
+  test('access helpers ask the database as the caller, never the table directly', () => {
+    const a = read('src', 'lib', 'platform', 'access.ts');
+    assert.match(a, /^import "server-only";/m);
+    assert.match(a, /select \* from public\.my_org_access\(\)/);
+    assert.match(a, /select public\.is_platform_admin\(\) as is_admin/);
+    assert.match(a, /withTransaction\(\{ id: userId \}/);
+    assert.doesNotMatch(a, /from platform_admins|platformAdmins|service_?role/i);
+  });
+
+  test('sign-out is a server action that clears the session and goes to /login', () => {
+    const s = read('src', 'lib', 'auth', 'sign-out.ts');
+    assert.match(s, /^"use server";/);
+    assert.match(s, /await supabase\.auth\.signOut\(\);/);
+    assert.match(s, /redirect\("\/login"\);/);
+  });
+});
+
 describe('schema mirror', () => {
   test('Drizzle knows trial_extended_days', () => {
     assert.match(read('src', 'db', 'schema', 'platform.ts'), /trialExtendedDays: integer\("trial_extended_days"\)\.notNull\(\)\.default\(0\),/);
