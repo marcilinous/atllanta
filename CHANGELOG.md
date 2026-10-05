@@ -5,6 +5,16 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.12.0 — 2026-10-05
+
+### What changed
+- **New companies can sign up.** Choose "Sign up" on the sign-in page and use your Google account. Then name your company, pick your time zone and currency, and choose which modules to switch on. You start as the company's owner on a 14-day trial, with Casual, Sick and Earned leave already set up.
+- Email-and-password sign-up is coming once email is set up for atllanta.com. Signing in is unchanged.
+- People you invite are not affected — they join your company as before.
+
+### Admins need to
+- Owner: in Supabase → Authentication → URL Configuration → Redirect URLs, add `https://atllanta.com/**` and `https://www.atllanta.com/**` so Google sign-in returns to the new domain.
+
 ## v1.11.0 — 2026-10-04
 
 ### What changed
