@@ -129,6 +129,30 @@ describe('static: shared helpers', () => {
   });
 });
 
+describe('static: /paused', () => {
+  const page = () => read('app', '(auth)', 'paused', 'page.tsx');
+
+  test('routes the signed-out, the company-less and the allowed away; never loops', () => {
+    const p = page();
+    assert.match(p, /if \(!user\) redirect\("\/login"\);/);
+    assert.match(p, /if \(!access\) redirect\("\/start"\);/);
+    assert.match(p, /if \(access\.state === "ok"\) redirect\("\/"\);/);
+  });
+
+  test('only owners and admins see the contact; everyone can sign out', () => {
+    const p = page();
+    assert.match(p, /const canContact = access\.role === "owner" \|\| access\.role === "admin";/);
+    assert.match(p, /PLATFORM_CONTACT\.email/);
+    assert.match(p, /PLATFORM_CONTACT\.phone/);
+    assert.match(p, /PLATFORM_CONTACT\.whatsapp/);
+    assert.match(p, /Please ask your admin\./);
+    assert.match(p, /<SignOutButton \/>/);
+    const b = read('app', '(auth)', 'paused', 'sign-out-button.tsx');
+    assert.match(b, /^"use client";/);
+    assert.match(b, /signOut\(\)/);
+  });
+});
+
 describe('schema mirror', () => {
   test('Drizzle knows trial_extended_days', () => {
     assert.match(read('src', 'db', 'schema', 'platform.ts'), /trialExtendedDays: integer\("trial_extended_days"\)\.notNull\(\)\.default\(0\),/);
