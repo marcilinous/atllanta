@@ -179,6 +179,48 @@ describe('static: gates', () => {
   });
 });
 
+describe('platform: schemas and actions', () => {
+  test('extend accepts only 7, 14 or 30 days and a real company id', async () => {
+    const { extendTrialSchema, orgActionSchema } = await import('../src/lib/platform/trials/schemas.ts');
+    const id = '7b0e6c1e-1234-4abc-8def-0123456789ab';
+    for (const d of [7, 14, 30]) assert.ok(extendTrialSchema.safeParse({ orgId: id, days: d }).success, String(d));
+    for (const d of [0, 10, 31, '7']) assert.equal(extendTrialSchema.safeParse({ orgId: id, days: d }).success, false, String(d));
+    assert.equal(orgActionSchema.safeParse({ orgId: 'x' }).success, false);
+  });
+
+  test('only the functions\' own refusals reach the screen', async () => {
+    const { explainPlatformError } = await import('../src/lib/platform/trials/explain.ts');
+    const e = (code, message) => ({ code, message });
+    assert.equal(explainPlatformError(e('22023', 'This would pass the 30-day extension limit')), 'This would pass the 30-day extension limit');
+    assert.equal(explainPlatformError(e('22023', 'Only a company on a trial can be extended')), 'Only a company on a trial can be extended');
+    assert.equal(explainPlatformError(e('42501', 'Only the Atllanta platform owner can do that')), 'Only the Atllanta platform owner can do that');
+    assert.equal(explainPlatformError({ cause: e('22023', 'Extend by 7, 14 or 30 days') }), 'Extend by 7, 14 or 30 days');
+    assert.equal(explainPlatformError(e('42501', 'new row violates row-level security policy for table "organizations"')), null);
+    assert.equal(explainPlatformError(e('XX000', 'boom')), null);
+  });
+
+  test('actions run the platform functions as the caller, without the service role', () => {
+    const s = read('src', 'lib', 'platform', 'trials', 'actions.ts');
+    assert.match(s, /^"use server";/);
+    for (const fn of ['platform_activate_org', 'platform_extend_trial', 'platform_pause_org']) assert.ok(s.includes(`public.${fn}(`), fn);
+    assert.match(s, /withTransaction\(\{ id: user\.id \}/);
+    assert.match(s, /revalidatePath\("\/platform"\)/);
+    assert.doesNotMatch(s, /service_?role/i);
+  });
+
+  test('the page is for the platform owner only and lists companies through platform_orgs()', () => {
+    const p = read('app', '(platform)', 'platform', 'page.tsx');
+    assert.match(p, /if \(!user\) redirect\("\/login"\);/);
+    assert.match(p, /if \(!\(await isPlatformAdmin\(user\.id\)\)\) notFound\(\);/);
+    assert.match(p, /select \* from public\.platform_orgs\(\)/);
+    const t = read('app', '(platform)', 'platform', 'companies-table.tsx');
+    assert.match(t, /^"use client";/);
+    for (const fn of ['activateOrg', 'extendTrial', 'pauseOrg']) assert.ok(t.includes(`${fn}(`), fn);
+    assert.match(t, /trialExtendedDays \+ d > o\.maxTrialExtensionDays/);
+    assert.match(t, /Pause \{/);
+  });
+});
+
 describe('schema mirror', () => {
   test('Drizzle knows trial_extended_days', () => {
     assert.match(read('src', 'db', 'schema', 'platform.ts'), /trialExtendedDays: integer\("trial_extended_days"\)\.notNull\(\)\.default\(0\),/);
