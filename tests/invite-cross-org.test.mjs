@@ -38,6 +38,7 @@ before(async () => {
     export function supabaseAdmin() {
       return {
         from: (t) => chain(t),
+        rpc: async (name, args) => { S.db.push({ rpc: name, args }); return { data: S.orgState, error: null }; },
         auth: { admin: {
           listUsers: async () => ({ data: { users: S.authUsers } }),
           createUser: async ({ email }) => { S.created.push(email); return { data: { user: { id: 'new-user-id' } }, error: null }; },
@@ -45,6 +46,7 @@ before(async () => {
       };
     }
   `);
+  fs.copyFileSync(path.join(ROOT, 'lib', 'orgAccess.js'), path.join(tmp, 'lib', 'orgAccess.js'));
   fs.copyFileSync(path.join(ROOT, 'server/legacy/create-org.js'), path.join(tmp, 'server', 'legacy', 'create-org.js'));
   handler = (await import(pathToFileURL(path.join(tmp, 'server', 'legacy', 'create-org.js')).href)).default;
   realFetch = globalThis.fetch;
@@ -67,6 +69,7 @@ beforeEach(() => {
   S.callerStatus = 'active';
   S.emailMember = null;
   S.existingRow = null;
+  S.orgState = 'ok';
   const has = (ops, ...want) => ops.some(o => want.every((w, i) => o[i] === w));
   S.tables = {
     users: (ops) => {
@@ -133,6 +136,14 @@ describe('invite across organisations', () => {
     const r = res(); await handler(invite('new@a.com'), r);
     assert.equal(r.statusCode, 403);
     assert.equal(S.upserts.length, 0);
+  });
+
+  test('a company whose trial ended or which is paused cannot invite (v1.13.0)', async () => {
+    S.orgState = 'paused';
+    const r = res(); await handler(invite('new@a.com'), r);
+    assert.equal(r.statusCode, 403);
+    assert.equal(S.upserts.length, 0);
+    assert.equal(S.created.length, 0);
   });
 
   test('an exited caller cannot invite, even an owner/admin', async () => {

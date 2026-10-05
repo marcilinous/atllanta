@@ -69,6 +69,57 @@ describe('migration: the billing guard', () => {
   });
 });
 
+describe('migration: policies that skipped the checkpoint (review fix)', () => {
+  test('helpdesk, assets, announcements and expenses go through auth_org_id()', () => {
+    for (const [table, policy] of [
+      ['announcements', 'org_isolation_select'], ['asset_assignments', 'org_isolation_select'], ['assets', 'org_isolation_select'],
+      ['expense_categories', 'org_isolation_select'], ['expenses', 'org_isolation_select'],
+      ['helpdesk_categories', 'org_read_categories'], ['helpdesk_categories', 'org_update_categories'], ['helpdesk_categories', 'org_delete_categories'],
+      ['helpdesk_tickets', 'org_read_tickets'], ['helpdesk_tickets', 'org_update_tickets'],
+    ]) {
+      assert.ok(sql.includes(`alter policy ${policy} on public.${table} using (org_id = public.auth_org_id());`), `${table}.${policy}`);
+    }
+    for (const [table, policy] of [['helpdesk_categories', 'org_insert_categories'], ['helpdesk_tickets', 'org_insert_tickets']]) {
+      assert.ok(sql.includes(`alter policy ${policy} on public.${table} with check (org_id = public.auth_org_id());`), `${table}.${policy}`);
+    }
+    const viaCategory = '(category_id in (select c.id from public.helpdesk_categories c where c.org_id = public.auth_org_id()))';
+    assert.ok(sql.includes(`alter policy org_read_handlers on public.helpdesk_category_handlers using ${viaCategory};`));
+    assert.ok(sql.includes(`alter policy org_delete_handlers on public.helpdesk_category_handlers using ${viaCategory};`));
+    assert.ok(sql.includes(`alter policy org_insert_handlers on public.helpdesk_category_handlers with check ${viaCategory};`));
+  });
+
+  test('employee documents in storage need an unblocked company too', () => {
+    for (const p of ['documents_employees_read', 'documents_employees_delete']) {
+      assert.match(sql, new RegExp(`alter policy ${p} on storage\\.objects using \\([\\s\\S]*?and public\\.auth_org_id\\(\\) is not null\\);`), p);
+    }
+    assert.match(sql, /alter policy documents_employees_insert on storage\.objects with check \([\s\S]*?and public\.auth_org_id\(\) is not null\);/);
+  });
+
+  test('AI admin reads are gated; the service endpoints get a service-role-only check', () => {
+    const a = fnBody('ai_is_org_admin_of');
+    // coalesce: a blocked admin must get false, not null — ai_clear_flag()
+    // tests `not (… or ai_is_org_admin_of(…))`, and not(null) does not refuse.
+    assert.match(a, /and coalesce\(p_org_id = public\.auth_org_id\(\), false\)/);
+    const s = fnBody('org_access_state_for');
+    assert.match(s, /when exists \(select 1 from public\.platform_admins pa where pa\.user_id = p_user_id\) then 'ok'/);
+    assert.match(s, /public\.org_access_state\(o\.payment_status, o\.trial_ends_at\)/);
+    assert.match(sql, /revoke all on function public\.org_access_state_for\(uuid, uuid\) from public, anon, authenticated;/);
+    assert.match(sql, /grant execute on function public\.org_access_state_for\(uuid, uuid\) to service_role;/);
+  });
+});
+
+describe('legacy service endpoints check the company (review fix)', () => {
+  test('one helper, used by the AI gateway, bulk import and invites', () => {
+    const h = read('lib', 'orgAccess.js');
+    assert.match(h, /db\.rpc\("org_access_state_for", \{ p_org_id: orgId, p_user_id: userId \}\)/);
+    assert.match(h, /if \(error\) return \{ ok: false, status: 503/);
+    assert.match(h, /if \(data !== "ok"\) return \{ ok: false, status: 403, error: ACCESS_PAUSED \}/);
+    assert.match(read('lib', 'aiGateway.js'), /const access = await checkOrgAccess\(db, profile\.org_id, user\.id\);/);
+    assert.match(read('server', 'legacy', 'bulk-import.js'), /const access = await checkOrgAccess\(sb, membership\.org_id, user\.id\);/);
+    assert.match(read('server', 'legacy', 'create-org.js'), /const access = await checkOrgAccess\(db, me\.org_id, user\.id\);/);
+  });
+});
+
 describe('migration: platform functions', () => {
   test('each checks the platform admin first and is only for signed-in users', () => {
     for (const [name, sig] of [['platform_orgs', ''], ['platform_activate_org', 'uuid'], ['platform_extend_trial', 'uuid, int'], ['platform_pause_org', 'uuid']]) {

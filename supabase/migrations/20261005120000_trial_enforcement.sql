@@ -215,6 +215,72 @@ begin
 end;
 $function$;
 
+-- 7. Review fix: the policies that never went through auth_org_id(). They
+--    looked the company up in users directly, so a blocked company could
+--    still use Helpdesk, read assets/announcements/expenses and its employee
+--    documents through the REST API. Same tables, same checks, now through
+--    the checkpoint.
+alter policy org_isolation_select on public.announcements using (org_id = public.auth_org_id());
+alter policy org_isolation_select on public.asset_assignments using (org_id = public.auth_org_id());
+alter policy org_isolation_select on public.assets using (org_id = public.auth_org_id());
+alter policy org_isolation_select on public.expense_categories using (org_id = public.auth_org_id());
+alter policy org_isolation_select on public.expenses using (org_id = public.auth_org_id());
+alter policy org_read_categories on public.helpdesk_categories using (org_id = public.auth_org_id());
+alter policy org_update_categories on public.helpdesk_categories using (org_id = public.auth_org_id());
+alter policy org_delete_categories on public.helpdesk_categories using (org_id = public.auth_org_id());
+alter policy org_insert_categories on public.helpdesk_categories with check (org_id = public.auth_org_id());
+alter policy org_read_tickets on public.helpdesk_tickets using (org_id = public.auth_org_id());
+alter policy org_update_tickets on public.helpdesk_tickets using (org_id = public.auth_org_id());
+alter policy org_insert_tickets on public.helpdesk_tickets with check (org_id = public.auth_org_id());
+alter policy org_read_handlers on public.helpdesk_category_handlers using (category_id in (select c.id from public.helpdesk_categories c where c.org_id = public.auth_org_id()));
+alter policy org_delete_handlers on public.helpdesk_category_handlers using (category_id in (select c.id from public.helpdesk_categories c where c.org_id = public.auth_org_id()));
+alter policy org_insert_handlers on public.helpdesk_category_handlers with check (category_id in (select c.id from public.helpdesk_categories c where c.org_id = public.auth_org_id()));
+
+-- Employee documents: hr_can_approve()/hr_visible_user_ids() read users
+-- directly, so these also require an unblocked company.
+alter policy documents_employees_read on storage.objects using (
+  bucket_id = 'documents' and split_part(name, '/', 1) = 'employees'
+  and public.storage_path_uuid(split_part(name, '/', 2)) in (select public.hr_visible_user_ids())
+  and public.auth_org_id() is not null);
+alter policy documents_employees_delete on storage.objects using (
+  bucket_id = 'documents' and split_part(name, '/', 1) = 'employees' and public.hr_can_approve()
+  and public.storage_path_uuid(split_part(name, '/', 2)) in (select public.hr_visible_user_ids())
+  and public.auth_org_id() is not null);
+alter policy documents_employees_insert on storage.objects with check (
+  bucket_id = 'documents' and split_part(name, '/', 1) = 'employees' and public.hr_can_approve()
+  and public.storage_path_uuid(split_part(name, '/', 2)) in (select public.hr_visible_user_ids())
+  and public.auth_org_id() is not null);
+
+-- AI usage/quota reads by a company admin go through the checkpoint too.
+create or replace function public.ai_is_org_admin_of(p_org_id uuid)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $function$
+  select exists (
+    select 1 from public.users u
+    where u.id = auth.uid() and u.org_id = p_org_id and u.role in ('owner','admin')
+  ) and coalesce(p_org_id = public.auth_org_id(), false)
+$function$;
+
+-- 8. For the legacy service-role endpoints (AI gateway, bulk import,
+--    invites), which act for a signed-in user: the same rule, by id.
+create or replace function public.org_access_state_for(p_org_id uuid, p_user_id uuid)
+returns text
+language sql
+stable security definer
+set search_path to ''
+as $function$
+  select case
+    when exists (select 1 from public.platform_admins pa where pa.user_id = p_user_id) then 'ok'
+    else (select public.org_access_state(o.payment_status, o.trial_ends_at) from public.organizations o where o.id = p_org_id)
+  end
+$function$;
+
+revoke all on function public.org_access_state_for(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.org_access_state_for(uuid, uuid) to service_role;
+
 revoke all on function public.platform_orgs() from public, anon;
 grant execute on function public.platform_orgs() to authenticated;
 revoke all on function public.platform_activate_org(uuid) from public, anon;
