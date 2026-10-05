@@ -60,6 +60,8 @@ export const organizations = pgTable("organizations", {
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   trialCandidateCap: integer("trial_candidate_cap").default(25),
   maxTrialExtensionDays: integer("max_trial_extension_days").default(30),
+  // v1.13.0: days already granted by platform_extend_trial(); capped at maxTrialExtensionDays.
+  trialExtendedDays: integer("trial_extended_days").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

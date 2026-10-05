@@ -1,4 +1,5 @@
 import { supabaseAdmin, SUPABASE_URL } from "../../lib/supabaseServer.js";
+import { checkOrgAccess } from "../../lib/orgAccess.js";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -40,6 +41,9 @@ export default async function handler(req, res) {
   if (membership.status === "exited") {
     return res.status(403).json({ error: "Your account is no longer active" });
   }
+  // v1.13.0: a company whose trial has ended or which is paused cannot import.
+  const access = await checkOrgAccess(sb, membership.org_id, user.id);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
   if (!["owner", "admin"].includes(membership.role)) {
     return res.status(403).json({ error: "Admin access required" });
   }

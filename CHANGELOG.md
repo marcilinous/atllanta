@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.13.0 — 2026-10-05
+
+### What changed
+- **Free trials now end.** A company whose 14-day trial has ended, or which Atllanta has paused, sees a "trial ended" page instead of the app until Atllanta reactivates it. Owners and admins see how to contact us; everyone else is asked to speak to their admin. Nothing is deleted — everything is back as soon as access is restored.
+- **Existing companies are unaffected:** all are now marked active.
+- Admins can no longer change their company's plan, trial dates or credits directly — those are managed by Atllanta.
+- New for the Atllanta platform owner: a **Companies** page to activate a company, extend its trial (7, 14 or 30 days, within its limit) or pause it.
+
+### Admins need to
+- Nothing.
+
 ## v1.12.0 — 2026-10-05
 
 ### What changed

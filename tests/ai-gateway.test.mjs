@@ -39,6 +39,7 @@ before(async () => {
     export async function logGroqGeneration(o) { globalThis.__gw.log.push({ langfuse: o }); }
   `);
   fs.copyFileSync(path.join(ROOT, 'lib', 'aiGateway.js'), path.join(tmp, 'lib', 'aiGateway.js'));
+  fs.copyFileSync(path.join(ROOT, 'lib', 'orgAccess.js'), path.join(tmp, 'lib', 'orgAccess.js'));
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
   process.env.GROQ_API_KEY = 'groq-key';
   realFetch = globalThis.fetch;
@@ -76,6 +77,7 @@ beforeEach(() => {
     ai_bot_check: { data: [{ flagged: false, reason: null, paused_until: null }], error: null },
     ai_quota_check: { data: [allowedQuota], error: null },
     ai_record_usage: { data: null, error: null },
+    org_access_state_for: { data: 'ok', error: null },
   };
   S.groq = groqOk;
 });
@@ -110,6 +112,21 @@ describe('resolveCaller', () => {
     S.profile = { data: { id: 'user-1', org_id: null, role: 'member', status: 'active' }, error: null };
     const c = await caller();
     assert.deepEqual([c.ok, c.status], [false, 403]);
+  });
+
+  test('refuses a company whose trial ended or which is paused (v1.13.0), and a failed check', async () => {
+    for (const state of ['trial_ended', 'paused', null]) {
+      S.log = [];
+      S.auth = new Response(JSON.stringify({ id: 'user-1' }), { status: 200 });
+      S.rpc.org_access_state_for = { data: state, error: null };
+      const c = await caller();
+      assert.deepEqual([c.ok, c.status], [false, 403], String(state));
+      assert.deepEqual(rpcs('org_access_state_for')[0].args, { p_org_id: 'org-1', p_user_id: 'user-1' });
+    }
+    S.rpc.org_access_state_for = { data: null, error: { message: 'down' } };
+    S.auth = new Response(JSON.stringify({ id: 'user-1' }), { status: 200 });
+    const c = await caller();
+    assert.deepEqual([c.ok, c.status], [false, 503]);
   });
 
   test('refuses an exited user', async () => {

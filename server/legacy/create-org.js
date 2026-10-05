@@ -2,6 +2,7 @@
 // POST { action: "invite", email, role, full_name? } — owner/admin invites a member.
 
 import { supabaseAdmin, SUPABASE_URL } from "../../lib/supabaseServer.js";
+import { checkOrgAccess } from "../../lib/orgAccess.js";
 
 async function getUserFromToken(token) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -68,6 +69,9 @@ async function handleInvite(req, res, db, user) {
   if (!me?.org_id || !["owner", "admin"].includes(me.role)) {
     return res.status(403).json({ error: "Insufficient permissions" });
   }
+  // v1.13.0: a company whose trial has ended or which is paused cannot invite.
+  const access = await checkOrgAccess(db, me.org_id, user.id);
+  if (!access.ok) return res.status(access.status).json({ error: access.error });
 
   const { email: rawEmail, role, full_name } = req.body || {};
   if (!rawEmail?.trim()) return res.status(400).json({ error: "Email is required" });

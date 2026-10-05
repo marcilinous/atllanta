@@ -42,9 +42,10 @@ before(async () => {
     }
     export const SUPABASE_URL = 'https://stub.supabase.co';
     export function supabaseAdmin() {
-      return { from: (t) => chain(t) };
+      return { from: (t) => chain(t), rpc: async (name, args) => { S.db.push({ rpc: name, args }); return { data: S.orgState, error: null }; } };
     }
   `);
+  fs.copyFileSync(path.join(ROOT, 'lib', 'orgAccess.js'), path.join(tmp, 'lib', 'orgAccess.js'));
   fs.copyFileSync(path.join(ROOT, 'server/legacy/bulk-import.js'), path.join(tmp, 'server', 'legacy', 'bulk-import.js'));
   handler = (await import(pathToFileURL(path.join(tmp, 'server', 'legacy', 'bulk-import.js')).href)).default;
   realFetch = globalThis.fetch;
@@ -64,6 +65,7 @@ beforeEach(() => {
   S.orgId = 'org-1';
   S.callerRole = 'admin';
   S.callerStatus = 'active';
+  S.orgState = 'ok';
 });
 
 function res() {
@@ -82,6 +84,15 @@ describe('bulk-import access', () => {
     await handler(importReq(), r);
     assert.deepEqual([r.statusCode, r.body], [403, { error: 'Your account is no longer active' }]);
     assert.equal(S.inserts.length, 0);
+  });
+
+  test('a company whose trial ended or which is paused cannot import (v1.13.0)', async () => {
+    S.orgState = 'trial_ended';
+    const r = res();
+    await handler(importReq(), r);
+    assert.equal(r.statusCode, 403);
+    assert.equal(S.inserts.length, 0);
+    assert.deepEqual(S.db.find((e) => e.rpc)?.args, { p_org_id: 'org-1', p_user_id: 'caller-id' });
   });
 
   test('an active admin can still import', async () => {

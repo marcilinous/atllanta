@@ -33,6 +33,20 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-05 (later):** **v1.12.0 is live** (#140 → `6f91af4`,
+  tagged; migration `20261005080657_company_signup` applied). **v1.13.0
+  (trial enforcement, piece 2) is built** on `claude/trial-enforcement`,
+  with spec and plan under `docs/superpowers/`. Its migration
+  `…_trial_enforcement.sql` passed a rolled-back production probe. It was
+  **applied** on the owner's yes (2026-10-05, recorded `20261005091125`)
+  and re-probed live, rolled back. All five companies are now `active`.
+  - Blocked companies (an ended trial, or paused) are refused through
+    `auth_org_id()` and sent to `/paused`.
+  - The owner's new `/platform` Companies screen activates, extends (7, 14
+    or 30 days, capped) and pauses.
+  - A guard closes the hole that let company admins edit their own
+    billing and trial fields.
+  - Next: piece 3 (private feedback).
 - **Update 2026-10-05:** **v1.11.0 is live** (#139 → `fe1809e`, tagged;
   the `v1.10.0` tag re-pointed to `ed7713b`). The owner bought
   **atllanta.com** and pointed it at Vercel (apex → `www`). The owner then
@@ -1005,6 +1019,66 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-10-05 — Trial enforcement (v1.13.0)
+
+**Owner decisions:**
+- all five existing companies are marked `active` at launch (4 of them sat
+  on trials that ended in July or August, RTcompu included);
+- extensions are 7, 14 or 30 days, with the total capped at
+  `max_trial_extension_days`;
+- the blocked page shows anchansachinv99@gmail.com and 8073163762 to owners
+  and admins, and a plain "ask your admin" to everyone else;
+- the platform screen covers companies and trials only.
+
+**How it works:**
+- `org_access_state()` holds the rule:
+  - `cancelled` → paused;
+  - `trial` past `trial_ends_at` → trial ended;
+  - anything else → ok.
+- `auth_org_id()`, behind 176 of the 207 policies, returns null for a
+  blocked company. Platform admins are exempt; server code is unaffected.
+- `my_org_access()` explains the block. Both stacks redirect to
+  `/paused`, and a failed check shows the retry screen.
+
+**Found while specifying:** `organizations_admin_update` let a company
+admin edit any column of their own org, `payment_status` and
+`trial_ends_at` included. The new `organizations_guard_billing_fields()`
+trigger refuses changes to the plan, trial and billing columns, and
+increases to `credits_balance` (`consume_credits` only decreases it), for
+everyone except server code and platform admins.
+
+**Final review** (Opus, fresh context) found two back doors, both fixed in
+the same migration:
+
+1. **18 policies never went through `auth_org_id()`.** They looked the org
+   up in `users` directly: Helpdesk ×10; the select policies on assets,
+   asset_assignments, announcements, expenses and expense_categories; and
+   the three `documents_employees_*` storage policies. Now gated. Also
+   gated, `ai_is_org_admin_of()`, with `coalesce(…, false)`: a probe
+   showed that a null result would let `ai_clear_flag` through.
+2. **The legacy service-role endpoints never checked the company.** The
+   AI gateway, bulk import and invites act for a user with the service
+   key. They now check `org_access_state_for()` (service role only) via
+   `lib/orgAccess.js`. A failed check returns 503, never "allowed".
+
+Left as they are, on purpose:
+- own-row policies (notifications, Google tokens, own posts and files);
+- the blocked company's own AI-limit and AI-report functions.
+
+**Platform functions** (platform-admin only, each audited and published):
+`platform_orgs`, `platform_activate_org`, `platform_extend_trial`,
+`platform_pause_org`.
+
+**Probe** (production, rolled back), all as intended:
+- query speed unchanged (7.0 → 2.5 ms on 6,132 rows);
+- an expired member sees only their own row and is refused writes;
+- an expired owner can't un-expire themselves; status, trial date and
+  credit increases are refused for owners, while renaming works;
+- pause, extend and activate work; extending by 10, past the cap or on a
+  non-trial is refused;
+- non-admins are refused; the platform admin's own paused org stays open;
+- server code is unaffected.
 
 ### 2026-10-05 — Company sign-up (v1.12.0)
 

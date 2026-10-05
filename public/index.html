@@ -231,14 +231,31 @@ if (!getMembership()) {
   // A failed load is not "no row": say so instead of sending an existing
   // member to /start (which would send them straight back — a loop).
   if (getProfileError()) {
-    document.body.innerHTML = '<main style="max-width:28rem;margin:4rem auto;padding:0 1rem;font-family:system-ui,sans-serif">'
-      + '<p>We couldn&rsquo;t load your account. Check your connection and try again.</p>'
-      + '<button type="button" class="btn btn-primary" id="profile-retry">Try again</button></main>';
-    document.getElementById('profile-retry').addEventListener('click', () => window.location.reload());
+    showProfileRetry();
     throw new Error('Profile could not be loaded');
   }
   window.location.replace('/start');
   throw new Error('No organisation yet');
+}
+// v1.13.0: a company whose trial has ended, or which Atllanta paused, goes
+// to /paused. The database refuses its data anyway; a failed check is not
+// "allowed" — show the retry instead of an app that cannot load.
+const { data: accessRows, error: accessError } = await sb.rpc('my_org_access');
+if (accessError) {
+  showProfileRetry();
+  throw new Error('Access could not be checked');
+}
+const access = accessRows?.[0];
+if (access && access.state !== 'ok') {
+  window.location.replace('/paused');
+  throw new Error('Company access paused');
+}
+// Hoisted: used by both checks above.
+function showProfileRetry() {
+  document.body.innerHTML = '<main style="max-width:28rem;margin:4rem auto;padding:0 1rem;font-family:system-ui,sans-serif">'
+    + '<p>We couldn&rsquo;t load your account. Check your connection and try again.</p>'
+    + '<button type="button" class="btn btn-primary" id="profile-retry">Try again</button></main>';
+  document.getElementById('profile-retry').addEventListener('click', () => window.location.reload());
 }
 const org = getOrg();
 const user = getUser();
