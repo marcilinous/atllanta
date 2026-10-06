@@ -68,7 +68,7 @@ New migration `…_platform_feedback.sql`.
 ```
 platform_feedback(
   id uuid pk default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete set null,
+  user_id uuid references auth.users(id) on delete set null,
   org_id uuid references organizations(id) on delete set null,
   role text,                      -- the sender's role when sent
   kind text not null check (kind in ('idea','problem','praise')),
