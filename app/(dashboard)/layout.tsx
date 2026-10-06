@@ -9,5 +9,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const user = await getSessionUser();
   const access = user ? await getOrgAccess(user.id) : null;
   if (access && access.state !== "ok") redirect("/paused");
-  return <>{children}</>;
+  return (
+    <>
+      <div className="mx-auto flex w-full max-w-4xl justify-end px-4 pt-3 sm:px-6">
+        <a href="/feedback?from=/hrms" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          Send feedback
+        </a>
+      </div>
+      {children}
+    </>
+  );
 }

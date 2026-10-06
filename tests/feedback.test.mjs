@@ -167,3 +167,35 @@ describe('static: platform feedback screen', () => {
     assert.match(c, /whitespace-pre-wrap/);
   });
 });
+
+describe('static: sending', () => {
+  test('/feedback: signed-out to /login, no account to /start, and blocked companies are NOT sent to /paused', () => {
+    const p = read('app', '(auth)', 'feedback', 'page.tsx');
+    assert.match(p, /if \(!user\) redirect\("\/login"\);/);
+    assert.match(p, /if \(!access\) redirect\("\/start"\);/);
+    assert.doesNotMatch(p, /redirect\("\/paused"\)/);
+    assert.match(p, /const from = safeFrom\(sp\.from\);/);
+  });
+
+  test('the form sends once (disabled while pending), keeps the page, and thanks the sender', () => {
+    const f = read('app', '(auth)', 'feedback', 'feedback-form.tsx');
+    assert.match(f, /^"use client";/);
+    assert.match(f, /await submitFeedback\(\{ kind, rating, message, page: from \}\)/);
+    assert.match(f, /disabled=\{[^}]*isPending/);
+    assert.match(f, /Thanks — this goes straight to the Atllanta team\./);
+    assert.match(f, /maxLength=\{2000\}/);
+  });
+
+  test('entry points: legacy account menu, /paused, and the new-stack workspace', () => {
+    const html = read('public', 'index.html');
+    assert.match(html, /id="feedback-menu-btn"/);
+    assert.match(html, /window\.location\.assign\('\/feedback\?from=' \+ encodeURIComponent\('\/' \+ \(location\.hash \|\| ''\)\)\)/);
+    assert.match(read('app', '(auth)', 'paused', 'page.tsx'), /href="\/feedback\?from=\/paused"/);
+    assert.match(read('app', '(dashboard)', 'layout.tsx'), /href="\/feedback\?from=\/hrms"/);
+  });
+
+  test('/feedback is never served from the service-worker cache', () => {
+    const list = read('public', 'sw.js').match(/const NETWORK_ONLY_PREFIXES = \[([^\]]*)\]/)[1];
+    assert.match(list, /"\/feedback"/);
+  });
+});
