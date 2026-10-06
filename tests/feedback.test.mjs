@@ -83,3 +83,64 @@ describe('migration: platform owner functions', () => {
     }
   });
 });
+
+describe('schemas', () => {
+  const ok = { kind: 'idea', rating: null, message: 'More reports please', page: '/hrms/leave' };
+
+  test('accepts the three kinds, a 1–5 or empty rating, and a trimmed 1–2000 message', async () => {
+    const { submitFeedbackSchema, FEEDBACK_KINDS } = await import('../src/lib/platform/feedback/schemas.ts');
+    assert.deepEqual(FEEDBACK_KINDS.map((k) => k.key), ['idea', 'problem', 'praise']);
+    assert.equal(submitFeedbackSchema.parse({ ...ok, message: '  hi  ' }).message, 'hi');
+    assert.ok(submitFeedbackSchema.safeParse({ ...ok, rating: 5 }).success);
+    assert.ok(submitFeedbackSchema.safeParse({ ...ok, message: 'a'.repeat(2000) }).success);
+    for (const bad of [{ ...ok, kind: 'bug' }, { ...ok, rating: 0 }, { ...ok, rating: 6 }, { ...ok, rating: 2.5 },
+      { ...ok, message: '   \n  ' }, { ...ok, message: 'a'.repeat(2001) }]) {
+      assert.equal(submitFeedbackSchema.safeParse(bad).success, false, JSON.stringify(bad).slice(0, 60));
+    }
+  });
+
+  test('never takes a sender, company or role from input', async () => {
+    const { submitFeedbackSchema } = await import('../src/lib/platform/feedback/schemas.ts');
+    const r = submitFeedbackSchema.parse({ ...ok, userId: 'x', orgId: 'y', role: 'owner' });
+    for (const k of ['userId', 'orgId', 'role']) assert.equal(k in r, false, k);
+  });
+
+  test('safeFrom keeps on-site paths only', async () => {
+    const { safeFrom } = await import('../src/lib/platform/feedback/schemas.ts');
+    assert.equal(safeFrom('/hrms/leave'), '/hrms/leave');
+    assert.equal(safeFrom('/#/dashboard'), '/#/dashboard');
+    for (const bad of ['//evil.com', 'https://evil.com', 'javascript:alert(1)', '/\\evil.com', '', null, undefined, 'x'.repeat(301)]) {
+      assert.equal(safeFrom(bad), null, String(bad).slice(0, 30));
+    }
+  });
+
+  test('mark-read needs a real id', async () => {
+    const { markReadSchema } = await import('../src/lib/platform/feedback/schemas.ts');
+    assert.ok(markReadSchema.safeParse({ id: '7b0e6c1e-1234-4abc-8def-0123456789ab', read: true }).success);
+    assert.equal(markReadSchema.safeParse({ id: 'x', read: true }).success, false);
+  });
+});
+
+describe('only the functions\' own refusals reach the screen', () => {
+  test('allow-listed messages pass; anything else is hidden', async () => {
+    const { explainFeedbackError } = await import('../src/lib/platform/feedback/explain.ts');
+    const e = (code, message) => ({ code, message });
+    assert.equal(explainFeedbackError(e('22023', "You've sent a lot of feedback today — please try again tomorrow")), "You've sent a lot of feedback today — please try again tomorrow");
+    assert.equal(explainFeedbackError({ cause: e('22023', 'Write a message of up to 2,000 characters') }), 'Write a message of up to 2,000 characters');
+    assert.equal(explainFeedbackError(e('42501', 'Only the Atllanta platform owner can do that')), 'Only the Atllanta platform owner can do that');
+    assert.equal(explainFeedbackError(e('42501', 'permission denied for table platform_feedback')), null);
+    assert.equal(explainFeedbackError(e('XX000', 'boom')), null);
+  });
+});
+
+describe('static: actions', () => {
+  test('run the functions as the caller, without the service role', () => {
+    const s = read('src', 'lib', 'platform', 'feedback', 'actions.ts');
+    assert.match(s, /^"use server";/);
+    assert.match(s, /select public\.submit_feedback\(/);
+    assert.match(s, /select public\.platform_feedback_mark_read\(/);
+    assert.match(s, /withTransaction\(\{ id: user\.id \}/);
+    assert.match(s, /revalidatePath\("\/platform\/feedback"\)/);
+    assert.doesNotMatch(s, /service_?role/i);
+  });
+});
