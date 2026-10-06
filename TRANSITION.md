@@ -35,8 +35,9 @@
 - **Stack target:** see `CLAUDE.md`
 - **Update 2026-10-06:** **v1.14.1 is live** (#143, launch film). **v1.15.0
   (private feedback, piece 3) is built** on `claude/feedback`: its migration
-  `…_platform_feedback.sql` passed a rolled-back production probe and is
-  applied only on the owner's yes; once live this completes the owner's
+  `…_platform_feedback.sql` passed rolled-back production probes and was
+  **applied** on the owner's yes (2026-10-06, recorded `20261006175528`),
+  then re-probed live (rolled back); once live this completes the owner's
   four-piece sequence (sign-up, trial, feedback, home page).
 - **Update 2026-10-05 (late):** **v1.14.0 is live** (#142 → `77a3992`,
   tagged); the home page and sign-up are confirmed working by the owner.
