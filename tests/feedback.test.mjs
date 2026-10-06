@@ -28,7 +28,7 @@ describe('migration: the table is private', () => {
     assert.match(sql, /user_id uuid references auth\.users\(id\) on delete set null/);
     assert.match(sql, /kind text not null check \(kind in \('idea', 'problem', 'praise'\)\)/);
     assert.match(sql, /rating smallint check \(rating between 1 and 5\)/);
-    assert.match(sql, /check \(char_length\(btrim\(message\)\) between 1 and 2000\)/);
+    assert.match(sql, /check \(char_length\(regexp_replace\(message, '\^\x5cs\+\|\x5cs\+\$', '', 'g'\)\) between 1 and 2000\)/);
     assert.match(sql, /alter table public\.platform_feedback enable row level security;/);
     assert.match(sql, /revoke all on table public\.platform_feedback from public, anon, authenticated;/);
     assert.doesNotMatch(sql, /create policy/i);
@@ -48,13 +48,13 @@ describe('migration: submit_feedback', () => {
     const f = fnBody('submit_feedback');
     assert.match(f, /p_kind not in \('idea', 'problem', 'praise'\)/);
     assert.match(f, /p_rating < 1 or p_rating > 5/);
-    assert.match(f, /v_msg text := btrim\(coalesce\(p_message, ''\)\);/);
+    assert.match(f, /v_msg text := regexp_replace\(coalesce\(p_message, ''\), '\^\x5cs\+\|\x5cs\+\$', '', 'g'\);/);
     assert.match(f, /char_length\(v_msg\) < 1 or char_length\(v_msg\) > 2000/);
     assert.match(f, /f\.created_at > now\(\) - interval '24 hours'\) >= 10/);
   });
 
   test('keeps only on-site page paths', () => {
-    assert.match(fnBody('submit_feedback'), /v_page := case when p_page like '\/%' and p_page not like '\/\/%' then left\(p_page, 300\) else null end;/);
+    assert.match(fnBody('submit_feedback'), /v_page := case when p_page like '\/%' and p_page not like '\/\/%' and position\(chr\(92\) in p_page\) = 0 then left\(p_page, 300\) else null end;/);
   });
 
   test('notifies every platform admin in their own org, in-app only', () => {

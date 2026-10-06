@@ -12,7 +12,7 @@ create table if not exists public.platform_feedback (
   role text,
   kind text not null check (kind in ('idea', 'problem', 'praise')),
   rating smallint check (rating between 1 and 5),
-  message text not null check (char_length(btrim(message)) between 1 and 2000),
+  message text not null check (char_length(regexp_replace(message, '^\s+|\s+$', '', 'g')) between 1 and 2000),
   page text check (page is null or char_length(page) <= 300),
   read_at timestamptz,
   created_at timestamptz not null default now()
@@ -38,7 +38,7 @@ declare
   v_org uuid;
   v_role text;
   v_org_name text;
-  v_msg text := btrim(coalesce(p_message, ''));
+  v_msg text := regexp_replace(coalesce(p_message, ''), '^\s+|\s+$', '', 'g');
   v_page text;
   v_id uuid;
   v_label text;
@@ -64,7 +64,7 @@ begin
     raise exception 'You''ve sent a lot of feedback today — please try again tomorrow' using errcode = '22023';
   end if;
 
-  v_page := case when p_page like '/%' and p_page not like '//%' then left(p_page, 300) else null end;
+  v_page := case when p_page like '/%' and p_page not like '//%' and position(chr(92) in p_page) = 0 then left(p_page, 300) else null end;
 
   insert into public.platform_feedback (user_id, org_id, role, kind, rating, message, page)
   values (v_uid, v_org, v_role, p_kind, p_rating, v_msg, v_page)
