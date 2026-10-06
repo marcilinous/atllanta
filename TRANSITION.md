@@ -33,6 +33,17 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-07:** **v1.15.0 is live** (#144, tagged). The owner's
+  four-piece sequence is complete. "Generic CRM Test Co" was paused on the
+  owner's word. It is an internal test company, most likely created on
+  2026-08-06 by an earlier session.
+  - Back to Phase 4 item 3, with **expenses** as the next area.
+  - Its rules were checked first and had holes, so **v1.15.1 (expenses
+    integrity) is built** on `claude/expenses-integrity`. Its migration passed a
+    26-scenario rolled-back production probe and was **applied** on the
+    owner's yes (2026-10-07, recorded `20261006191041`), then rechecked live
+    and rolled back (Decisions & Blockers, 2026-10-07).
+  - Next: the new-stack expenses screens.
 - **Update 2026-10-06:** **v1.14.1 is live** (#143, launch film). **v1.15.0
   (private feedback, piece 3) is built** on `claude/feedback`: its migration
   `…_platform_feedback.sql` passed rolled-back production probes and was
@@ -893,6 +904,14 @@ running on the new stack; old vanilla-JS HRMS views retired.
   Phase 4 item 4 (retire legacy views once parity is confirmed). Other
   legacy places that approve leave (the approvals inbox) keep working under
   the v1.7.1 guard. 369/369 unit tests. Rollback: redeploy v1.8.0.
+- 2026-10-07 — **Attendance is done** (v1.10.0 preview, v1.11.0 cutover).
+  **Expenses is next.**
+  - Its rules were checked first and had holes. **v1.15.1 (expenses
+    integrity)** fixes them; see Decisions & Blockers, 2026-10-07.
+  - The approver rule is the same as leave, and only owners and admins mark a
+    claim reimbursed (owner, option a).
+  - The new-stack expenses screens follow, on the same two-gate Server Action
+    pattern with module key `finance`.
 
 ---
 
@@ -1048,6 +1067,81 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-10-07 — Expenses integrity (security, legacy v1.15.1)
+
+Found when starting the expenses port (Phase 4 item 3's next area), with the
+same "check its rules first" step as leave and attendance. Production had 0
+expenses and 0 categories; Finance is switched on for RTcompu and njk. On the
+live rules:
+- **Every member could read every colleague's claims.** `org_isolation_select`
+  checked only the org.
+- **A claimant could change an approved claim's amount, date or receipt**,
+  because `expenses_guard_review` froze only the review fields.
+- **A claimant could delete a claim at any status**, even once reimbursed.
+- **Owners and admins skipped the guard.** They could approve their own claim
+  and stamp anyone as the reviewer.
+- **Managers' approvals silently did nothing.** Managers were shown Approve and
+  Reject, but the update policy let only owners and admins change someone
+  else's row, so the click matched 0 rows. The screen still said "Expense
+  approved" and published the event.
+- **Any manager in the org could read every receipt** (`documents_expenses_read`
+  used `hr_can_approve()`).
+
+**Owner decision 2026-10-07, option a:**
+- Approvers are the same people as for leave: admins, the reporting line, and a
+  manager over the department.
+- Nobody approves their own claim, and an owner's or admin's claim needs an
+  admin or another owner.
+- Only owners and admins mark a claim reimbursed.
+
+Option b (owners and admins only) was declined.
+
+The fix is migration `…_expenses_integrity.sql`:
+- **`exp_select`:** a claim is seen by the same people as leave (admin, self,
+  reporting line, `hr_visible_user_ids`).
+- **`exp_insert`:** your own claim only, pending and unreviewed.
+- **`exp_update`:** approvers only.
+- **`exp_delete`:** your own claim, while pending.
+- **`expenses_amount_positive`:** a claim must be for more than 0.
+- **`expenses_guard()`** replaces `expenses_guard_review`:
+  - a category must belong to your own company;
+  - what was claimed never changes after submitting;
+  - the only steps allowed are pending → approved/rejected (by an approver,
+    never your own, and an owner's/admin's claim needs an admin) and
+    approved → reimbursed (owner/admin only);
+  - the database stamps the reviewer and `reimbursed_at`;
+  - the service role is exempt.
+- **Receipts:**
+  - read by the uploader, or by whoever can see the claim that points at the
+    receipt;
+  - the uploader can delete one only while no reviewed claim uses it; owners and
+    admins keep their delete.
+
+Legacy `finance/index.js`:
+- "Mark reimbursed" is shown to owners and admins only.
+- Approve, reject and reimburse now check that a row actually changed before
+  saying so. The worker drafted the change (Groq) and I reviewed it.
+
+`tests/expenses-integrity.test.mjs` pins the migration and the legacy screen.
+
+**Verified:** 26 scenarios ran on production with the migration applied inside
+an always-rolled-back transaction, all as intended (RTcompu member, their
+manager, an unrelated colleague, the admin, the owner, and another company's
+admin). Production was unchanged afterwards. **Applied 2026-10-07** on the owner's yes
+(recorded `20261006191041`; file renamed to match). Checked live: the four
+`exp_*` policies, `trg_expenses_guard`, `expenses_amount_positive`, and both
+receipt policies for `authenticated`. It was replayed as real RTcompu people
+(rolled back):
+- a member submits; self-approval is refused; a colleague sees nothing;
+- the manager approves, with the reviewer stamped; the manager's reimburse is
+  refused;
+- the member's edit after approval and delete are refused; the admin
+  reimburses.
+
+Note: RTcompu has no departments set, so every RTcompu manager is "a manager
+over the department" for everyone and can approve any member's claim. This is
+the same as leave today.
 
 ### 2026-10-06 — Private feedback (v1.15.0)
 
