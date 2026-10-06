@@ -11,9 +11,9 @@ import { getSessionUser } from "../../supabase/server";
 import { explainFeedbackError } from "./explain";
 import { markReadSchema, safeFrom, submitFeedbackSchema } from "./schemas";
 
-async function run<T>(query: SQL): Promise<T[]> {
+async function run<T>(query: SQL, signInMessage: string): Promise<T[]> {
   const user = await getSessionUser();
-  if (!user) throw new ActionError("Sign in to send feedback.");
+  if (!user) throw new ActionError(signInMessage);
   return withTransaction({ id: user.id }, async (tx) => {
     try {
       return (await tx.execute(query)) as unknown as T[];
@@ -27,13 +27,14 @@ async function run<T>(query: SQL): Promise<T[]> {
 
 export const submitFeedback = action(submitFeedbackSchema, async (input) => {
   const [row] = await run<{ id: string }>(
-    sql`select public.submit_feedback(${input.kind}, ${input.rating}::int, ${input.message}, ${safeFrom(input.page)}) as id`
+    sql`select public.submit_feedback(${input.kind}, ${input.rating}::int, ${input.message}, ${safeFrom(input.page)}) as id`,
+    "Sign in to send feedback."
   );
   return { id: row.id };
 });
 
 export const markFeedbackRead = action(markReadSchema, async (input) => {
-  await run(sql`select public.platform_feedback_mark_read(${input.id}::uuid, ${input.read})`);
+  await run(sql`select public.platform_feedback_mark_read(${input.id}::uuid, ${input.read})`, "Sign in first.");
   revalidatePath("/platform/feedback");
   revalidatePath("/platform");
   return { id: input.id, read: input.read };

@@ -10,9 +10,10 @@ export const FEEDBACK_KINDS = [
 
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number]["key"];
 
-/** An on-site path to come back to, or null (blocks //host, schemes, junk). */
+/** An on-site path to come back to, or null (blocks //host, schemes, junk,
+ *  backslashes and control characters — browsers strip tab/LF/CR from URLs). */
 export function safeFrom(value: string | null | undefined): string | null {
-  if (!value || value.length > 300 || value.includes("\\")) return null;
+  if (!value || value.length > 300 || /[\u0000-\u001f\u007f\\]/.test(value)) return null;
   return value.startsWith("/") && !value.startsWith("//") ? value : null;
 }
 

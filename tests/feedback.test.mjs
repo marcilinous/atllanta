@@ -51,10 +51,13 @@ describe('migration: submit_feedback', () => {
     assert.match(f, /v_msg text := regexp_replace\(coalesce\(p_message, ''\), '\^\x5cs\+\|\x5cs\+\$', '', 'g'\);/);
     assert.match(f, /char_length\(v_msg\) < 1 or char_length\(v_msg\) > 2000/);
     assert.match(f, /f\.created_at > now\(\) - interval '24 hours'\) >= 10/);
+    const lock = /perform pg_advisory_xact_lock\(hashtextextended\('submit_feedback:' \|\| v_uid::text, 0\)\);/;
+    assert.match(f, lock);
+    assert.ok(f.search(lock) < f.indexOf('select count(*) from public.platform_feedback'), 'lock before count');
   });
 
   test('keeps only on-site page paths', () => {
-    assert.match(fnBody('submit_feedback'), /v_page := case when p_page like '\/%' and p_page not like '\/\/%' and position\(chr\(92\) in p_page\) = 0 then left\(p_page, 300\) else null end;/);
+    assert.match(fnBody('submit_feedback'), /v_page := case when p_page like '\/%' and p_page not like '\/\/%' and position\(chr\(92\) in p_page\) = 0 and p_page !~ '\[\[:cntrl:\]\]' then left\(p_page, 300\) else null end;/);
   });
 
   test('notifies every platform admin in their own org, in-app only', () => {
@@ -109,7 +112,7 @@ describe('schemas', () => {
     const { safeFrom } = await import('../src/lib/platform/feedback/schemas.ts');
     assert.equal(safeFrom('/hrms/leave'), '/hrms/leave');
     assert.equal(safeFrom('/#/dashboard'), '/#/dashboard');
-    for (const bad of ['//evil.com', 'https://evil.com', 'javascript:alert(1)', '/\\evil.com', '', null, undefined, 'x'.repeat(301)]) {
+    for (const bad of ['//evil.com', 'https://evil.com', 'javascript:alert(1)', '/\\evil.com', '/\t/evil.com', '/\n/evil.com', '/\r/evil.com', '', null, undefined, 'x'.repeat(301)]) {
       assert.equal(safeFrom(bad), null, String(bad).slice(0, 30));
     }
   });

@@ -59,12 +59,13 @@ begin
   if char_length(v_msg) < 1 or char_length(v_msg) > 2000 then
     raise exception 'Write a message of up to 2,000 characters' using errcode = '22023';
   end if;
+  perform pg_advisory_xact_lock(hashtextextended('submit_feedback:' || v_uid::text, 0));
   if (select count(*) from public.platform_feedback f
        where f.user_id = v_uid and f.created_at > now() - interval '24 hours') >= 10 then
     raise exception 'You''ve sent a lot of feedback today — please try again tomorrow' using errcode = '22023';
   end if;
 
-  v_page := case when p_page like '/%' and p_page not like '//%' and position(chr(92) in p_page) = 0 then left(p_page, 300) else null end;
+  v_page := case when p_page like '/%' and p_page not like '//%' and position(chr(92) in p_page) = 0 and p_page !~ '[[:cntrl:]]' then left(p_page, 300) else null end;
 
   insert into public.platform_feedback (user_id, org_id, role, kind, rating, message, page)
   values (v_uid, v_org, v_role, p_kind, p_rating, v_msg, v_page)
