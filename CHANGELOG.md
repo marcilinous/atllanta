@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.16.0 — 2026-10-07
+
+### What changed
+- **New Expenses screens (preview)** at `/hrms/expenses`. See your pending, approved and reimbursed totals, submit a claim with an optional receipt (PDF or photo, up to 4 MB), and withdraw a claim while it's pending.
+- **Approvals** for managers and admins: approve or reject claims with a comment. Owners and admins also get a **To reimburse** list with **Mark reimbursed**.
+- **View receipt** opens a claim's receipt for the people allowed to see that claim.
+- The old Finance screen still works as before. It will forward to the new screens after the owner's check.
+
+### Admins need to
+- Nothing.
+
 ## v1.15.1 — 2026-10-07
 
 ### What changed
