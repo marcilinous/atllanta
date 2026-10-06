@@ -196,7 +196,6 @@ import analyticsHome from '/views/analytics/index.js';
 import analyticsQuestion from '/views/analytics/builder.js';
 import analyticsDashboard from '/views/analytics/dashboard.js';
 import documentsView from '/views/documents/index.js';
-import financeView from '/views/finance/index.js';
 import adminView from '/views/admin/index.js';
 import announcementsView from '/views/announcements/index.js';
 import helpdeskView from '/views/helpdesk/index.js';
@@ -550,7 +549,10 @@ registerRoute('analytics', analyticsHome);
 registerRoute('analytics/question', analyticsQuestion);
 registerRoute('analytics/dashboard', analyticsDashboard);
 registerRoute('documents', documentsView);
-registerRoute('finance', financeView);
+// Expenses cutover (v1.16.1): claims, approvals and reimbursing live on the
+// new stack. The expense report and the categories stay here, linked from the
+// new screen's tabs (neither links back into this redirect).
+registerRoute('finance', toNewStack('/hrms/expenses', 'expenses'));
 registerRoute('admin', adminView);
 registerRoute('announcements', announcementsView);
 registerRoute('helpdesk', helpdeskView);

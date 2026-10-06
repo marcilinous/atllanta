@@ -165,8 +165,21 @@ describe('static: the screens', () => {
     assert.match(nav, /href="\/#\/finance\/categories"/);
   });
 
-  test('preview: the legacy #/finance route is untouched', () => {
-    const html = read('public', 'index.html');
-    assert.match(html, /registerRoute\('finance', financeView\);/);
+});
+
+describe('cutover (v1.16.1)', () => {
+  const html = read('public', 'index.html');
+  const nav = read('app', '(dashboard)', 'hrms', 'expenses', 'expenses-nav.tsx');
+
+  test('#/finance forwards to the new screens; the legacy finance view is no longer loaded', () => {
+    assert.match(html, /registerRoute\('finance', toNewStack\('\/hrms\/expenses', 'expenses'\)\);/);
+    assert.doesNotMatch(html, /import financeView from '\/views\/finance\/index\.js';/);
+    assert.match(html, /registerRoute\('attendance', toNewStack\('\/hrms\/attendance', 'attendance'\)\);/, 'attendance still forwards');
+  });
+
+  test('the report and categories stay legacy, and the tabs never link back into the redirect', () => {
+    assert.match(html, /registerRoute\('reports\/expenses', expenseReport\);/);
+    assert.match(html, /registerRoute\('finance\/categories', expenseCategoriesView\);/);
+    assert.doesNotMatch(nav, /href="\/#\/finance"/);
   });
 });
