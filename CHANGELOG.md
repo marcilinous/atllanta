@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.15.1 — 2026-10-07
+
+### What changed
+- **Expense claims are private.** A claim (and its receipt) is now seen only by the person who made it, owners and admins, their managers, and their department's manager — the same people who see their leave. Before, every colleague could read every claim.
+- **Managers can approve and reject claims.** Their Approve and Reject buttons used to say "Expense approved" while nothing changed; now they work for the people they manage. Nobody can approve their own claim, and an owner's or admin's claim needs another owner or admin.
+- **Only owners and admins mark a claim reimbursed**, and only once it's approved.
+- **A claim can't be changed after it's submitted**, and can be withdrawn only while it's still pending. Approved and reimbursed claims (and their receipts) stay on record.
+
+### Admins need to
+- Nothing.
+
 ## v1.15.0 — 2026-10-06
 
 ### What changed

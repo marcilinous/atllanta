@@ -8,6 +8,7 @@ export default async function financeView(container) {
   const org = getOrg();
   const membership = getMembership();
   const isManager = membership && ['owner', 'admin', 'manager'].includes(membership.role);
+  const isAdmin = membership && ['owner', 'admin'].includes(membership.role);
   let activeTab = 'my';
 
   container.innerHTML = `
@@ -128,7 +129,7 @@ export default async function financeView(container) {
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                   ` : ''}
-                  ${e.status === 'approved' && isManager ? `
+                  ${e.status === 'approved' && isAdmin ? `
                     <button class="btn btn-ghost btn-sm btn-reimburse" data-id="${e.id}" title="Mark Reimbursed" style="color:var(--color-accent)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </button>
@@ -148,10 +149,11 @@ export default async function financeView(container) {
 
     listEl.querySelectorAll('.btn-approve').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const { error } = await sb.from('expenses').update({
+        const { data, error } = await sb.from('expenses').update({
           status: 'approved', reviewed_by: user.id, reviewed_at: new Date().toISOString()
-        }).eq('id', btn.dataset.id);
+        }).eq('id', btn.dataset.id).select('id');
         if (error) { toast(error.message); return; }
+        if (!data?.length) { toast('You cannot change this expense claim'); return; }
         publishEvent('finance.expense.approved', { expense_id: btn.dataset.id, org_id: org.id, user_id: btn.dataset.uid, amount: btn.dataset.amt });
         toast('Expense approved');
         loadExpenses();
@@ -161,10 +163,11 @@ export default async function financeView(container) {
 
     listEl.querySelectorAll('.btn-reject').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const { error } = await sb.from('expenses').update({
+        const { data, error } = await sb.from('expenses').update({
           status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString()
-        }).eq('id', btn.dataset.id);
+        }).eq('id', btn.dataset.id).select('id');
         if (error) { toast(error.message); return; }
+        if (!data?.length) { toast('You cannot change this expense claim'); return; }
         toast('Expense rejected');
         loadExpenses();
         loadStats();
@@ -173,10 +176,11 @@ export default async function financeView(container) {
 
     listEl.querySelectorAll('.btn-reimburse').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const { error } = await sb.from('expenses').update({
+        const { data, error } = await sb.from('expenses').update({
           status: 'reimbursed', reimbursed_at: new Date().toISOString()
-        }).eq('id', btn.dataset.id);
+        }).eq('id', btn.dataset.id).select('id');
         if (error) { toast(error.message); return; }
+        if (!data?.length) { toast('You cannot change this expense claim'); return; }
         toast('Marked as reimbursed');
         loadExpenses();
         loadStats();
