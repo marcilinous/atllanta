@@ -1,6 +1,6 @@
-const CACHE_NAME = "atllanta-1.14.1";
+const CACHE_NAME = "atllanta-1.15.0";
 // App Router routes (app/), and /media (video: the cache cannot serve range requests): never cached by this worker.
-const NETWORK_ONLY_PREFIXES = ["/settings", "/session", "/auth", "/health", "/hrms", "/start", "/paused", "/platform", "/media"];
+const NETWORK_ONLY_PREFIXES = ["/settings", "/session", "/auth", "/health", "/hrms", "/start", "/paused", "/platform", "/feedback", "/media"];
 const STATIC_ASSETS = [
   "/index.html",
   "/login.html",

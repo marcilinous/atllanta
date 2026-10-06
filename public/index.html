@@ -112,6 +112,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             <span id="theme-label">Dark Mode</span>
           </button>
+          <button class="user-menu-item" id="feedback-menu-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Send feedback
+          </button>
           <div class="user-menu-divider"></div>
           <button class="user-menu-item danger" id="logout-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -281,6 +285,10 @@ document.addEventListener('click', (e) => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', logout);
+// v1.15.0: private feedback to the Atllanta team (new-stack page).
+document.getElementById('feedback-menu-btn').addEventListener('click', () => {
+  window.location.assign('/feedback?from=' + encodeURIComponent('/' + (location.hash || '')));
+});
 
 // Role-based nav visibility
 const userRole = membership?.role || 'member';

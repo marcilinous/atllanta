@@ -61,8 +61,11 @@ export default async function PausedPage() {
         ) : (
           <p className="text-sm">Your company&rsquo;s access to Atllanta is paused. Please ask your admin.</p>
         )}
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <SignOutButton />
+          <a href="/feedback?from=/paused" className="text-sm text-primary hover:underline">
+            {canContact ? "Tell us why — send feedback" : "Send feedback"}
+          </a>
         </div>
       </div>
     </main>
