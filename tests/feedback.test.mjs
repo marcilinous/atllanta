@@ -144,3 +144,26 @@ describe('static: actions', () => {
     assert.doesNotMatch(s, /service_?role/i);
   });
 });
+
+describe('static: platform feedback screen', () => {
+  test('the platform layout checks the admin once and shows Companies / Feedback tabs with the unread count', () => {
+    const l = read('app', '(platform)', 'platform', 'layout.tsx');
+    assert.match(l, /if \(!user\) redirect\("\/login"\);/);
+    assert.match(l, /if \(!\(await isPlatformAdmin\(user\.id\)\)\) notFound\(\);/);
+    assert.match(l, /select count\(\*\)::int as n from public\.platform_feedback_list\(true\)/);
+    assert.match(l, /<PlatformNav unread=\{unread\} \/>/);
+    const n = read('app', '(platform)', 'platform', 'platform-nav.tsx');
+    assert.match(n, /href: "\/platform"/);
+    assert.match(n, /href: "\/platform\/feedback"/);
+  });
+
+  test('the feedback page reads through platform_feedback_list with filters from the query string', () => {
+    const p = read('app', '(platform)', 'platform', 'feedback', 'page.tsx');
+    assert.match(p, /select \* from public\.platform_feedback_list\(\$\{onlyUnread\}, \$\{kind\}\)/);
+    assert.match(p, /const kind = FEEDBACK_KINDS\.some\(\(k\) => k\.key === sp\.kind\) \? \(sp\.kind \?\? null\) : null;/);
+    const c = read('app', '(platform)', 'platform', 'feedback', 'feedback-list.tsx');
+    assert.match(c, /^"use client";/);
+    assert.match(c, /markFeedbackRead\(\{ id: f\.id, read: !f\.readAt \}\)/);
+    assert.match(c, /whitespace-pre-wrap/);
+  });
+});
