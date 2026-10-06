@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.15.0 — 2026-10-06
+
+### What changed
+- **Send feedback** from the account menu (or from the "trial ended" page): pick Idea, Problem or Praise, rate us if you like, and tell us more. It goes privately to the Atllanta team — nobody in your company sees it.
+- For the Atllanta platform owner: a **Feedback** tab on the platform screen, and a bell notification for each new entry.
+
+### Admins need to
+- Nothing.
+
 ## v1.14.1 — 2026-10-05
 
 ### What changed

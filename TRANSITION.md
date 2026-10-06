@@ -33,6 +33,11 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-06:** **v1.14.1 is live** (#143, launch film). **v1.15.0
+  (private feedback, piece 3) is built** on `claude/feedback`: its migration
+  `…_platform_feedback.sql` passed a rolled-back production probe and is
+  applied only on the owner's yes; once live this completes the owner's
+  four-piece sequence (sign-up, trial, feedback, home page).
 - **Update 2026-10-05 (late):** **v1.14.0 is live** (#142 → `77a3992`,
   tagged); the home page and sign-up are confirmed working by the owner.
   **v1.14.1 is built** on `claude/home-video`:
@@ -1042,6 +1047,23 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-10-06 — Private feedback (v1.15.0)
+
+**Owner's answers:** feedback types are Idea, Problem and Praise, with optional
+1–5 star rating; users submit from the account menu or from `/paused`; only
+the Atllanta platform owner can read feedback; nothing is public.
+
+**How it works:** `platform_feedback` is a private table with row-level RLS
+and no grants; sender is stamped from the `users` row (not `auth_org_id`), so
+blocked companies can still send. Rate limit: 10 entries per user per rolling
+24 hours. Messages are trimmed of all whitespace before counting characters
+(1–2,000); pages are kept only if they start with `/` and not `//`, blocking
+off-site links and the back-link attack vector. Each new entry triggers one
+bell notification (title "New feedback: {kind}", body "{company}: {first 120
+chars of message}", channel `in_app`, org `platform_admin`'s own org). **Probe**
+(production, rolled back): user can't send > 10/24h, malformed pages/messages
+refused, expired member can send, admin list/filter/mark-read work, anon denied.
 
 ### 2026-10-05 — Trial enforcement (v1.13.0)
 
