@@ -275,7 +275,11 @@ export const expenses = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  () => [check("expenses_status_check", inList("status", EXPENSE_STATUSES))]
+  (t) => [
+    check("expenses_status_check", inList("status", EXPENSE_STATUSES)),
+    // v1.15.1 (expenses integrity).
+    check("expenses_amount_positive", sql`${t.amount} > 0`),
+  ]
 );
 
 // --- Announcements & noticeboard ---------------------------------------------

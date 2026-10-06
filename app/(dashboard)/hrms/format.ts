@@ -19,6 +19,15 @@ export function formatTime(value: string | null, timeZone: string): string {
   return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone });
 }
 
+// Money in the org's currency ("INR 450.50" if the code is unknown to Intl).
+export function formatMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
 export function formatRange(start: string, end: string): string {
   return start === end ? formatDay(start) : `${formatDay(start)} – ${formatDay(end)}`;
 }

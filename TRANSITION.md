@@ -33,6 +33,18 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-07 (later):** **v1.15.1 is live** (#145, tagged). The
+  owner approved the expenses design, preview first. **v1.16.0 (expenses
+  preview) is built** on `claude/phase-4-expenses`. The legacy `#/finance`
+  route is untouched.
+  - **The screens:**
+    - `/hrms/expenses`: totals, New claim with a receipt, My claims with
+      Withdraw and View receipt;
+    - `/hrms/expenses/approvals`: decide; To reimburse for owners/admins.
+  - **The rules:** both gates for Finance on every action, with all writes
+    under the v1.15.1 rules.
+  - Next: the owner checks it in the browser, then an expenses cutover like
+    attendance's.
 - **Update 2026-10-07:** **v1.15.0 is live** (#144, tagged). The owner's
   four-piece sequence is complete. "Generic CRM Test Co" was paused on the
   owner's word. It is an internal test company, most likely created on
@@ -912,6 +924,50 @@ running on the new stack; old vanilla-JS HRMS views retired.
     claim reimbursed (owner, option a).
   - The new-stack expenses screens follow, on the same two-gate Server Action
     pattern with module key `finance`.
+- 2026-10-07 — **Expenses on the new stack, built (v1.16.0,
+  `claude/phase-4-expenses`; a preview, not yet the default).** The owner
+  approved the design ("preview first").
+  - **The screens:**
+    - `/hrms/expenses`: Pending/Approved/Reimbursed totals; New claim (title,
+      amount, date no later than the org's today, category, note, optional
+      receipt); My claims with a two-step Withdraw and View receipt;
+    - `/hrms/expenses/approvals`: Waiting for your decision (approve, or reject
+      with a comment); To reimburse for owners/admins;
+    - tabs: Report (`#/reports/expenses`) and Categories
+      (`#/finance/categories`) stay legacy.
+  - **`src/lib/hrms/expenses/`** holds `schemas.ts`, `queries.ts` and
+    `actions.ts`. Every action calls `requireFeature("finance", "finance", …)`:
+    `create` to submit, `edit` to withdraw, `approve` to decide or reimburse,
+    and `view` for a receipt link.
+  - **What comes from the server, never from input:** the org, the person,
+    the currency (`organizations.currency`) and the reviewer.
+  - **Writes and their checks:** writes run as the caller, so the v1.15.1 RLS
+    and `expenses_guard()` decide.
+    - The actions also refuse self-review, and a non-owner/admin reimbursing,
+      before asking the database.
+    - A guard refusal (`42501`) gets a plain message.
+    - A category must be one of the company's active ones.
+  - **The approvals list** never offers a claim the guard would refuse: never
+    your own, and an owner's/admin's only to an owner/admin.
+  - **Receipts:**
+    - up to 4 MB, PDF or image;
+    - uploaded as the caller to `expenses/{org}/{self}/`;
+    - removed if the claim then fails, or when it is withdrawn;
+    - opened through a 60-second signed URL created as the caller, so both
+      the row RLS and the storage policy apply.
+  - **Events and audit:**
+    - events keep the legacy shapes (`finance.expense.created` /
+      `finance.expense.approved`);
+    - each change writes an audit row with module `finance`.
+  - **Schema:** `hrms.ts` now declares the v1.15.1 `expenses_amount_positive`
+    check.
+  - **Who wrote what:** the Groq worker drafted the client components (form,
+    my claims, review list, receipt button, `formatMoney`), and I reviewed
+    them. Fixes: an unescaped apostrophe, unique field ids, and a truncated
+    output finished by hand.
+  - **Checks:** unit tests, typecheck, lint and build.
+
+  Not yet: the cutover of `#/finance`, and the legacy report and categories.
 
 ---
 
