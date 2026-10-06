@@ -40,8 +40,9 @@
   - Back to Phase 4 item 3, with **expenses** as the next area.
   - Its rules were checked first and had holes, so **v1.15.1 (expenses
     integrity) is built** on `claude/expenses-integrity`. Its migration passed a
-    26-scenario rolled-back production probe and is **not yet applied**; it
-    waits for the owner's yes (Decisions & Blockers, 2026-10-07).
+    26-scenario rolled-back production probe and was **applied** on the
+    owner's yes (2026-10-07, recorded `20261006191041`), then rechecked live
+    and rolled back (Decisions & Blockers, 2026-10-07).
   - Next: the new-stack expenses screens.
 - **Update 2026-10-06:** **v1.14.1 is live** (#143, launch film). **v1.15.0
   (private feedback, piece 3) is built** on `claude/feedback`: its migration
@@ -1127,8 +1128,16 @@ Legacy `finance/index.js`:
 **Verified:** 26 scenarios ran on production with the migration applied inside
 an always-rolled-back transaction, all as intended (RTcompu member, their
 manager, an unrelated colleague, the admin, the owner, and another company's
-admin). Production was unchanged afterwards. **Not yet applied:** waiting for
-the owner's yes.
+admin). Production was unchanged afterwards. **Applied 2026-10-07** on the owner's yes
+(recorded `20261006191041`; file renamed to match). Checked live: the four
+`exp_*` policies, `trg_expenses_guard`, `expenses_amount_positive`, and both
+receipt policies for `authenticated`. It was replayed as real RTcompu people
+(rolled back):
+- a member submits; self-approval is refused; a colleague sees nothing;
+- the manager approves, with the reviewer stamped; the manager's reimburse is
+  refused;
+- the member's edit after approval and delete are refused; the admin
+  reimburses.
 
 Note: RTcompu has no departments set, so every RTcompu manager is "a manager
 over the department" for everyone and can approve any member's claim. This is
