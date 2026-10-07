@@ -39,9 +39,10 @@
   - Its rules were checked first and had holes. **v1.16.2 (assets
     integrity) is built** on `claude/assets-integrity`.
   - Its migration `…_assets_integrity.sql` passed a 28-scenario rolled-back
-    production probe and is **not yet applied**; it waits for the owner's yes.
+    production probe. It was **applied** on the owner's yes (2026-10-07,
+    recorded `20261007093843`), then rechecked live and rolled back.
   - Details are under Decisions & Blockers, 2026-10-07 (assets integrity).
-  - Next: apply it, then the new-stack assets screens (v1.17.0, preview).
+  - Next: the new-stack assets screens (v1.17.0, preview).
 - **Update 2026-10-07 (night):** **v1.16.0 is live** (#146, tagged). **v1.16.1
   (expenses cutover) is built** on `claude/expenses-cutover`, on the owner's
   call ("switch expenses over").
@@ -1232,6 +1233,15 @@ transaction, 28 scenarios, all as intended. Covered:
 - allowed: assigning to someone on notice; deleting an asset takes its
   history with it; server code is unaffected.
 - Production was unchanged afterwards.
+
+**Applied** on the owner's yes (2026-10-07, recorded `20261007093843`; file
+renamed to match). The first `apply_migration` call returned "Invalid or
+expired requestState" and recorded nothing; the retry applied it. **Live
+recheck** (rolled back):
+- the eight new policies are in place;
+- an admin adds and assigns an asset;
+- the holder sees 1, a manager 0, another company 0;
+- deleting while held is refused; after the return, the delete works.
 
 ### 2026-10-07 — Expenses integrity (security, legacy v1.15.1)
 
