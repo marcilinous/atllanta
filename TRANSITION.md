@@ -33,6 +33,15 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-07 (afternoon):** **v1.16.1 is live** (#147, tagged), so
+  expenses is done on the new stack. **Assets is the next area** (owner,
+  "assets first"; directory and announcements follow).
+  - Its rules were checked first and had holes. **v1.16.2 (assets
+    integrity) is built** on `claude/assets-integrity`.
+  - Its migration `…_assets_integrity.sql` passed a 28-scenario rolled-back
+    production probe and is **not yet applied**; it waits for the owner's yes.
+  - Details are under Decisions & Blockers, 2026-10-07 (assets integrity).
+  - Next: apply it, then the new-stack assets screens (v1.17.0, preview).
 - **Update 2026-10-07 (night):** **v1.16.0 is live** (#146, tagged). **v1.16.1
   (expenses cutover) is built** on `claude/expenses-cutover`, on the owner's
   call ("switch expenses over").
@@ -992,6 +1001,20 @@ running on the new stack; old vanilla-JS HRMS views retired.
   - Other places that act on expenses keep working under the v1.15.1 rules:
     the bell notifications (module `finance`) and the report.
   - Rollback: redeploy v1.16.0.
+- 2026-10-07 — **v1.16.1 shipped** (#147, tagged). **Expenses is done.**
+  **Assets is next** (owner: "assets first").
+  - Its rules were checked first and had holes. **v1.16.2 (assets
+    integrity)** fixes them; see Decisions & Blockers, 2026-10-07 (assets
+    integrity).
+  - **Owner decisions:**
+    - (a) owners and admins see every asset; everyone else sees only what
+      they hold;
+    - (b) the new screens add a read-only "My assets" for everyone.
+  - **The plan:**
+    - v1.17.0: `/hrms/assets` as a preview, on the two-gate pattern with
+      module key `people`, plus an owner/admin check for changes; assign and
+      return each run in one transaction;
+    - v1.17.1: the `#/assets` cutover.
 
 ---
 
@@ -1147,6 +1170,68 @@ _(none yet)_
 
 _(Log anything that changes scope, gets deferred, or needs the owner's call
 — date-stamped, most recent first.)_
+
+### 2026-10-07 — Assets integrity (security, legacy v1.16.2)
+
+Found when starting the assets port (Phase 4 item 3's next area), with the
+same "check its rules first" step as leave, attendance and expenses.
+Production had 0 assets and 0 assignment records. People is switched on for
+RTcompu and njk. Writes were already owners/admins only, through
+`auth_org_id()`, so a paused or expired company is refused. On the live rules:
+- **Every member could read the whole register:** costs, serial numbers,
+  notes, who holds what, and the full history. Only the legacy screen hid it,
+  by being admin-only.
+- **Nothing kept status, holder and history in step.** An asset could be:
+  - "assigned" with no holder, or held while "available";
+  - held by someone from another company;
+  - carrying several open records.
+- **The history itself was unprotected.** It could be rewritten or deleted,
+  and the legacy screen ignored a failed history write.
+
+**Owner decision (a):** owners and admins see everything; everyone else sees
+only what is assigned to them, plus their own history. A manager does not see
+their team's assets.
+
+**The fix** is migration `…_assets_integrity.sql`:
+- **Policies:** `assets_select` and `asset_assignments_select` per (a). Insert,
+  update and delete on both tables are owners/admins of the company, with
+  `org_id = auth_org_id()`.
+- **Checks:**
+  - `assets_holder_consistent`: status is `assigned` exactly when there is a
+    holder, and `assigned_at` is set exactly when there is a holder;
+  - `assets_purchase_cost_nonnegative`;
+  - unique `asset_assignments_one_open`: at most one open record per asset.
+- **`assets_guard()`:**
+  - an asset is added unassigned, and `created_by` is stamped;
+  - its company and creator never change;
+  - it is assigned only from unassigned (return first), and only to a member
+    of the same company who has not exited (active or on notice);
+  - it is never deleted while held.
+- **`asset_assignments_guard()`:**
+  - a record is added only for the asset's current holder; `assigned_by` and
+    `assigned_at` are stamped by the database;
+  - afterwards the only write is closing it, once the asset has been returned
+    (`returned_at` stamped);
+  - a record is deleted only by the cascade from deleting its asset.
+- Server code (no user) is exempt, as everywhere.
+
+**The legacy screen keeps working unchanged.** Its two-step assign (asset,
+then record) and two-step return (asset, then close) match the guard's order.
+
+**Probe:** the migration was applied on production inside an always-rolled-back
+transaction, 28 scenarios, all as intended. Covered:
+- the legacy add, edit, assign, return and delete flows, with the stamps
+  overriding spoofed values;
+- visibility: the holder 1/1, another member 0/0, a manager 0, an admin all;
+- refused: members and managers writing; adding pre-assigned; a second open
+  record; a record for a non-holder; reassigning without returning; a holder
+  with an "available" status; deleting while held; closing while held;
+  reopening, editing or deleting history; assigning to an exited person or
+  another company's; another company reading, editing or planting; moving
+  company; a negative cost;
+- allowed: assigning to someone on notice; deleting an asset takes its
+  history with it; server code is unaffected.
+- Production was unchanged afterwards.
 
 ### 2026-10-07 — Expenses integrity (security, legacy v1.15.1)
 

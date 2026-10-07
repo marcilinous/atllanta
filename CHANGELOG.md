@@ -5,6 +5,17 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.16.2 — 2026-10-07
+
+### What changed
+- **The asset register is private to owners and admins.** Everyone else sees only the assets assigned to them, and their own assignment history. Before, every colleague could read every asset's cost, serial number, notes and holder.
+- **Assignments always add up.** An asset is "assigned" exactly when someone holds it, and has at most one open assignment record. It can be given only to a current member of your company, never to someone who has left or works elsewhere. To hand it to someone else, return it first.
+- **Assignment history is kept as it happened.** The history records who assigned the asset and when. Once a record is written, the only later change allowed is marking the asset returned. Deleting an asset still removes its history with it, and an asset can't be deleted while someone holds it.
+- A purchase cost can't be negative.
+
+### Admins need to
+- Nothing.
+
 ## v1.16.1 — 2026-10-07
 
 ### What changed
