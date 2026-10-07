@@ -109,6 +109,7 @@ test('status lists equal the live CHECK constraints', () => {
   assert.deepEqual([...hrms.ATTENDANCE_STATUSES], ['present', 'absent', 'half_day', 'late', 'on_leave', 'holiday', 'weekly_off']);
   const checks = configs.flatMap((cfg) => cfg.checks.map((c) => c.name)).sort();
   assert.deepEqual(checks, [
+    'assets_holder_consistent', 'assets_purchase_cost_nonnegative',
     'assets_status_check', 'assets_type_check', 'attendance_regularizations_status_check',
     'attendance_status_check', 'expenses_amount_positive', 'expenses_status_check', 'leave_requests_status_check',
     'posts_type_check',
