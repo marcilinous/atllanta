@@ -5,6 +5,20 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.17.0 — 2026-10-07
+
+### What changed
+- **New Assets screens (preview)** at `/hrms/assets`.
+- **My assets**, for everyone: the company equipment assigned to you, since when, and whether its warranty is still in force.
+- **Register**, for owners and admins: totals, search by name, serial or person, and type and status filters.
+  - Add an asset.
+  - Open any asset to edit it, assign it to a colleague (with a note), mark it returned, or delete it once it's back.
+  - Each asset shows its full assignment history: who held it, who handed it over, and when.
+- The old Assets screen still works as before. It will forward to the new screens after the owner's check.
+
+### Admins need to
+- Nothing.
+
 ## v1.16.2 — 2026-10-07
 
 ### What changed

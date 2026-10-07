@@ -33,6 +33,16 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-07 (evening):** **v1.16.2 is live** (#148, tagged). **v1.17.0
+  (assets preview) is built** on `claude/phase-4-assets`. The legacy `#/assets`
+  route is untouched.
+  - **The screens:**
+    - `/hrms/assets`: My assets, for everyone;
+    - `/hrms/assets/register`: the register (owners/admins), with a page per
+      asset for edit, assign, return, delete and history.
+  - **The rules:** both gates on every action, with all writes under the
+    v1.16.2 rules.
+  - Next: the owner checks it in the browser, then the `#/assets` cutover.
 - **Update 2026-10-07 (afternoon):** **v1.16.1 is live** (#147, tagged), so
   expenses is done on the new stack. **Assets is the next area** (owner,
   "assets first"; directory and announcements follow).
@@ -1016,6 +1026,60 @@ running on the new stack; old vanilla-JS HRMS views retired.
       module key `people`, plus an owner/admin check for changes; assign and
       return each run in one transaction;
     - v1.17.1: the `#/assets` cutover.
+- 2026-10-07 — **v1.16.2 shipped** (#148, tagged). **Assets on the new stack,
+  built (v1.17.0, `claude/phase-4-assets`; a preview, not yet the default).**
+  - **The screens:**
+    - `/hrms/assets` (**My assets**): what the caller holds now, since when,
+      and its warranty;
+    - `/hrms/assets/register`: totals, search (name, serial, holder) and
+      type/status filters in the URL, the list, and Add an asset;
+    - `/hrms/assets/register/[assetId]`: details, assign (person and note),
+      mark returned, a two-step delete (only while not held), edit details,
+      and the history.
+  - **`src/lib/hrms/assets/`** holds `schemas.ts`, `queries.ts` and
+    `actions.ts`.
+    - Every action calls `requireFeature("people", "people", …)`: `create` to
+      add, `edit` to edit, assign or return, and `delete` to delete. Then
+      owners/admins only, because the legacy nav files `#/assets` under
+      People and only they may write.
+    - **Ruling:** My assets is gated by `featureContext("me", "me", "view")`,
+      not People. Seeing what you hold is self-service, like your own leave,
+      so a member whose People screen is hidden still sees it. The
+      v1.16.2 RLS limits them to their own assets. If wrong, it costs a one-line
+      gate change.
+    - **Ruling:** My assets shows current assets only, no history. Once an
+      asset is returned, RLS hides it from the former holder, so their
+      history would have no asset names.
+  - **What comes from the server, never from input:** the org. The creator,
+    the assigner and the times are stamped by the v1.16.2 guards. No edit can
+    set a holder; assigning is its own action.
+  - **Writes and their checks:**
+    - assign and return each update the asset and its history in **one
+      transaction**, in the order the guards expect;
+    - an edit changes the status only while the asset is not held;
+    - a guard refusal passes the guard's own plain message through;
+    - an open-record clash (23505) and a check failure (23514) get plain
+      messages.
+  - **The people to assign** exclude anyone who has exited, the guard's rule.
+  - **Dates** are shown as the org's local day.
+  - **Events and audit:**
+    - events keep the legacy names and payloads (`people.asset.created`, now
+      with `asset_id`; `people.asset.assigned`; `people.asset.returned`);
+      nothing consumes them today;
+    - each change writes an audit row with module `people`.
+  - **Schema:** `hrms.ts` now declares `assets_holder_consistent`,
+    `assets_purchase_cost_nonnegative` and the partial unique index
+    `asset_assignments_one_open`. The snapshot test is updated.
+    `schemas.ts` keeps its own copy of the type and status lists, because
+    node's test runner can't import `hrms.ts`, and a test holds the two equal.
+  - **Who wrote what:** the Groq worker drafted the two client components
+    (`asset-form.tsx`, `asset-actions.tsx`), and I reviewed them. Fixes: a
+    truncated output finished by hand; one payload object passed to two
+    differently typed actions; a missing status for held assets; an unlabelled
+    person picker.
+  - **Checks:** unit tests, typecheck, lint and build.
+
+  Not yet: the `#/assets` cutover.
 
 ---
 

@@ -34,6 +34,7 @@ import {
   date,
   time,
   unique,
+  uniqueIndex,
   check,
 } from "drizzle-orm/pg-core";
 // `.ts` extension: tests/hrms-schema.test.mjs imports this file directly
@@ -220,22 +221,33 @@ export const assets = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  () => [
+  (t) => [
     check("assets_status_check", inList("status", ASSET_STATUSES)),
     check("assets_type_check", inList("type", ASSET_TYPES)),
+    // v1.16.2 (assets integrity).
+    check(
+      "assets_holder_consistent",
+      sql`(${t.status} = 'assigned') = (${t.assignedTo} is not null) and (${t.assignedTo} is null) = (${t.assignedAt} is null)`
+    ),
+    check("assets_purchase_cost_nonnegative", sql`${t.purchaseCost} is null or ${t.purchaseCost} >= 0`),
   ]
 );
 
-export const assetAssignments = pgTable("asset_assignments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull().references(() => organizations.id),
-  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
-  returnedAt: timestamp("returned_at", { withTimezone: true }),
-  assignedBy: uuid("assigned_by").references(() => users.id),
-  notes: text("notes"),
-});
+export const assetAssignments = pgTable(
+  "asset_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id),
+    assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    returnedAt: timestamp("returned_at", { withTimezone: true }),
+    assignedBy: uuid("assigned_by").references(() => users.id),
+    notes: text("notes"),
+  },
+  // v1.16.2 (assets integrity): at most one open record per asset.
+  (t) => [uniqueIndex("asset_assignments_one_open").on(t.assetId).where(sql`${t.returnedAt} is null`)]
+);
 
 // --- Expenses ----------------------------------------------------------------
 
