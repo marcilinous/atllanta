@@ -5,6 +5,15 @@ MINOR adds or changes a feature, PATCH only fixes, MAJOR breaks data, tenancy or
 behaviour users would notice. Each version is tagged `vX.Y.Z` on the commit that
 was promoted to production.
 
+## v1.16.1 — 2026-10-07
+
+### What changed
+- **Finance now opens the new Expenses screens.** The Finance button, and any link to it, takes you to the claims, approvals and reimbursing screens introduced in v1.16.0.
+- The expense report and the expense categories are unchanged. Reach them from the **Report** and **Categories** tabs.
+
+### Admins need to
+- Nothing.
+
 ## v1.16.0 — 2026-10-07
 
 ### What changed

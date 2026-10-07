@@ -33,6 +33,18 @@
   to Phases 4 and 9 (see Phase 3 notes).
 - **Active phase:** Phase 4 (HRMS Migration) — Phases 1–3 complete
 - **Stack target:** see `CLAUDE.md`
+- **Update 2026-10-07 (night):** **v1.16.0 is live** (#146, tagged). **v1.16.1
+  (expenses cutover) is built** on `claude/expenses-cutover`, on the owner's
+  call ("switch expenses over").
+  - `#/finance` now forwards to `/hrms/expenses`; the Finance nav button goes
+    through it.
+  - The expense report (`#/reports/expenses`) and categories
+    (`#/finance/categories`) stay legacy. They are linked from the new tabs,
+    and neither links back into the redirect.
+  - `views/finance/index.js` is no longer loaded but stays in the repo until
+    Phase 4 item 4.
+  - Rollback: redeploy v1.16.0.
+  - Next in Phase 4 item 3: the next HRMS area.
 - **Update 2026-10-07 (later):** **v1.15.1 is live** (#145, tagged). The
   owner approved the expenses design, preview first. **v1.16.0 (expenses
   preview) is built** on `claude/phase-4-expenses`. The legacy `#/finance`
@@ -968,6 +980,18 @@ running on the new stack; old vanilla-JS HRMS views retired.
   - **Checks:** unit tests, typecheck, lint and build.
 
   Not yet: the cutover of `#/finance`, and the legacy report and categories.
+- 2026-10-07 — **v1.16.0 shipped** (#146, tagged). **Expenses cutover built
+  (v1.16.1, `claude/expenses-cutover`), the owner's call ("switch expenses
+  over").**
+  - The legacy `#/finance` route forwards to `/hrms/expenses`
+    (`toNewStack`, `window.location.replace`, so Back does not loop).
+  - The report and categories stay legacy and are linked from the new tabs;
+    neither links back into the redirect.
+  - `views/finance/index.js` is no longer imported. It stays in the repo
+    until item 4, and its v1.15.1 fixes still apply if it is ever loaded.
+  - Other places that act on expenses keep working under the v1.15.1 rules:
+    the bell notifications (module `finance`) and the report.
+  - Rollback: redeploy v1.16.0.
 
 ---
 
